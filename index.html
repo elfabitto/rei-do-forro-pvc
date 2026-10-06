@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rei do Forro — Gerador de Orçamentos</title>
+<meta name="description" content="Gerador de orçamentos de forro de PVC — Rei do Forro">
+<style>
+  :root{
+    --bg:#eef0f3;
+    --card:#ffffff;
+    --ink:#15161a;
+    --ink-2:#464a52;
+    --muted:#7c828d;
+    --line:#dfe3e8;
+    --line-2:#eceef1;
+    --orange:#ee6a1e;
+    --orange-dk:#cf5513;
+    --orange-bg:#fdf1e8;
+    --shadow:0 1px 2px rgba(20,22,26,.06), 0 8px 24px -12px rgba(20,22,26,.18);
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0;background:var(--bg);color:var(--ink);
+    font-family:"Segoe UI",-apple-system,BlinkMacSystemFont,Roboto,Helvetica,Arial,sans-serif;
+    font-size:15px;line-height:1.5;
+  }
+  .wrap{max-width:1120px;margin:0 auto;padding:0 20px}
+
+  /* ---------- Topo ---------- */
+  .topbar{background:var(--card);border-bottom:3px solid var(--orange);box-shadow:var(--shadow)}
+  .topbar .wrap{display:flex;align-items:center;gap:14px;height:76px}
+  .topbar img{height:52px;width:auto;display:block}
+  .brand{line-height:1.15}
+  .brand .n{font-weight:800;font-size:17px;letter-spacing:.4px}
+  .brand .n i{font-style:normal;color:var(--orange)}
+  .brand .s{font-size:11.5px;color:var(--muted);letter-spacing:1.4px;text-transform:uppercase}
+  .topbar .right{margin-left:auto;font-size:12px;color:var(--muted);letter-spacing:.6px;text-transform:uppercase}
+  @media (max-width:560px){.topbar .right{display:none}}
+
+  h1{font-size:21px;margin:32px 0 2px;letter-spacing:-.3px}
+  .sub{color:var(--muted);font-size:14px;margin:0 0 22px}
+
+  /* ---------- Grid ---------- */
+  .grid{display:grid;grid-template-columns:minmax(0,380px) minmax(0,1fr);gap:22px;align-items:start;padding-bottom:56px}
+  @media (max-width:880px){.grid{grid-template-columns:1fr}}
+
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow)}
+  .panel > header{
+    padding:14px 20px;border-bottom:1px solid var(--line);
+    font-size:11.5px;font-weight:800;letter-spacing:1.4px;text-transform:uppercase;color:var(--ink-2);
+  }
+  .panel > .body{padding:20px}
+
+  label.f{display:block;margin-bottom:18px}
+  label.f > span,.lbl{
+    display:block;font-size:11.5px;font-weight:700;letter-spacing:.9px;
+    text-transform:uppercase;color:var(--muted);margin-bottom:7px;
+  }
+  input[type=text],select{
+    width:100%;padding:11px 12px;font:inherit;font-size:15px;color:var(--ink);
+    background:#fff;border:1px solid var(--line);border-radius:6px;outline:none;
+    transition:border-color .12s, box-shadow .12s;
+  }
+  input[type=text]:focus,select:focus{border-color:var(--orange);box-shadow:0 0 0 3px rgba(238,106,30,.14)}
+  select{
+    appearance:none;cursor:pointer;padding-right:36px;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='11' height='7'><path d='M1 1l4.5 4.5L10 1' stroke='%2315161a' stroke-width='1.8' fill='none' stroke-linecap='round'/></svg>");
+    background-repeat:no-repeat;background-position:right 13px center;
+  }
+
+  .seg{display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;margin-bottom:18px}
+  .seg button{
+    flex:1;padding:10px 6px;border:0;border-right:1px solid var(--line);cursor:pointer;
+    background:#f7f8f9;color:var(--ink-2);font:600 13px inherit;transition:background .12s,color .12s;
+  }
+  .seg button:last-child{border-right:0}
+  .seg button.on{background:var(--ink);color:#fff;font-weight:700}
+
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .calc{
+    display:flex;justify-content:space-between;align-items:baseline;
+    background:#f7f8f9;border:1px solid var(--line);border-radius:6px;
+    padding:9px 12px;margin:-6px 0 18px;font-size:13px;color:var(--muted);
+  }
+  .calc b{font-size:16px;color:var(--ink);font-variant-numeric:tabular-nums}
+
+  .ref{
+    display:flex;align-items:center;gap:11px;padding:11px 12px;margin-bottom:20px;
+    background:#f7f8f9;border:1px solid var(--line);border-radius:6px;
+  }
+  .ref .sw{width:36px;height:36px;border-radius:4px;border:1px solid var(--line);flex:0 0 auto}
+  .ref .tx{font-size:11.5px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase}
+  .ref .tx b{display:block;font-size:14px;color:var(--ink);letter-spacing:0;text-transform:none;
+             font-variant-numeric:tabular-nums;margin-top:1px}
+
+  .opts{display:grid;gap:7px}
+  .opt{
+    display:flex;align-items:center;gap:10px;cursor:pointer;
+    border:1px solid var(--line);border-radius:6px;padding:11px 12px;transition:border-color .12s,background .12s;
+  }
+  .opt:hover{border-color:#c9ced6}
+  .opt:has(input:checked){border-color:var(--orange);background:var(--orange-bg)}
+  .opt input{accent-color:var(--orange);width:16px;height:16px;cursor:pointer;flex:0 0 auto;margin:0}
+  .opt .t{font-size:14.5px;font-weight:600}
+  .opt .v{margin-left:auto;font-size:12.5px;font-weight:700;color:var(--orange-dk);font-variant-numeric:tabular-nums}
+  .opt .v.z{color:var(--muted);font-weight:600}
+
+  /* ---------- Documento ---------- */
+  .docs{display:grid;gap:22px}
+  .doc{background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow);overflow:hidden}
+  .doc-top{display:flex;align-items:center;gap:12px;padding:16px 22px;border-bottom:1px solid var(--line-2)}
+  .doc-top img{height:44px;width:auto}
+  .doc-top .n{font-weight:800;font-size:15px;letter-spacing:.3px;line-height:1.2}
+  .doc-top .n i{font-style:normal;color:var(--orange)}
+  .doc-top .n s{display:block;text-decoration:none;font-weight:600;font-size:10.5px;
+                color:var(--muted);letter-spacing:1.3px;text-transform:uppercase;margin-top:2px}
+  .doc-top .mod{
+    margin-left:auto;text-align:right;font-size:11px;letter-spacing:1.2px;
+    text-transform:uppercase;color:var(--muted);font-weight:700;
+  }
+  .doc-bar{
+    display:flex;align-items:center;justify-content:space-between;gap:12px;
+    background:var(--ink);color:#fff;padding:11px 22px;
+    font-size:12px;font-weight:800;letter-spacing:2px;text-transform:uppercase;
+  }
+  .doc-bar .m{color:var(--orange);letter-spacing:1.4px;text-align:right}
+
+  .rows{padding:6px 22px 2px}
+  .row{display:flex;align-items:baseline;gap:14px;padding:11px 0;border-bottom:1px solid var(--line-2)}
+  .row:last-child{border-bottom:0}
+  .row .k{font-size:11.5px;font-weight:700;letter-spacing:.9px;text-transform:uppercase;color:var(--muted);flex:0 0 132px}
+  .row .v{margin-left:auto;text-align:right;font-weight:700;font-size:15.5px;font-variant-numeric:tabular-nums}
+  .row.sm .v{font-size:14.5px;font-weight:600}
+
+  .sect{
+    padding:14px 22px 6px;font-size:11.5px;font-weight:800;letter-spacing:1.3px;
+    text-transform:uppercase;color:var(--ink);border-top:1px solid var(--line-2);
+  }
+  .sect span{color:var(--muted);font-weight:600;letter-spacing:.4px;text-transform:none;margin-left:6px}
+
+  .totais{border-top:1px solid var(--line);background:var(--orange-bg);padding:14px 22px}
+  .tot{display:flex;align-items:baseline;gap:14px;padding:5px 0}
+  .tot .k{font-size:12px;font-weight:800;letter-spacing:1.1px;text-transform:uppercase;color:var(--ink-2)}
+  .tot .v{margin-left:auto;font-weight:800;font-size:28px;color:var(--orange-dk);
+          font-variant-numeric:tabular-nums;letter-spacing:-.5px}
+  .tot.b .k{color:var(--muted)}
+  .tot.b .v{font-size:19px;color:var(--ink-2);font-weight:700}
+
+  .acts{display:flex;flex-wrap:wrap;gap:8px;padding:14px 22px;border-top:1px solid var(--line)}
+  .btn{
+    border:1px solid var(--line);background:#fff;color:var(--ink);
+    padding:9px 15px;border-radius:6px;font:600 13px inherit;cursor:pointer;white-space:nowrap;
+    transition:border-color .12s,background .12s,color .12s;
+  }
+  .btn:hover{border-color:var(--ink);background:#f7f8f9}
+  .btn.p{background:var(--orange);border-color:var(--orange);color:#fff;font-weight:700}
+  .btn.p:hover{background:var(--orange-dk);border-color:var(--orange-dk)}
+  .btn.ok{background:#0f8a43;border-color:#0f8a43;color:#fff}
+
+  details.raw{border-top:1px solid var(--line-2)}
+  details.raw summary{
+    padding:11px 22px;cursor:pointer;font-size:12px;font-weight:700;letter-spacing:.6px;
+    text-transform:uppercase;color:var(--muted);list-style:none;
+  }
+  details.raw summary::-webkit-details-marker{display:none}
+  details.raw summary::before{content:"+ ";color:var(--orange)}
+  details[open].raw summary::before{content:"− "}
+  details.raw pre{
+    margin:0;padding:0 22px 18px;white-space:pre-wrap;word-break:break-word;
+    font-family:ui-monospace,Consolas,"Courier New",monospace;font-size:12.5px;line-height:1.7;color:var(--ink-2);
+  }
+
+  .empty{
+    background:var(--card);border:1px dashed #c9ced6;border-radius:8px;
+    padding:64px 24px;text-align:center;color:var(--muted);font-size:14px;
+  }
+  .empty b{display:block;color:var(--ink-2);font-size:15px;margin-bottom:4px}
+
+  footer{border-top:1px solid var(--line);padding:22px 0 40px;color:var(--muted);font-size:12.5px}
+  footer .wrap{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="wrap">
+    <img id="logoTop" alt="Rei do Forro">
+    <div class="brand">
+      <div class="n">REI DO <i>FORRO</i></div>
+      <div class="s">Forro de PVC</div>
+    </div>
+    <div class="right">Gerador de orçamentos</div>
+  </div>
+</div>
+
+<div class="wrap">
+  <h1>Novo orçamento</h1>
+  <p class="sub">Informe a área e o tipo de forro para gerar o orçamento pronto para envio.</p>
+
+  <div class="grid">
+
+    <!-- ENTRADA -->
+    <section class="panel">
+      <header>Dados da obra</header>
+      <div class="body">
+
+        <div class="lbl">Medida</div>
+        <div class="seg">
+          <button type="button" id="tabArea" class="on">Área em m²</button>
+          <button type="button" id="tabMed">Largura × Comprimento</button>
+        </div>
+
+        <div id="paneArea">
+          <label class="f">
+            <span>Área do compartimento (m²)</span>
+            <input type="text" id="area" inputmode="decimal" placeholder="Ex.: 23">
+          </label>
+        </div>
+
+        <div id="paneMed" hidden>
+          <div class="two">
+            <label class="f"><span>Largura (m)</span>
+              <input type="text" id="larg" inputmode="decimal" placeholder="Ex.: 4,60"></label>
+            <label class="f"><span>Comprimento (m)</span>
+              <input type="text" id="comp" inputmode="decimal" placeholder="Ex.: 5"></label>
+          </div>
+          <div class="calc"><span>Área calculada</span><b id="areaCalc">—</b></div>
+        </div>
+
+        <label class="f">
+          <span>Tipo de forro</span>
+          <select id="forro"></select>
+        </label>
+
+        <div class="ref">
+          <div class="sw" id="swatch"></div>
+          <div class="tx">Preço do m² — só o forro<b id="precoBase">—</b></div>
+        </div>
+
+        <div class="lbl">Acabamento</div>
+        <div class="opts">
+          <label class="opt"><input type="radio" name="acab" value="0" checked>
+            <span class="t">Acabamento normal (Perfil)</span><span class="v z">Incluso</span></label>
+          <label class="opt"><input type="radio" name="acab" value="4">
+            <span class="t">Moldura (4 cm)</span><span class="v">+ R$ 4,00/m²</span></label>
+          <label class="opt"><input type="radio" name="acab" value="8">
+            <span class="t">Sanca (8 cm)</span><span class="v">+ R$ 8,00/m²</span></label>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- SAÍDA -->
+    <div id="out"></div>
+
+  </div>
+</div>
+
+<footer><div class="wrap">
+  <span>Rei do Forro — Forro de PVC</span>
+  <span>Valores conforme tabela vigente. Confirme as medidas antes de enviar.</span>
+</div></footer>
+
+<script src="logo-data.js"></script>
+<script>
+/* ---------- Catálogo (R$/m²) ---------- */
+const CATALOGO = [
+  { nome:"BRANCO GERMINADO",         forroVista:22.90, forroCartao:24.70, instVista:50.00, instCartao:54.00, cor:"repeating-linear-gradient(90deg,#fff 0 7px,#dfe3e8 7px 9px)" },
+  { nome:"BRANCO LISO FOSCO",        forroVista:24.00, forroCartao:25.90, instVista:54.00, instCartao:58.30, cor:"#f1f2f4" },
+  { nome:"BRANCO LISO BRILHOSO",     forroVista:33.80, forroCartao:36.50, instVista:64.00, instCartao:69.00, cor:"linear-gradient(135deg,#fff 40%,#d7dce2)" },
+  { nome:"CEDRO T1 LISO",            forroVista:41.00, forroCartao:44.30, instVista:71.00, instCartao:76.50, cor:"linear-gradient(135deg,#a2a8ae,#70767c)" },
+  { nome:"FREIJÓ GERMINADO",         forroVista:41.00, forroCartao:44.30, instVista:71.00, instCartao:76.50, cor:"repeating-linear-gradient(90deg,#e8b887 0 7px,#cf9a63 7px 9px)" },
+  { nome:"MOGNO GERMINADO",          forroVista:41.00, forroCartao:44.30, instVista:71.00, instCartao:76.50, cor:"repeating-linear-gradient(90deg,#8c3b27 0 7px,#6d2a1b 7px 9px)" },
+  { nome:"FREIJÓ T1 LISO",           forroVista:41.00, forroCartao:44.30, instVista:71.00, instCartao:76.50, cor:"linear-gradient(135deg,#e7c79c,#d2a877)" },
+  { nome:"MOGNO LISO",               forroVista:43.60, forroCartao:47.00, instVista:74.00, instCartao:79.90, cor:"linear-gradient(135deg,#b5402a,#8e2f1e)" },
+  { nome:"CEREJEIRA LISO",           forroVista:43.60, forroCartao:47.00, instVista:74.00, instCartao:79.90, cor:"linear-gradient(135deg,#b9a62a,#9c8a1f)" },
+  { nome:"GUARUBA LISO",             forroVista:43.60, forroCartao:47.00, instVista:74.00, instCartao:79.90, cor:"linear-gradient(135deg,#b3885f,#916a46)" },
+  { nome:"ADESIVADO IPÊ COLONIAL",   forroVista:46.00, forroCartao:49.70, instVista:80.00, instCartao:86.40, cor:"linear-gradient(135deg,#b2a08e,#8d7b6a)" },
+  { nome:"ADESIVADO FREIJÓ COLONIAL",forroVista:46.00, forroCartao:49.70, instVista:80.00, instCartao:86.40, cor:"linear-gradient(135deg,#d9a86d,#bd8a50)" },
+];
+
+const ACABAMENTOS = { 0:"ACABAMENTO NORMAL (PERFIL)", 4:"MOLDURA (4 cm)", 8:"SANCA (8 cm)" };
+
+/* ---------- Helpers ---------- */
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+const num = v => { const n = parseFloat(String(v).replace(/\./g,"").replace(",",".")); return isFinite(n) && n > 0 ? n : 0; };
+const brl = n => n.toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2});
+const m2  = n => n.toLocaleString("pt-BR",{maximumFractionDigits:2});
+
+$("logoTop").src = LOGO;
+
+/* ---------- Select ---------- */
+const sel = $("forro");
+CATALOGO.forEach((p,i) => sel.add(new Option(`${p.nome} — R$ ${brl(p.forroVista)}/m²`, i)));
+sel.value = 2;
+
+/* ---------- Abas ---------- */
+let modo = "area";
+function setModo(m){
+  modo = m;
+  $("tabArea").classList.toggle("on", m === "area");
+  $("tabMed").classList.toggle("on", m === "med");
+  $("paneArea").hidden = m !== "area";
+  $("paneMed").hidden  = m !== "med";
+  render();
+}
+$("tabArea").onclick = () => setModo("area");
+$("tabMed").onclick  = () => setModo("med");
+
+function getArea(){
+  if (modo === "area") return num($("area").value);
+  return Math.round(num($("larg").value) * num($("comp").value) * 100) / 100;
+}
+
+/* ---------- Modelo do orçamento ---------- */
+function bloco(titulo, area, forro, vistaM2, cartaoM2, acab){
+  const v = vistaM2 + acab, c = cartaoM2 + acab;
+  const d = {
+    titulo, area, forro, acab, acabNome: ACABAMENTOS[acab],
+    vistaM2:v, cartaoM2:c, totalVista: area * v, totalCartao: area * c,
+  };
+  d.texto = `*ORÇAMENTO — REI DO FORRO*
+----------
+*Área:* ${m2(area)}m²
+*Forro:* ${forro}
+*Acabamento:* ${d.acabNome}
+
+*${titulo}*
+_valor do metro quadrado_
+*À vista*: R$ ${brl(v)}/m²
+*No cartão*: R$ ${brl(c)}/m²
+----------
+*VALOR TOTAL*
+💵 *À vista*: R$ ${brl(d.totalVista)}
+💳 *No cartão*: R$ ${brl(d.totalCartao)}`;
+  return d;
+}
+
+/* ---------- Documento em HTML ---------- */
+function docHTML(d, idx){
+  return `<article class="doc">
+    <div class="doc-top">
+      <img src="${LOGO}" alt="">
+      <div class="n">REI DO <i>FORRO</i><s>Forro de PVC</s></div>
+      <div class="mod">Orçamento</div>
+    </div>
+    <div class="doc-bar"><span>${esc(d.titulo)}</span><span class="m">${m2(d.area)} m²</span></div>
+
+    <div class="rows">
+      <div class="row"><span class="k">Área</span><span class="v">${m2(d.area)} m²</span></div>
+      <div class="row"><span class="k">Forro</span><span class="v">${esc(d.forro)}</span></div>
+      <div class="row"><span class="k">Acabamento</span><span class="v">${esc(d.acabNome)}</span></div>
+    </div>
+
+    <div class="sect">Valor do metro quadrado <span>· ${esc(d.titulo.toLowerCase())}</span></div>
+    <div class="rows">
+      <div class="row sm"><span class="k">À vista</span><span class="v">R$ ${brl(d.vistaM2)}/m²</span></div>
+      <div class="row sm"><span class="k">No cartão</span><span class="v">R$ ${brl(d.cartaoM2)}/m²</span></div>
+    </div>
+
+    <div class="totais">
+      <div class="tot"><span class="k">Total à vista</span><span class="v">R$ ${brl(d.totalVista)}</span></div>
+      <div class="tot b"><span class="k">Total no cartão</span><span class="v">R$ ${brl(d.totalCartao)}</span></div>
+    </div>
+
+    <div class="acts">
+      <button class="btn p" data-act="imagem" data-i="${idx}">Copiar imagem</button>
+      <button class="btn"   data-act="texto"  data-i="${idx}">Copiar texto</button>
+      <button class="btn"   data-act="baixar" data-i="${idx}">Baixar PNG</button>
+      <a class="btn" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(d.texto)}">WhatsApp</a>
+    </div>
+
+    <details class="raw"><summary>Texto para WhatsApp</summary><pre>${esc(d.texto)}</pre></details>
+  </article>`;
+}
+
+/* ---------- Imagem (canvas, sem biblioteca) ---------- */
+const logoImg = new Image();
+const logoPronta = new Promise(ok => { logoImg.onload = ok; logoImg.onerror = ok; logoImg.src = LOGO; });
+const FF = '"Segoe UI", Arial, Helvetica, sans-serif';
+
+function desenhar(d){
+  const W = 1000, PAD = 56;
+  const C = { ink:"#15161a", ink2:"#464a52", muted:"#7c828d", line:"#e4e7eb",
+              orange:"#ee6a1e", orangeDk:"#cf5513", orangeBg:"#fdf1e8" };
+
+  const itens = [];
+  const add = (h, draw) => itens.push({ h, draw });
+
+  const linha = (k, v, o = {}) => add(o.h || 56, (x, y) => {
+    x.textAlign = "left";
+    x.font = `700 20px ${FF}`; x.fillStyle = C.muted;
+    if (x.letterSpacing !== undefined) x.letterSpacing = "1px";
+    x.fillText(k.toUpperCase(), PAD, y);
+    if (x.letterSpacing !== undefined) x.letterSpacing = "0px";
+    x.textAlign = "right";
+    x.font = `${o.peso || 700} ${o.fv || 28}px ${FF}`; x.fillStyle = o.cor || C.ink;
+    x.fillText(v, W - PAD, y);
+    x.textAlign = "left";
+    x.strokeStyle = C.line; x.lineWidth = 1;
+    x.beginPath(); x.moveTo(PAD, y + 17.5); x.lineTo(W - PAD, y + 17.5); x.stroke();
+  });
+
+  const titulo = txt => add(50, (x, y) => {
+    x.font = `800 19px ${FF}`; x.fillStyle = C.ink;
+    if (x.letterSpacing !== undefined) x.letterSpacing = "1.4px";
+    x.fillText(txt.toUpperCase(), PAD, y);
+    if (x.letterSpacing !== undefined) x.letterSpacing = "0px";
+  });
+
+  const nomeFonte = d.forro.length > 22 ? 24 : 28;
+  linha("Área", `${m2(d.area)} m²`);
+  linha("Forro", d.forro, { fv: nomeFonte });
+  linha("Acabamento", d.acabNome, { fv: 24 });
+  add(14, () => {});
+  titulo(`Valor do metro quadrado · ${d.titulo}`);
+  linha("À vista", `R$ ${brl(d.vistaM2)}/m²`, { h: 52, fv: 25 });
+  linha("No cartão", `R$ ${brl(d.cartaoM2)}/m²`, { h: 52, fv: 25 });
+
+  const HEAD = 118, BAR = 56, TOT = 176, FOOT = 54;
+  const corpo = itens.reduce((s, i) => s + i.h, 0) + 30;
+  const H = HEAD + BAR + corpo + TOT + FOOT;
+
+  const cv = document.createElement("canvas");
+  cv.width = W; cv.height = H;
+  const x = cv.getContext("2d");
+  x.textBaseline = "alphabetic";
+
+  x.fillStyle = "#fff"; x.fillRect(0, 0, W, H);
+
+  /* cabeçalho branco com a logo */
+  if (logoImg.naturalWidth) x.drawImage(logoImg, PAD - 10, 12, 92, 92);
+  x.textAlign = "left";
+  x.font = `800 26px ${FF}`;
+  const bx = PAD + 92, t1 = "REI DO ", w1 = x.measureText(t1).width;
+  x.fillStyle = C.ink;    x.fillText(t1, bx, 56);
+  x.fillStyle = C.orange; x.fillText("FORRO", bx + w1, 56);
+  x.font = `600 15px ${FF}`; x.fillStyle = C.muted;
+  if (x.letterSpacing !== undefined) x.letterSpacing = "2px";
+  x.fillText("FORRO DE PVC", bx, 80);
+  x.textAlign = "right";
+  x.font = `700 16px ${FF}`; x.fillStyle = C.muted;
+  x.fillText("ORÇAMENTO", W - PAD, 60);
+  if (x.letterSpacing !== undefined) x.letterSpacing = "0px";
+
+  /* faixa preta */
+  x.fillStyle = C.ink; x.fillRect(0, HEAD, W, BAR);
+  x.textAlign = "left"; x.fillStyle = "#fff"; x.font = `800 22px ${FF}`;
+  if (x.letterSpacing !== undefined) x.letterSpacing = "3px";
+  x.fillText(d.titulo, PAD, HEAD + 37);
+  x.textAlign = "right"; x.fillStyle = C.orange; x.font = `800 22px ${FF}`;
+  x.fillText(`${m2(d.area)} M²`, W - PAD, HEAD + 37);
+  if (x.letterSpacing !== undefined) x.letterSpacing = "0px";
+
+  let y = HEAD + BAR + 46;
+  for (const it of itens){ it.draw(x, y); y += it.h; }
+
+  /* totais */
+  const ty = H - FOOT - TOT;
+  x.fillStyle = C.orangeBg; x.fillRect(0, ty, W, TOT);
+  x.fillStyle = C.orange;   x.fillRect(0, ty, W, 4);
+  x.textAlign = "left"; x.font = `800 20px ${FF}`; x.fillStyle = C.ink2;
+  if (x.letterSpacing !== undefined) x.letterSpacing = "1.2px";
+  x.fillText("TOTAL À VISTA", PAD, ty + 62);
+  x.fillStyle = C.muted; x.fillText("TOTAL NO CARTÃO", PAD, ty + 130);
+  if (x.letterSpacing !== undefined) x.letterSpacing = "0px";
+  x.textAlign = "right";
+  x.font = `800 54px ${FF}`; x.fillStyle = C.orangeDk;
+  x.fillText(`R$ ${brl(d.totalVista)}`, W - PAD, ty + 70);
+  x.font = `700 36px ${FF}`; x.fillStyle = C.ink2;
+  x.fillText(`R$ ${brl(d.totalCartao)}`, W - PAD, ty + 136);
+
+  /* rodapé */
+  x.fillStyle = C.ink; x.fillRect(0, H - FOOT, W, FOOT);
+  x.textAlign = "center"; x.font = `600 16px ${FF}`; x.fillStyle = "#a8aeb8";
+  x.fillText("Valores sujeitos a confirmação das medidas no local.", W / 2, H - 20);
+
+  return cv;
+}
+
+const canvasBlob = cv => new Promise(r => cv.toBlob(r, "image/png"));
+
+function baixar(blob, nome){
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = nome;
+  a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+
+function nomeArquivo(d){
+  const acentos = new RegExp("[\\u0300-\\u036f]", "g");   // marcas de acento soltas pelo NFD
+  const slug = s => s.toLowerCase().normalize("NFD").replace(acentos, "")
+                     .replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
+  return `orcamento-${slug(d.forro)}-${slug(d.titulo)}-${slug(m2(d.area))}m2.png`;
+}
+
+/* ---------- Render ---------- */
+function render(){
+  const p = CATALOGO[sel.value];
+  const acab = parseFloat(document.querySelector("input[name=acab]:checked").value);
+
+  $("swatch").style.background = p.cor;
+  $("precoBase").textContent = `R$ ${brl(p.forroVista)} à vista · R$ ${brl(p.forroCartao)} cartão`;
+
+  const area = getArea();
+  $("areaCalc").textContent = area ? `${m2(area)} m²` : "—";
+
+  if (!area){
+    $("out").innerHTML = `<div class="empty"><b>Nenhum orçamento gerado</b>
+      Informe a área ou as medidas do compartimento.</div>`;
+    return;
+  }
+
+  const dados = {
+    1: bloco("SÓ O FORRO", area, p.nome, p.forroVista, p.forroCartao, acab),
+    2: bloco("INSTALAÇÃO COMPLETA", area, p.nome, p.instVista, p.instCartao, acab),
+  };
+
+  $("out").innerHTML = `<div class="docs">${docHTML(dados[1],1)}${docHTML(dados[2],2)}</div>`;
+
+  $("out").querySelectorAll("button[data-act]").forEach(b => b.onclick = async () => {
+    const d = dados[b.dataset.i], original = b.textContent;
+    const feedback = msg => {
+      b.textContent = msg; b.classList.add("ok");
+      setTimeout(() => { b.textContent = original; b.classList.remove("ok"); }, 1800);
+    };
+
+    if (b.dataset.act === "texto"){
+      try { await navigator.clipboard.writeText(d.texto); }
+      catch { const ta = document.createElement("textarea"); ta.value = d.texto;
+              document.body.appendChild(ta); ta.select(); document.execCommand("copy"); ta.remove(); }
+      return feedback("Copiado ✓");
+    }
+
+    await logoPronta;
+    const blob = await canvasBlob(desenhar(d));
+
+    if (b.dataset.act === "baixar"){ baixar(blob, nomeArquivo(d)); return feedback("Baixado ✓"); }
+
+    try {
+      await navigator.clipboard.write([ new ClipboardItem({ "image/png": blob }) ]);
+      feedback("Copiado ✓");
+    } catch {
+      baixar(blob, nomeArquivo(d));   // navegador sem suporte: baixa o arquivo
+      feedback("Baixado ✓");
+    }
+  });
+}
+
+document.addEventListener("input", render);
+document.addEventListener("change", render);
+render();
+</script>
+</body>
+</html>
