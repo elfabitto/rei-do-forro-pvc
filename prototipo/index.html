@@ -1,0 +1,947 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rei do Forro — Sistema (protótipo)</title>
+<style>
+  :root{
+    /* superfícies e tinta */
+    --bg:#eef0f3; --surface:#ffffff; --surface-2:#f7f8f9;
+    --ink:#15161a; --ink-2:#464a52; --muted:#7c828d;
+    --line:#dfe3e8; --line-2:#eceef1;
+    /* marca */
+    --orange:#ee6a1e; --orange-dk:#cf5513; --orange-bg:#fdf1e8;
+    /* séries (validadas: ΔE protan 26,6 · normal 34,7 sobre #ffffff) */
+    --s-entrega:#2a78d6; --s-instalacao:#ee6a1e;
+    --s-entrega-bg:#eaf2fc; --s-instalacao-bg:#fdf1e8;
+    --deemph:#dde1e6;
+    /* status (paleta reservada, sempre com rótulo junto) */
+    --good:#0ca30c; --warning:#fab219; --serious:#ec835a; --critical:#d03b3b;
+    --grid:#eceef1; --axis:#dfe3e8;
+    --shadow:0 1px 2px rgba(20,22,26,.06), 0 8px 24px -12px rgba(20,22,26,.18);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-size:14.5px;line-height:1.5;
+       font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  a{color:inherit}
+  button{font:inherit}
+
+  /* ---------- faixa de protótipo ---------- */
+  .proto{background:#15161a;color:#ffd9bf;font-size:12px;letter-spacing:.4px;
+         padding:7px 20px;text-align:center}
+  .proto b{color:var(--orange)}
+
+  /* ---------- layout ---------- */
+  .app{display:grid;grid-template-columns:232px 1fr;min-height:calc(100vh - 32px)}
+  @media (max-width:900px){.app{grid-template-columns:1fr}}
+
+  aside{background:var(--surface);border-right:1px solid var(--line);padding:0 0 24px}
+  .logo{display:flex;align-items:center;gap:11px;padding:16px 18px;border-bottom:1px solid var(--line-2)}
+  .logo img{height:42px}
+  .logo .n{font-weight:800;font-size:14.5px;line-height:1.15}
+  .logo .n i{font-style:normal;color:var(--orange)}
+  .logo .n s{display:block;text-decoration:none;font-size:10px;font-weight:600;color:var(--muted);
+             letter-spacing:1.2px;text-transform:uppercase;margin-top:2px}
+  nav{padding:14px 10px}
+  nav .grp{font-size:10.5px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;
+           color:var(--muted);padding:14px 10px 6px}
+  nav button{display:flex;align-items:center;gap:10px;width:100%;text-align:left;
+             padding:9px 10px;border:0;border-radius:6px;background:transparent;color:var(--ink-2);
+             font-weight:600;cursor:pointer;margin-bottom:2px}
+  nav button:hover{background:var(--surface-2)}
+  nav button.on{background:var(--ink);color:#fff}
+  nav button .ic{width:18px;text-align:center;opacity:.9}
+  nav button .badge{margin-left:auto;background:var(--orange);color:#fff;font-size:11px;
+                    font-weight:800;border-radius:999px;padding:1px 7px}
+  nav button.on .badge{background:var(--orange)}
+
+  main{min-width:0}
+  .top{display:flex;align-items:center;gap:14px;background:var(--surface);
+       border-bottom:1px solid var(--line);padding:14px 24px;position:sticky;top:0;z-index:20}
+  .top h1{font-size:18px;margin:0;letter-spacing:-.2px}
+  .top .sub{font-size:12.5px;color:var(--muted)}
+  .who{margin-left:auto;display:flex;align-items:center;gap:10px}
+  .who select{padding:8px 30px 8px 11px;border:1px solid var(--line);border-radius:6px;
+              background:var(--surface-2);font-size:13px;font-weight:600;appearance:none;cursor:pointer;
+              background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='11' height='7'><path d='M1 1l4.5 4.5L10 1' stroke='%2315161a' stroke-width='1.8' fill='none' stroke-linecap='round'/></svg>");
+              background-repeat:no-repeat;background-position:right 11px center}
+  .avatar{width:32px;height:32px;border-radius:50%;background:var(--ink);color:#fff;
+          display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12.5px}
+  .papel{font-size:10.5px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;
+         color:var(--muted)}
+
+  .view{padding:24px}
+  .view[hidden]{display:none}
+
+  /* ---------- cartões ---------- */
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow)}
+  .card > header{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--line-2)}
+  .card > header h2{margin:0;font-size:13px;font-weight:800;letter-spacing:.9px;text-transform:uppercase;color:var(--ink-2)}
+  .card > header .hint{font-size:12px;color:var(--muted);font-weight:500;letter-spacing:0;text-transform:none}
+  .card > .body{padding:18px}
+
+  .cols{display:grid;gap:18px}
+  .c-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .c-2{grid-template-columns:minmax(0,1.35fr) minmax(0,1fr)}
+  @media (max-width:1180px){.c-4{grid-template-columns:repeat(2,minmax(0,1fr))}.c-2{grid-template-columns:1fr}}
+  @media (max-width:620px){.c-4{grid-template-columns:1fr}}
+  .mb{margin-bottom:18px}
+
+  /* ---------- stat tiles ---------- */
+  .tile{background:var(--surface);border:1px solid var(--line);border-radius:8px;
+        box-shadow:var(--shadow);padding:16px 18px}
+  .tile .lab{font-size:12.5px;color:var(--muted);font-weight:600}
+  .tile .val{font-size:30px;font-weight:700;letter-spacing:-.7px;margin:5px 0 2px;line-height:1.1}
+  .tile .val.hero{font-size:48px;letter-spacing:-1.4px}
+  .tile .dl{font-size:12.5px;color:var(--muted)}
+  .tile .dl b{font-weight:700}
+  .up{color:#006300} .down{color:var(--critical)}
+  .spark{display:flex;align-items:flex-end;gap:3px;height:28px;margin-top:10px}
+  .spark i{flex:1;background:var(--deemph);border-radius:2px 2px 0 0;min-height:2px}
+  .spark i.cur{background:var(--orange)}
+
+  /* ---------- gráfico de colunas empilhadas ---------- */
+  .chart{position:relative;padding:4px 0 0 44px}
+  .plot{position:relative;height:190px}
+  .gl{position:absolute;left:0;right:0;border-top:1px solid var(--grid)}
+  .gl span{position:absolute;left:-44px;top:-8px;width:38px;text-align:right;
+           font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+  .gl.base{border-top-color:var(--axis)}
+  .bars{position:absolute;inset:0;display:flex;align-items:flex-end;justify-content:space-around}
+  .bar{width:24px;display:flex;flex-direction:column;justify-content:flex-end;height:100%;cursor:default}
+  .seg{width:100%}
+  .seg.top{border-radius:4px 4px 0 0}
+  .seg + .seg{margin-top:2px}            /* o vão de 2px é a superfície separando */
+  .seg.conv{background:var(--orange)}
+  .seg.rest{background:var(--deemph)}
+  .xaxis{display:flex;justify-content:space-around;margin-top:9px}
+  .xaxis span{width:52px;text-align:center;font-size:11.5px;color:var(--muted)}
+  .dlab{position:absolute;width:52px;text-align:center;font-size:11.5px;font-weight:700;
+        color:var(--ink);transform:translateX(-14px)}
+
+  .legend{display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+  .legend i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+  .legend span{font-size:12.5px;color:var(--ink-2);font-weight:600}
+
+  /* ---------- barras horizontais (ranking) ---------- */
+  .rank{display:grid;gap:12px}
+  .rk{display:grid;grid-template-columns:110px 1fr auto;gap:12px;align-items:center}
+  .rk .nm{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rk .tr{background:var(--surface-2);border-radius:4px;height:16px;position:relative}
+  .rk .fl{position:absolute;left:0;top:0;bottom:0;background:var(--orange);border-radius:0 4px 4px 0}
+  .rk .vl{font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+
+  /* ---------- tabelas ---------- */
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th{text-align:left;font-size:11px;font-weight:800;letter-spacing:.9px;text-transform:uppercase;
+     color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+  td{padding:11px 12px;border-bottom:1px solid var(--line-2);vertical-align:middle}
+  tr:last-child td{border-bottom:0}
+  tbody tr:hover{background:var(--surface-2)}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+  .tw{overflow-x:auto}
+  .lnk{color:var(--orange-dk);font-weight:700;cursor:pointer;background:none;border:0;padding:0}
+  .lnk:hover{text-decoration:underline}
+
+  details.tbl{margin-top:16px;border-top:1px solid var(--line-2);padding-top:10px}
+  details.tbl summary{cursor:pointer;font-size:12px;font-weight:700;color:var(--muted);
+                      letter-spacing:.5px;text-transform:uppercase;list-style:none}
+  details.tbl summary::-webkit-details-marker{display:none}
+  details.tbl summary::before{content:"+ ";color:var(--orange)}
+  details[open].tbl summary::before{content:"− "}
+
+  /* ---------- etiquetas ---------- */
+  .tag{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;
+       padding:3px 9px;border-radius:999px;white-space:nowrap}
+  .tag::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor;flex:0 0 auto}
+  .t-gerada{background:#eef1f5;color:#4a5160}
+  .t-exec{background:#fef4e0;color:#8a6200}
+  .t-fim{background:#e7f6e7;color:#0a6b0a}
+  .t-canc{background:#fbeaea;color:#9b2727}
+  .t-aberto{background:#eaf2fc;color:#1b5496}
+  .t-conv{background:#fdf1e8;color:var(--orange-dk)}
+  .t-perd{background:#f1f2f4;color:#6b7280}
+
+  .pill{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;
+        padding:3px 9px;border-radius:5px}
+  .p-ent{background:var(--s-entrega-bg);color:#1b5496}
+  .p-ins{background:var(--s-instalacao-bg);color:var(--orange-dk)}
+  .pill .ic{font-size:11px}
+
+  /* ---------- agenda ---------- */
+  .cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:1px;background:var(--line-2);
+       border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .cal .hd{background:var(--surface-2);padding:9px 6px;text-align:center;font-size:11px;
+           font-weight:800;letter-spacing:.9px;text-transform:uppercase;color:var(--muted)}
+  .cal .dy{background:var(--surface);min-height:104px;padding:7px 7px 9px}
+  .cal .dy.off{background:#fafbfc}
+  .cal .dy .n{font-size:12px;font-weight:700;color:var(--ink-2);margin-bottom:5px;
+              display:flex;align-items:center;gap:5px}
+  .cal .dy.hoje .n{color:#fff;background:var(--ink);border-radius:999px;
+                   width:21px;height:21px;justify-content:center;font-size:11px}
+  .cal .dy .n small{font-weight:600;color:var(--muted);font-size:10.5px;margin-left:auto}
+  .ev{display:block;width:100%;text-align:left;border:0;border-radius:4px;padding:4px 6px;
+      margin-bottom:3px;font-size:11px;font-weight:600;cursor:pointer;line-height:1.3}
+  .ev.ent{background:var(--s-entrega-bg);color:#1b5496;box-shadow:inset 3px 0 0 var(--s-entrega)}
+  .ev.ins{background:var(--s-instalacao-bg);color:var(--orange-dk);box-shadow:inset 3px 0 0 var(--s-instalacao)}
+  .ev:hover{filter:brightness(.97)}
+  .vaga{font-size:10.5px;color:var(--good);font-weight:700;margin-top:3px}
+  .vaga.cheio{color:var(--muted)}
+
+  /* ---------- gaveta de O.S. ---------- */
+  .scrim{position:fixed;inset:0;background:rgba(21,22,26,.45);z-index:40}
+  .scrim[hidden]{display:none}
+  .drawer{position:fixed;top:0;right:0;bottom:0;width:min(560px,100%);background:var(--surface);
+          z-index:41;overflow-y:auto;box-shadow:-10px 0 40px -12px rgba(0,0,0,.3)}
+  .drawer[hidden]{display:none}
+  .dh{display:flex;align-items:center;gap:12px;padding:16px 20px;border-bottom:1px solid var(--line);
+      position:sticky;top:0;background:var(--surface);z-index:2}
+  .dh h3{margin:0;font-size:16px}
+  .dh .x{margin-left:auto;border:1px solid var(--line);background:#fff;border-radius:6px;
+         width:30px;height:30px;cursor:pointer;font-size:15px;color:var(--muted)}
+  .sec{padding:16px 20px;border-bottom:1px solid var(--line-2)}
+  .sec h4{margin:0 0 10px;font-size:11px;font-weight:800;letter-spacing:1.1px;
+          text-transform:uppercase;color:var(--muted)}
+  .kv{display:grid;grid-template-columns:120px 1fr;gap:7px 12px;font-size:13.5px}
+  .kv dt{color:var(--muted);font-weight:600}
+  .kv dd{margin:0;font-weight:600}
+  .kv dd.wk{font-weight:500}
+
+  .tl{list-style:none;margin:0;padding:0}
+  .tl li{position:relative;padding:0 0 14px 20px;font-size:13px}
+  .tl li::before{content:"";position:absolute;left:0;top:5px;width:9px;height:9px;border-radius:50%;
+                 background:var(--deemph)}
+  .tl li.done::before{background:var(--orange)}
+  .tl li::after{content:"";position:absolute;left:4px;top:14px;bottom:0;width:1px;background:var(--line)}
+  .tl li:last-child{padding-bottom:0}
+  .tl li:last-child::after{display:none}
+  .tl small{display:block;color:var(--muted);font-size:12px}
+
+  .btn{border:1px solid var(--line);background:#fff;color:var(--ink);padding:9px 15px;
+       border-radius:6px;font-weight:600;font-size:13px;cursor:pointer}
+  .btn:hover{border-color:var(--ink);background:var(--surface-2)}
+  .btn.p{background:var(--orange);border-color:var(--orange);color:#fff;font-weight:700}
+  .btn.p:hover{background:var(--orange-dk);border-color:var(--orange-dk)}
+  .btn:disabled{opacity:.45;cursor:not-allowed;background:#fff;border-color:var(--line);color:var(--muted)}
+  .btnrow{display:flex;gap:8px;flex-wrap:wrap;padding:16px 20px}
+
+  .aviso{display:flex;gap:9px;background:#fef9ec;border:1px solid #f3dca6;border-radius:6px;
+         padding:10px 12px;font-size:12.5px;color:#7a5a00;margin:0 20px 16px}
+  .aviso .ic{flex:0 0 auto}
+
+  .tip{position:fixed;z-index:60;background:var(--ink);color:#fff;font-size:12px;padding:7px 10px;
+       border-radius:6px;pointer-events:none;opacity:0;transition:opacity .1s;max-width:230px;line-height:1.45}
+  .tip.on{opacity:1}
+  .tip b{color:var(--orange)}
+
+  .vazio{text-align:center;color:var(--muted);padding:46px 20px;font-size:13.5px}
+</style>
+</head>
+<body>
+
+<div class="proto">PROTÓTIPO DE INTERFACE — dados fictícios, sem banco de dados. Serve para validar telas e fluxo antes de escrever o <b>Django</b>.</div>
+
+<div class="app">
+
+  <aside>
+    <div class="logo">
+      <img id="logoNav" alt="">
+      <div class="n">REI DO <i>FORRO</i><s>Gestão</s></div>
+    </div>
+    <nav id="nav">
+      <div class="grp">Operação</div>
+      <button data-v="dash" class="on"><span class="ic">▣</span> Painel</button>
+      <button data-v="orc"><span class="ic">▤</span> Orçamentos <span class="badge" id="bOrc"></span></button>
+      <button data-v="os"><span class="ic">▦</span> Ordens de Serviço <span class="badge" id="bOs"></span></button>
+      <button data-v="age"><span class="ic">▥</span> Agenda</button>
+      <div class="grp">Cadastros</div>
+      <button data-v="cli"><span class="ic">▢</span> Clientes</button>
+      <button data-v="cfg"><span class="ic">▧</span> Tabela de preços</button>
+    </nav>
+  </aside>
+
+  <main>
+    <div class="top">
+      <div>
+        <h1 id="tTit">Painel</h1>
+        <div class="sub" id="tSub"></div>
+      </div>
+      <div class="who">
+        <div class="papel" id="tPapel"></div>
+        <select id="selUser" aria-label="Usuário conectado"></select>
+        <div class="avatar" id="tAv"></div>
+      </div>
+    </div>
+
+    <section class="view" id="v-dash"></section>
+    <section class="view" id="v-orc" hidden></section>
+    <section class="view" id="v-os"  hidden></section>
+    <section class="view" id="v-age" hidden></section>
+    <section class="view" id="v-cli" hidden></section>
+    <section class="view" id="v-cfg" hidden></section>
+  </main>
+</div>
+
+<div class="scrim" id="scrim" hidden></div>
+<div class="drawer" id="drawer" hidden></div>
+<div class="tip" id="tip"></div>
+
+<script src="../docs/logo-data.js"></script>
+<script>
+/* =======================================================================
+   PROTÓTIPO — todos os dados abaixo são fictícios e vivem só em memória.
+   O objetivo é validar telas, fluxo e permissões antes do Django.
+   ======================================================================= */
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const brl = n => n.toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2});
+const brl0 = n => n.toLocaleString("pt-BR",{maximumFractionDigits:0});
+const m2 = n => n.toLocaleString("pt-BR",{maximumFractionDigits:2});
+$("logoNav").src = LOGO;
+
+/* ---------- datas ---------- */
+const HOJE = new Date(); HOJE.setHours(0,0,0,0);
+const dia = n => { const d = new Date(HOJE); d.setDate(d.getDate()+n); return d; };
+const iso = d => d.toISOString().slice(0,10);
+const fmt = d => d.toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit"});
+const fmtL = d => d.toLocaleDateString("pt-BR",{day:"2-digit",month:"long",year:"numeric"});
+const DIAS = ["dom","seg","ter","qua","qui","sex","sáb"];
+
+/* ---------- usuários e permissões ---------- */
+const USUARIOS = [
+  { id:1, nome:"Alan Ferreira",  papel:"diretor",    ini:"AF" },
+  { id:2, nome:"Marcos Lima",    papel:"vendedor",   ini:"ML" },
+  { id:3, nome:"Jonas Ribeiro",  papel:"instalador", ini:"JR" },
+];
+/* O que cada papel pode fazer. No Django isto vira Group + Permission,
+   e no Supabase/Postgres as mesmas regras viram RLS. */
+const PODE = {
+  diretor:    { verFinanceiro:true,  finalizarOS:true,  cancelarOS:true,  trocarVendedor:true,  verTodos:true,  criarOrc:true, agendar:true },
+  vendedor:   { verFinanceiro:false, finalizarOS:false, cancelarOS:false, trocarVendedor:false, verTodos:false, criarOrc:true, agendar:true },
+  instalador: { verFinanceiro:false, finalizarOS:false, cancelarOS:false, trocarVendedor:false, verTodos:false, criarOrc:false, agendar:false },
+};
+let eu = USUARIOS[0];
+const pode = a => PODE[eu.papel][a];
+
+/* ---------- clientes ---------- */
+const CLIENTES = [
+  { id:1, nome:"Maria Souza",        fone:"(66) 99988-1122", bairro:"Jardim Aeroporto",
+    end:"Rua das Palmeiras, 180", compl:"Casa dos fundos", mapa:"https://maps.app.goo.gl/exemplo1" },
+  { id:2, nome:"Construtora Vale",   fone:"(66) 3421-7788",  bairro:"Centro",
+    end:"Av. Brasil, 1450", compl:"Sala 3 — prédio azul", mapa:"https://maps.app.goo.gl/exemplo2" },
+  { id:3, nome:"João Pedro Alves",   fone:"(66) 99615-0043", bairro:"Vila Nova",
+    end:"Rua 7 de Setembro, 62", compl:"", mapa:"" },
+  { id:4, nome:"Rosana Martins",     fone:"(66) 99204-8890", bairro:"Parque das Águas",
+    end:"Rua Ipê Amarelo, 305", compl:"Apto 201, bloco B", mapa:"https://maps.app.goo.gl/exemplo3" },
+  { id:5, nome:"Edson Carvalho",     fone:"(66) 99771-3360", bairro:"Santa Luzia",
+    end:"Travessa São João, 44", compl:"", mapa:"https://maps.app.goo.gl/exemplo4" },
+];
+const cli = id => CLIENTES.find(c => c.id === id);
+
+/* ---------- orçamentos ---------- */
+const ORCAMENTOS = [
+  { id:"ORC-0126", cliente:1, tipo:"instalado", forro:"BRANCO LISO BRILHOSO", area:23,   acab:"Sanca (8 cm)",  vista:1656.00, cartao:1771.00, status:"convertido", vendedor:2, em:dia(-9)  },
+  { id:"ORC-0127", cliente:2, tipo:"material",  forro:"BRANCO LISO FOSCO",    area:84,   acab:"—",             vista:3246.00, cartao:3405.60, status:"convertido", vendedor:1, em:dia(-8)  },
+  { id:"ORC-0128", cliente:3, tipo:"instalado", forro:"MOGNO LISO",           area:31.5, acab:"Moldura (4 cm)",vista:2457.00, cartao:2642.85, status:"aberto",     vendedor:2, em:dia(-5)  },
+  { id:"ORC-0129", cliente:4, tipo:"instalado", forro:"CEDRO T1 LISO",        area:18,   acab:"Perfil",        vista:1278.00, cartao:1377.00, status:"convertido", vendedor:2, em:dia(-4)  },
+  { id:"ORC-0130", cliente:5, tipo:"material",  forro:"FREIJÓ T1 LISO",       area:42,   acab:"—",             vista:2187.00, cartao:2325.60, status:"aberto",     vendedor:1, em:dia(-2)  },
+  { id:"ORC-0131", cliente:3, tipo:"instalado", forro:"ADESIVADO IPÊ COLONIAL",area:12,  acab:"Perfil",        vista:960.00,  cartao:1036.80, status:"perdido",    vendedor:2, em:dia(-12) },
+  { id:"ORC-0132", cliente:1, tipo:"material",  forro:"BRANCO GERMINADO",     area:56,   acab:"—",             vista:1922.40, cartao:2033.20, status:"aberto",     vendedor:1, em:dia(-1)  },
+];
+
+/* ---------- ordens de serviço ---------- */
+const OS = [
+  { id:"OS-0048", orc:"ORC-0126", cliente:1, vendedor:2, status:"finalizada",
+    entrega:{ d:dia(-6), turno:"manhã" }, instalacao:{ d:dia(-5), turno:"tarde" },
+    total:1656.00, pagamentos:[ {forma:"PIX", valor:656.00, em:dia(-6)}, {forma:"Dinheiro", valor:1000.00, em:dia(-5)} ],
+    criadaPor:2, em:dia(-7), finalizadaPor:1, finalizadaEm:dia(-5), obs:"Cliente pediu acabamento em sanca na sala e no corredor." },
+  { id:"OS-0049", orc:"ORC-0127", cliente:2, vendedor:1, status:"em_execucao",
+    entrega:{ d:dia(0), turno:"manhã" }, instalacao:null,
+    total:3246.00, pagamentos:[ {forma:"Transferência", valor:1600.00, em:dia(-1)} ],
+    criadaPor:1, em:dia(-7), obs:"Somente material. Entregar na obra, falar com o encarregado Paulo." },
+  { id:"OS-0050", orc:"ORC-0129", cliente:4, vendedor:2, status:"gerada",
+    entrega:{ d:dia(2), turno:"tarde" }, instalacao:{ d:dia(3), turno:"manhã" },
+    total:1278.00, pagamentos:[],
+    criadaPor:2, em:dia(-3), obs:"Prédio sem elevador — subir material pela escada, 2º andar." },
+  { id:"OS-0051", orc:"ORC-0132", cliente:1, vendedor:1, status:"gerada",
+    entrega:{ d:dia(4), turno:"manhã" }, instalacao:null,
+    total:1922.40, pagamentos:[],
+    criadaPor:1, em:dia(-1), obs:"" },
+  { id:"OS-0047", orc:"—", cliente:5, vendedor:2, status:"cancelada",
+    entrega:{ d:dia(-3), turno:"tarde" }, instalacao:null,
+    total:840.00, pagamentos:[],
+    criadaPor:2, em:dia(-10), obs:"Cliente desistiu, vai reformar o telhado antes." },
+  { id:"OS-0052", orc:"ORC-0128", cliente:3, vendedor:2, status:"gerada",
+    entrega:{ d:dia(6), turno:"tarde" }, instalacao:{ d:dia(7), turno:"tarde" },
+    total:2457.00, pagamentos:[], criadaPor:2, em:dia(0), obs:"" },
+];
+
+const ST_OS = {
+  gerada:      { lab:"Gerada",       cls:"t-gerada" },
+  em_execucao: { lab:"Em execução",  cls:"t-exec"   },
+  finalizada:  { lab:"Finalizada",   cls:"t-fim"    },
+  cancelada:   { lab:"Cancelada",    cls:"t-canc"   },
+};
+const ST_ORC = {
+  aberto:     { lab:"Aberto",     cls:"t-aberto" },
+  convertido: { lab:"Convertido", cls:"t-conv"   },
+  perdido:    { lab:"Perdido",    cls:"t-perd"   },
+};
+
+/* Capacidade da agenda por turno — vira configuração no banco. */
+const CAPACIDADE = { entrega:3, instalacao:2 };
+const TURNOS = ["manhã","tarde"];
+
+const pago = o => o.pagamentos.reduce((s,p) => s + p.valor, 0);
+const osVisiveis = () => pode("verTodos") ? OS : OS.filter(o => o.vendedor === eu.id || o.criadaPor === eu.id);
+const orcVisiveis = () => pode("verTodos") ? ORCAMENTOS : ORCAMENTOS.filter(o => o.vendedor === eu.id);
+
+/* =======================  componentes  ======================= */
+
+function tag(map, k){ const s = map[k]; return `<span class="tag ${s.cls}">${s.lab}</span>`; }
+
+/* eventos da agenda derivados das O.S. (entrega + instalação) */
+function eventos(){
+  const ev = [];
+  for (const o of OS){
+    if (o.status === "cancelada") continue;
+    if (o.entrega)    ev.push({ os:o, tipo:"entrega",    d:o.entrega.d,    turno:o.entrega.turno });
+    if (o.instalacao) ev.push({ os:o, tipo:"instalacao", d:o.instalacao.d, turno:o.instalacao.turno });
+  }
+  return ev;
+}
+const evDoDia = d => eventos().filter(e => iso(e.d) === iso(d));
+
+/* =======================  PAINEL  ======================= */
+
+function semanas(){
+  /* 6 semanas fechadas, da mais antiga para a atual */
+  const out = [];
+  for (let k = 5; k >= 0; k--){
+    const fim = dia(-7*k), ini = dia(-7*k - 6);
+    const dentro = o => o.em >= ini && o.em <= fim;
+    const lista = ORCAMENTOS.filter(dentro);
+    /* o protótipo tem poucos registros reais; completa com uma série plausível */
+    const base = [9,12,7,14,11,0][5-k];
+    const conv = [4,6,3,7,5,0][5-k];
+    const total = base + lista.length;
+    const convert = conv + lista.filter(o => o.status === "convertido").length;
+    out.push({ ini, fim, total, convert, rot: k === 0 ? "esta sem." : fmt(ini) });
+  }
+  return out;
+}
+
+function grafConversao(){
+  const S = semanas();
+  const max = Math.max(...S.map(s => s.total));
+  const topo = Math.ceil(max / 5) * 5 || 5;
+  const ticks = [0, topo/2, topo];
+
+  const gls = ticks.map(t => `<div class="gl${t===0?" base":""}" style="bottom:${t/topo*100}%">
+      <span>${brl0(t)}</span></div>`).join("");
+
+  const bars = S.map(s => {
+    const resto = s.total - s.convert;
+    const hc = s.convert / topo * 100, hr = resto / topo * 100;
+    const tip = `${s.rot === "esta sem." ? "Esta semana" : "Semana de " + fmt(s.ini)}<br>`
+              + `<b>${s.convert}</b> de ${s.total} convertidos`
+              + (s.total ? ` · ${Math.round(s.convert/s.total*100)}%` : "");
+    return `<div class="bar" data-tip="${esc(tip)}">
+      ${resto ? `<div class="seg rest top" style="height:${hr}%"></div>` : ""}
+      <div class="seg conv${resto?"":" top"}" style="height:${hc}%"></div>
+    </div>`;
+  }).join("");
+
+  const tabela = `<details class="tbl"><summary>Ver tabela</summary><div class="tw"><table>
+    <thead><tr><th>Semana</th><th class="num">Orçamentos</th><th class="num">Convertidos</th><th class="num">Taxa</th></tr></thead>
+    <tbody>${S.map(s => `<tr><td>${s.rot === "esta sem." ? "Esta semana" : fmt(s.ini)+" a "+fmt(s.fim)}</td>
+      <td class="num">${s.total}</td><td class="num">${s.convert}</td>
+      <td class="num">${s.total ? Math.round(s.convert/s.total*100)+"%" : "—"}</td></tr>`).join("")}</tbody>
+  </table></div></details>`;
+
+  return `<div class="legend">
+      <span><i style="background:var(--orange)"></i>Convertidos em O.S.</span>
+      <span><i style="background:var(--deemph)"></i>Ainda abertos ou perdidos</span>
+    </div>
+    <div class="chart"><div class="plot">${gls}<div class="bars">${bars}</div></div>
+    <div class="xaxis">${S.map(s => `<span>${s.rot}</span>`).join("")}</div></div>
+    ${tabela}`;
+}
+
+function ranking(){
+  const vend = USUARIOS.filter(u => u.papel !== "instalador").map(u => {
+    const fechado = OS.filter(o => o.vendedor === u.id && o.status !== "cancelada");
+    return { u, n:fechado.length, valor:fechado.reduce((s,o) => s + o.total, 0) };
+  }).sort((a,b) => b.valor - a.valor);
+  const max = Math.max(...vend.map(v => v.valor), 1);
+
+  return `<div class="rank">${vend.map(v => `
+    <div class="rk" data-tip="${esc(v.u.nome)}<br><b>${v.n}</b> O.S. · R$ ${brl(v.valor)}">
+      <div class="nm">${esc(v.u.nome)}</div>
+      <div class="tr"><div class="fl" style="width:${v.valor/max*100}%"></div></div>
+      <div class="vl">R$ ${brl0(v.valor)}</div>
+    </div>`).join("")}</div>
+    <p style="font-size:12px;color:var(--muted);margin:14px 0 0">
+      Base da comissão: O.S. não canceladas, atribuídas a quem trouxe o cliente.</p>`;
+}
+
+function agendaSemana(){
+  const ini = dia(-HOJE.getDay());
+  const cels = [];
+  for (let i = 0; i < 7; i++){
+    const d = dia(-HOJE.getDay() + i);
+    const evs = evDoDia(d);
+    const hoje = iso(d) === iso(HOJE);
+    cels.push(`<div class="dy${hoje?" hoje":""}${d < HOJE ? " off":""}">
+      <div class="n">${hoje ? d.getDate() : d.getDate()}<small>${DIAS[d.getDay()]}</small></div>
+      ${evs.map(e => `<button class="ev ${e.tipo==="entrega"?"ent":"ins"}" data-os="${e.os.id}">
+          ${e.tipo==="entrega"?"⬇ Entrega":"🔧 Instalação"} · ${e.turno}<br>${esc(cli(e.os.cliente).nome.split(" ")[0])}
+        </button>`).join("")}
+      ${evs.length ? "" : `<div class="vaga">livre</div>`}
+    </div>`);
+  }
+  return `<div class="legend">
+      <span><i style="background:var(--s-entrega)"></i>Entrega</span>
+      <span><i style="background:var(--s-instalacao)"></i>Instalação</span>
+    </div>
+    <div class="cal">${DIAS.map(d => `<div class="hd">${d}</div>`).join("")}${cels.join("")}</div>`;
+}
+
+function renderDash(){
+  const mesIni = new Date(HOJE.getFullYear(), HOJE.getMonth(), 1);
+  const noMes  = ORCAMENTOS.filter(o => o.em >= mesIni);
+  const conv   = noMes.filter(o => o.status === "convertido");
+  const taxa   = noMes.length ? Math.round(conv.length / noMes.length * 100) : 0;
+  const execu  = OS.filter(o => o.status === "em_execucao").length;
+  const geradas= OS.filter(o => o.status === "gerada").length;
+  const aReceber = OS.filter(o => o.status !== "cancelada").reduce((s,o) => s + (o.total - pago(o)), 0);
+  const faturado = OS.filter(o => o.status === "finalizada").reduce((s,o) => s + pago(o), 0);
+  const S = semanas();
+
+  const tiles = `
+    <div class="tile">
+      <div class="lab">Orçamentos no mês</div>
+      <div class="val">${noMes.length}</div>
+      <div class="dl"><b class="up">▲ 3</b> contra o mês anterior</div>
+      <div class="spark">${S.map((s,i) => `<i class="${i===S.length-1?"cur":""}" style="height:${Math.max(6, s.total/14*100)}%"></i>`).join("")}</div>
+    </div>
+    <div class="tile">
+      <div class="lab">Taxa de conversão</div>
+      <div class="val hero">${taxa}%</div>
+      <div class="dl">${conv.length} de ${noMes.length} viraram O.S.</div>
+    </div>
+    <div class="tile">
+      <div class="lab">O.S. em andamento</div>
+      <div class="val">${geradas + execu}</div>
+      <div class="dl">${geradas} gerada${geradas===1?"":"s"} · ${execu} em execução</div>
+    </div>
+    ${pode("verFinanceiro") ? `
+    <div class="tile">
+      <div class="lab">A receber</div>
+      <div class="val">R$ ${brl0(aReceber)}</div>
+      <div class="dl">Recebido no período: <b>R$ ${brl0(faturado)}</b></div>
+    </div>` : `
+    <div class="tile">
+      <div class="lab">Minhas O.S. no mês</div>
+      <div class="val">${OS.filter(o => o.vendedor === eu.id).length}</div>
+      <div class="dl">Valores totais são restritos à diretoria</div>
+    </div>`}`;
+
+  const proximas = eventos().filter(e => e.d >= HOJE).sort((a,b) => a.d - b.d).slice(0,6);
+
+  $("v-dash").innerHTML = `
+    <div class="cols c-4 mb">${tiles}</div>
+
+    <div class="cols c-2 mb">
+      <div class="card"><header><h2>Orçamentos e conversão</h2>
+        <span class="hint">últimas 6 semanas</span></header>
+        <div class="body">${grafConversao()}</div></div>
+
+      <div class="card"><header><h2>Por quem trouxe o cliente</h2>
+        <span class="hint">base da comissão</span></header>
+        <div class="body">${ranking()}</div></div>
+    </div>
+
+    <div class="card mb"><header><h2>Agenda desta semana</h2>
+      <span class="hint">clique num compromisso para abrir a O.S.</span></header>
+      <div class="body">${agendaSemana()}</div></div>
+
+    <div class="cols c-2">
+      <div class="card"><header><h2>O.S. recentes</h2></header>
+        <div class="tw"><table><thead><tr>
+          <th>O.S.</th><th>Cliente</th><th>Status</th>${pode("verFinanceiro")?'<th class="num">Valor</th>':""}
+        </tr></thead><tbody>
+          ${osVisiveis().slice(0,5).map(o => `<tr>
+            <td><button class="lnk" data-os="${o.id}">${o.id}</button></td>
+            <td>${esc(cli(o.cliente).nome)}</td>
+            <td>${tag(ST_OS,o.status)}</td>
+            ${pode("verFinanceiro")?`<td class="num">R$ ${brl(o.total)}</td>`:""}
+          </tr>`).join("")}
+        </tbody></table></div></div>
+
+      <div class="card"><header><h2>Próximos compromissos</h2></header>
+        <div class="tw"><table><thead><tr>
+          <th>Quando</th><th>Tipo</th><th>Cliente</th><th>Bairro</th>
+        </tr></thead><tbody>
+          ${proximas.length ? proximas.map(e => `<tr>
+            <td>${fmt(e.d)} <span style="color:var(--muted)">${e.turno}</span></td>
+            <td><span class="pill ${e.tipo==="entrega"?"p-ent":"p-ins"}">
+                <span class="ic">${e.tipo==="entrega"?"⬇":"🔧"}</span>
+                ${e.tipo==="entrega"?"Entrega":"Instalação"}</span></td>
+            <td><button class="lnk" data-os="${e.os.id}">${esc(cli(e.os.cliente).nome)}</button></td>
+            <td>${esc(cli(e.os.cliente).bairro)}</td>
+          </tr>`).join("") : `<tr><td colspan="4" class="vazio">Nada agendado.</td></tr>`}
+        </tbody></table></div></div>
+    </div>`;
+}
+
+/* =======================  ORÇAMENTOS  ======================= */
+function renderOrc(){
+  const lista = orcVisiveis();
+  $("v-orc").innerHTML = `
+    <div class="card">
+      <header><h2>Orçamentos</h2>
+        <span class="hint">${lista.length} registro${lista.length===1?"":"s"}${pode("verTodos")?"":" · apenas os seus"}</span>
+        <div style="margin-left:auto">
+          <button class="btn p" ${pode("criarOrc")?"":"disabled"}>+ Novo orçamento</button>
+        </div>
+      </header>
+      <div class="tw"><table><thead><tr>
+        <th>Número</th><th>Cliente</th><th>Tipo</th><th>Forro</th>
+        <th class="num">Área</th><th class="num">À vista</th><th>Status</th><th>Vendedor</th><th></th>
+      </tr></thead><tbody>
+      ${lista.map(o => `<tr>
+        <td><b>${o.id}</b><br><span style="color:var(--muted);font-size:12px">${fmt(o.em)}</span></td>
+        <td>${esc(cli(o.cliente).nome)}</td>
+        <td><span class="pill ${o.tipo==="material"?"p-ent":"p-ins"}">${o.tipo==="material"?"Material":"Instalado"}</span></td>
+        <td style="font-size:12.5px">${esc(o.forro)}<br><span style="color:var(--muted)">${esc(o.acab)}</span></td>
+        <td class="num">${m2(o.area)} m²</td>
+        <td class="num">R$ ${brl(o.vista)}</td>
+        <td>${tag(ST_ORC,o.status)}</td>
+        <td style="font-size:12.5px">${esc(USUARIOS.find(u=>u.id===o.vendedor).nome)}</td>
+        <td>${o.status==="aberto"
+            ? `<button class="btn" data-gerar="${o.id}">Gerar O.S.</button>`
+            : o.status==="convertido"
+              ? `<button class="lnk" data-os="${(OS.find(s=>s.orc===o.id)||{}).id||""}">ver O.S.</button>` : ""}</td>
+      </tr>`).join("")}
+      </tbody></table></div>
+    </div>`;
+}
+
+/* =======================  ORDENS DE SERVIÇO  ======================= */
+let filtroOS = "todas";
+function renderOS(){
+  const todas = osVisiveis();
+  const lista = filtroOS === "todas" ? todas : todas.filter(o => o.status === filtroOS);
+  const cont = s => todas.filter(o => o.status === s).length;
+
+  $("v-os").innerHTML = `
+    <div class="card">
+      <header><h2>Ordens de Serviço</h2>
+        <div style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap">
+          ${[["todas",`Todas (${todas.length})`],["gerada",`Gerada (${cont("gerada")})`],
+             ["em_execucao",`Em execução (${cont("em_execucao")})`],
+             ["finalizada",`Finalizada (${cont("finalizada")})`],
+             ["cancelada",`Cancelada (${cont("cancelada")})`]]
+            .map(([k,l]) => `<button class="btn${filtroOS===k?" p":""}" data-f="${k}">${l}</button>`).join("")}
+        </div>
+      </header>
+      <div class="tw"><table><thead><tr>
+        <th>O.S.</th><th>Cliente / Obra</th><th>Entrega</th><th>Instalação</th>
+        <th>Quem trouxe</th><th>Status</th>${pode("verFinanceiro")?'<th class="num">Saldo</th>':""}<th></th>
+      </tr></thead><tbody>
+      ${lista.length ? lista.map(o => { const c = cli(o.cliente); const saldo = o.total - pago(o); return `<tr>
+        <td><b>${o.id}</b><br><span style="color:var(--muted);font-size:12px">${o.orc}</span></td>
+        <td>${esc(c.nome)}<br><span style="color:var(--muted);font-size:12px">${esc(c.bairro)}</span></td>
+        <td>${o.entrega ? fmt(o.entrega.d)+`<br><span style="color:var(--muted);font-size:12px">${o.entrega.turno}</span>` : "—"}</td>
+        <td>${o.instalacao ? fmt(o.instalacao.d)+`<br><span style="color:var(--muted);font-size:12px">${o.instalacao.turno}</span>` : `<span style="color:var(--muted)">sem instalação</span>`}</td>
+        <td style="font-size:12.5px">${esc(USUARIOS.find(u=>u.id===o.vendedor).nome)}</td>
+        <td>${tag(ST_OS,o.status)}</td>
+        ${pode("verFinanceiro")?`<td class="num">${saldo>0?`<b style="color:var(--critical)">R$ ${brl(saldo)}</b>`:`<span style="color:#006300">quitado</span>`}</td>`:""}
+        <td><button class="lnk" data-os="${o.id}">abrir</button></td>
+      </tr>`}).join("") : `<tr><td colspan="8" class="vazio">Nenhuma O.S. com esse filtro.</td></tr>`}
+      </tbody></table></div>
+    </div>`;
+}
+
+/* =======================  AGENDA  ======================= */
+let mesOff = 0;
+function renderAgenda(){
+  const ref = new Date(HOJE.getFullYear(), HOJE.getMonth() + mesOff, 1);
+  const primeiro = ref.getDay();
+  const ndias = new Date(ref.getFullYear(), ref.getMonth()+1, 0).getDate();
+
+  const cels = [];
+  for (let i = 0; i < primeiro; i++) cels.push(`<div class="dy off"></div>`);
+  for (let d = 1; d <= ndias; d++){
+    const data = new Date(ref.getFullYear(), ref.getMonth(), d);
+    const evs = evDoDia(data);
+    const hoje = iso(data) === iso(HOJE);
+    const fds = data.getDay() === 0;
+
+    /* vagas por turno, considerando a capacidade configurada */
+    const vagas = TURNOS.map(t => {
+      const ent = evs.filter(e => e.turno===t && e.tipo==="entrega").length;
+      const ins = evs.filter(e => e.turno===t && e.tipo==="instalacao").length;
+      const livre = (CAPACIDADE.entrega-ent) + (CAPACIDADE.instalacao-ins);
+      return { t, livre, cheio: livre <= 0 };
+    });
+    const totalLivre = vagas.reduce((s,v) => s + Math.max(0,v.livre), 0);
+
+    cels.push(`<div class="dy${hoje?" hoje":""}${fds?" off":""}">
+      <div class="n">${d}</div>
+      ${evs.map(e => `<button class="ev ${e.tipo==="entrega"?"ent":"ins"}" data-os="${e.os.id}">
+          ${e.tipo==="entrega"?"⬇":"🔧"} ${e.turno} · ${esc(cli(e.os.cliente).nome.split(" ")[0])}
+        </button>`).join("")}
+      ${fds ? "" : `<div class="vaga${totalLivre?"":" cheio"}">${totalLivre ? totalLivre+" vaga"+(totalLivre===1?"":"s") : "lotado"}</div>`}
+    </div>`);
+  }
+
+  $("v-age").innerHTML = `
+    <div class="card">
+      <header><h2>${ref.toLocaleDateString("pt-BR",{month:"long",year:"numeric"})}</h2>
+        <span class="hint">capacidade: ${CAPACIDADE.entrega} entregas e ${CAPACIDADE.instalacao} instalações por turno</span>
+        <div style="margin-left:auto;display:flex;gap:6px">
+          <button class="btn" data-mes="-1">←</button>
+          <button class="btn" data-mes="0">Hoje</button>
+          <button class="btn" data-mes="1">→</button>
+        </div>
+      </header>
+      <div class="body">
+        <div class="legend">
+          <span><i style="background:var(--s-entrega)"></i>Entrega</span>
+          <span><i style="background:var(--s-instalacao)"></i>Instalação</span>
+          <span style="color:var(--muted);font-weight:500">Domingo não é agendável</span>
+        </div>
+        <div class="cal">${DIAS.map(d => `<div class="hd">${d}</div>`).join("")}${cels.join("")}</div>
+      </div>
+    </div>`;
+}
+
+/* =======================  CLIENTES / CADASTROS  ======================= */
+function renderCli(){
+  $("v-cli").innerHTML = `
+    <div class="card"><header><h2>Clientes</h2>
+      <span class="hint">endereço da obra com complemento, bairro e localização do WhatsApp</span></header>
+      <div class="tw"><table><thead><tr>
+        <th>Cliente</th><th>Telefone</th><th>Endereço da obra</th><th>Bairro</th><th>Localização</th><th class="num">O.S.</th>
+      </tr></thead><tbody>
+      ${CLIENTES.map(c => `<tr>
+        <td><b>${esc(c.nome)}</b></td>
+        <td>${esc(c.fone)}</td>
+        <td>${esc(c.end)}${c.compl?`<br><span style="color:var(--muted);font-size:12px">${esc(c.compl)}</span>`:""}</td>
+        <td>${esc(c.bairro)}</td>
+        <td>${c.mapa?`<a class="lnk" href="${esc(c.mapa)}" target="_blank" rel="noopener">abrir mapa</a>`
+                    :`<span style="color:var(--muted)">não enviada</span>`}</td>
+        <td class="num">${OS.filter(o => o.cliente === c.id).length}</td>
+      </tr>`).join("")}
+      </tbody></table></div></div>`;
+}
+
+function renderCfg(){
+  $("v-cfg").innerHTML = `
+    <div class="card"><header><h2>Tabela de preços</h2>
+      <span class="hint">hoje fixa no código — vira cadastro no banco</span></header>
+      <div class="body">
+        <p style="margin:0 0 16px;color:var(--ink-2)">
+          O gerador de orçamentos que já está no ar lê a tabela de um array dentro do
+          <code>index.html</code>. No sistema, forros e materiais viram tabelas do banco com
+          histórico de preço, para que um orçamento antigo continue mostrando o valor
+          praticado na data em que foi feito.</p>
+        <div class="tw"><table><thead><tr><th>Entidade</th><th>Campos</th></tr></thead><tbody>
+          <tr><td><b>forro</b></td><td>nome · preço material à vista/cartão · preço instalado à vista/cartão · ativo</td></tr>
+          <tr><td><b>material</b></td><td>nome · unidade de lançamento · preço · unidade de cotação · preço de cotação · ativo</td></tr>
+          <tr><td><b>acabamento</b></td><td>nome · acréscimo por m² · aplica&nbsp;em (instalado)</td></tr>
+          <tr><td><b>tabela_preco_historico</b></td><td>entidade · valor · vigente_de · vigente_ate</td></tr>
+        </tbody></table></div>
+      </div></div>`;
+}
+
+/* =======================  GAVETA DA O.S.  ======================= */
+function abrirOS(id){
+  const o = OS.find(x => x.id === id); if (!o) return;
+  const c = cli(o.cliente), orc = ORCAMENTOS.find(x => x.id === o.orc);
+  const saldo = o.total - pago(o);
+  const vend = USUARIOS.find(u => u.id === o.vendedor);
+
+  const etapas = [
+    { k:"Gerada",      ok:true, q:`por ${USUARIOS.find(u=>u.id===o.criadaPor).nome} em ${fmt(o.em)}` },
+    { k:"Em execução", ok:["em_execucao","finalizada"].includes(o.status), q:o.entrega?`entrega ${fmt(o.entrega.d)} (${o.entrega.turno})`:"" },
+    { k:"Finalizada",  ok:o.status==="finalizada", q:o.finalizadaEm?`por ${USUARIOS.find(u=>u.id===o.finalizadaPor).nome} em ${fmt(o.finalizadaEm)}`:"" },
+  ];
+
+  $("drawer").innerHTML = `
+    <div class="dh">
+      <h3>${o.id}</h3>${tag(ST_OS,o.status)}
+      <button class="x" id="fechar" aria-label="Fechar">×</button>
+    </div>
+
+    <div class="sec"><h4>Cliente e obra</h4>
+      <dl class="kv">
+        <dt>Cliente</dt><dd>${esc(c.nome)}</dd>
+        <dt>Telefone</dt><dd class="wk">${esc(c.fone)}</dd>
+        <dt>Endereço</dt><dd class="wk">${esc(c.end)}</dd>
+        ${c.compl?`<dt>Complemento</dt><dd class="wk">${esc(c.compl)}</dd>`:""}
+        <dt>Bairro</dt><dd class="wk">${esc(c.bairro)}</dd>
+        <dt>Localização</dt><dd class="wk">${c.mapa
+          ? `<a class="lnk" href="${esc(c.mapa)}" target="_blank" rel="noopener">link enviado pelo WhatsApp</a>`
+          : `<span style="color:var(--muted)">não enviada</span>`}</dd>
+      </dl></div>
+
+    <div class="sec"><h4>Pedido</h4>
+      <dl class="kv">
+        <dt>Orçamento</dt><dd>${o.orc}${orc?` · ${esc(orc.forro)}`:""}</dd>
+        ${orc?`<dt>Tipo</dt><dd class="wk">${orc.tipo==="material"?"Material (só o forro)":"Instalado"}</dd>
+               <dt>Área</dt><dd class="wk">${m2(orc.area)} m²</dd>
+               <dt>Acabamento</dt><dd class="wk">${esc(orc.acab)}</dd>`:""}
+        <dt>Valor</dt><dd>R$ ${brl(o.total)}</dd>
+      </dl>
+      ${o.obs?`<p style="margin:12px 0 0;font-size:13px;color:var(--ink-2);background:var(--surface-2);
+        border-left:3px solid var(--line);padding:9px 11px;border-radius:0 5px 5px 0">${esc(o.obs)}</p>`:""}
+    </div>
+
+    <div class="sec"><h4>Agendamento</h4>
+      <dl class="kv">
+        <dt>Entrega</dt><dd>${o.entrega?`${fmtL(o.entrega.d)} · ${o.entrega.turno}`:"—"}</dd>
+        <dt>Instalação</dt><dd>${o.instalacao?`${fmtL(o.instalacao.d)} · ${o.instalacao.turno}`
+          :`<span style="color:var(--muted);font-weight:500">sem instalação (só material)</span>`}</dd>
+      </dl>
+      <div style="margin-top:12px"><button class="btn" ${pode("agendar")?"":"disabled"}>Reagendar</button></div>
+    </div>
+
+    <div class="sec"><h4>Comissão</h4>
+      <dl class="kv">
+        <dt>Trouxe o cliente</dt><dd>${esc(vend.nome)}</dd>
+        <dt>Lançada por</dt><dd class="wk">${esc(USUARIOS.find(u=>u.id===o.criadaPor).nome)}</dd>
+      </dl>
+      ${pode("trocarVendedor")
+        ? `<div style="margin-top:12px;display:flex;gap:8px;align-items:center">
+             <select id="selVend" style="padding:8px 11px;border:1px solid var(--line);border-radius:6px">
+               ${USUARIOS.filter(u=>u.papel!=="instalador").map(u =>
+                 `<option value="${u.id}"${u.id===o.vendedor?" selected":""}>${esc(u.nome)}</option>`).join("")}
+             </select>
+             <button class="btn" id="btTroca">Alterar</button>
+           </div>
+           <p style="font-size:12px;color:var(--muted);margin:9px 0 0">
+             A diretoria pode corrigir a atribuição quando lança a O.S. no lugar do funcionário.</p>`
+        : `<p style="font-size:12px;color:var(--muted);margin:10px 0 0">
+             Só a diretoria altera quem recebe a comissão.</p>`}
+    </div>
+
+    ${pode("verFinanceiro") ? `
+    <div class="sec"><h4>Pagamentos</h4>
+      ${o.pagamentos.length ? `<div class="tw"><table><thead><tr>
+        <th>Forma</th><th>Data</th><th class="num">Valor</th></tr></thead><tbody>
+        ${o.pagamentos.map(p => `<tr><td>${esc(p.forma)}</td><td>${fmt(p.em)}</td>
+          <td class="num">R$ ${brl(p.valor)}</td></tr>`).join("")}
+      </tbody></table></div>` : `<p style="color:var(--muted);font-size:13px;margin:0">Nenhum pagamento registrado.</p>`}
+      <dl class="kv" style="margin-top:12px">
+        <dt>Total</dt><dd>R$ ${brl(o.total)}</dd>
+        <dt>Pago</dt><dd>R$ ${brl(pago(o))}</dd>
+        <dt>Saldo</dt><dd style="color:${saldo>0?"var(--critical)":"#006300"}">R$ ${brl(saldo)}</dd>
+      </dl>
+    </div>` : ""}
+
+    <div class="sec"><h4>Histórico</h4>
+      <ul class="tl">${etapas.map(e => `<li class="${e.ok?"done":""}">${e.k}<small>${esc(e.q||"pendente")}</small></li>`).join("")}</ul>
+    </div>
+
+    ${!pode("finalizarOS") ? `<div class="aviso"><span class="ic">⚠</span>
+      <span>Finalizar a O.S. e registrar pagamentos é exclusivo da diretoria.
+      Troque o usuário no topo para ver essa etapa.</span></div>` : ""}
+
+    <div class="btnrow">
+      <button class="btn p" ${pode("finalizarOS") && o.status!=="finalizada" && o.status!=="cancelada" ? "" : "disabled"}>
+        Finalizar O.S. e lançar pagamento</button>
+      <button class="btn" ${pode("cancelarOS") && o.status!=="finalizada" && o.status!=="cancelada" ? "" : "disabled"}>Cancelar</button>
+      <button class="btn">Imprimir</button>
+    </div>`;
+
+  $("drawer").hidden = false; $("scrim").hidden = false;
+  $("fechar").onclick = fecharOS;
+  const bt = $("btTroca");
+  if (bt) bt.onclick = () => { o.vendedor = +$("selVend").value; abrirOS(id); desenhar(); };
+}
+function fecharOS(){ $("drawer").hidden = true; $("scrim").hidden = true; }
+$("scrim").onclick = fecharOS;
+document.addEventListener("keydown", e => { if (e.key === "Escape") fecharOS(); });
+
+/* =======================  navegação e eventos  ======================= */
+const TITULOS = {
+  dash:["Painel","Visão geral da operação"],
+  orc: ["Orçamentos","Gerados pelo sistema de orçamento"],
+  os:  ["Ordens de Serviço","Do orçamento convertido até a finalização"],
+  age: ["Agenda","Entregas e instalações por turno"],
+  cli: ["Clientes","Cadastro e endereços de obra"],
+  cfg: ["Tabela de preços","Forros, materiais e acabamentos"],
+};
+let viewAtual = "dash";
+
+function desenhar(){
+  ({ dash:renderDash, orc:renderOrc, os:renderOS, age:renderAgenda, cli:renderCli, cfg:renderCfg })[viewAtual]();
+  $("bOrc").textContent = orcVisiveis().filter(o => o.status === "aberto").length || "";
+  $("bOs").textContent  = osVisiveis().filter(o => ["gerada","em_execucao"].includes(o.status)).length || "";
+}
+
+function irPara(v){
+  viewAtual = v;
+  document.querySelectorAll("#nav button").forEach(b => b.classList.toggle("on", b.dataset.v === v));
+  document.querySelectorAll(".view").forEach(s => s.hidden = s.id !== "v-" + v);
+  $("tTit").textContent = TITULOS[v][0];
+  $("tSub").textContent = TITULOS[v][1];
+  desenhar();
+}
+$("nav").onclick = e => { const b = e.target.closest("button[data-v]"); if (b) irPara(b.dataset.v); };
+
+/* usuário conectado */
+const su = $("selUser");
+USUARIOS.forEach(u => su.add(new Option(u.nome, u.id)));
+function trocarUsuario(){
+  eu = USUARIOS.find(u => u.id === +su.value);
+  $("tAv").textContent = eu.ini;
+  $("tPapel").textContent = eu.papel;
+  fecharOS();
+  desenhar();
+}
+su.onchange = trocarUsuario;
+
+/* cliques delegados */
+document.addEventListener("click", e => {
+  const o = e.target.closest("[data-os]");
+  if (o && o.dataset.os){ abrirOS(o.dataset.os); return; }
+
+  const f = e.target.closest("[data-f]");
+  if (f){ filtroOS = f.dataset.f; renderOS(); return; }
+
+  const m = e.target.closest("[data-mes]");
+  if (m){ mesOff = m.dataset.mes === "0" ? 0 : mesOff + (+m.dataset.mes); renderAgenda(); return; }
+
+  const g = e.target.closest("[data-gerar]");
+  if (g){ alert("No sistema, este botão abre o formulário da O.S. já preenchido com o orçamento "
+        + g.dataset.gerar + ": cliente, endereço da obra, datas de entrega e instalação."); }
+});
+
+/* tooltip dos gráficos */
+const tip = $("tip");
+document.addEventListener("mouseover", e => {
+  const t = e.target.closest("[data-tip]");
+  if (!t) return;
+  tip.innerHTML = t.dataset.tip; tip.classList.add("on");
+});
+document.addEventListener("mousemove", e => {
+  if (!tip.classList.contains("on")) return;
+  const x = Math.min(e.clientX + 14, innerWidth - tip.offsetWidth - 10);
+  tip.style.left = x + "px";
+  tip.style.top = (e.clientY - tip.offsetHeight - 12) + "px";
+});
+document.addEventListener("mouseout", e => {
+  if (e.target.closest("[data-tip]")) tip.classList.remove("on");
+});
+
+trocarUsuario();
+irPara("dash");
+</script>
+</body>
+</html>

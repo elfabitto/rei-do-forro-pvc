@@ -1,0 +1,234 @@
+"""
+Testes de API: garantem que os endpoints que o React consome existem,
+respondem e respeitam as permissões.
+"""
+from datetime import timedelta
+from decimal import Decimal
+
+from django.contrib.auth import get_user_model
+from django.urls import reverse
+from django.utils import timezone
+from rest_framework.test import APITestCase
+
+from apps.catalogo.models import Acabamento, Forro
+from apps.clientes.models import Cliente, Endereco
+from apps.ordens.models import ConfiguracaoAgenda, OrdemServico, StatusOS
+
+D = Decimal
+Usuario = get_user_model()
+
+
+class ApiBase(APITestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.diretor = Usuario.objects.create_user("alan", password="x", papel="diretor", first_name="Alan")
+        cls.vendedor = Usuario.objects.create_user("marcos", password="x", papel="vendedor", first_name="Marcos")
+
+        cls.forro = Forro.objects.create(
+            nome="BRANCO LISO BRILHOSO",
+            preco_material_vista=D("33.80"), preco_material_cartao=D("36.50"),
+            preco_instalado_vista=D("64.00"), preco_instalado_cartao=D("69.00"),
+        )
+        cls.sanca = Acabamento.objects.create(nome="Sanca (8 cm)", acrescimo_m2=D("8.00"))
+        cls.cliente = Cliente.objects.create(nome="Maria Souza", telefone="(66) 99988-1122",
+                                             criado_por=cls.vendedor)
+        cls.endereco = Endereco.objects.create(cliente=cls.cliente, logradouro="Rua das Palmeiras",
+                                               numero="180", bairro="Jardim Aeroporto",
+                                               link_localizacao="https://maps.app.goo.gl/x")
+
+
+class AutenticacaoTest(ApiBase):
+    def test_api_exige_login(self):
+        self.assertEqual(self.client.get("/api/ordens-servico/").status_code, 401)
+
+    def test_token_e_eu(self):
+        r = self.client.post("/api/token/", {"username": "alan", "password": "x"}, format="json")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn("access", r.data)
+
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {r.data['access']}")
+        eu = self.client.get("/api/eu/")
+        self.assertEqual(eu.status_code, 200)
+        self.assertEqual(eu.data["papel"], "diretor")
+        self.assertTrue(eu.data["permissoes"]["finalizarOS"])
+
+    def test_permissoes_do_vendedor_vem_restritas(self):
+        self.client.force_authenticate(self.vendedor)
+        eu = self.client.get("/api/eu/").data
+        self.assertFalse(eu["permissoes"]["finalizarOS"])
+        self.assertFalse(eu["permissoes"]["verFinanceiro"])
+        self.assertFalse(eu["permissoes"]["trocarVendedor"])
+
+
+class OrcamentoApiTest(ApiBase):
+    def test_cria_instalado_com_sanca(self):
+        self.client.force_authenticate(self.vendedor)
+        r = self.client.post("/api/orcamentos/", {
+            "cliente": self.cliente.id, "tipo": "instalado", "area_m2": "23",
+            "forro": self.forro.id, "acabamento": self.sanca.id,
+        }, format="json")
+        self.assertEqual(r.status_code, 201, r.data)
+        self.assertEqual(r.data["total_vista"], "1656.00")
+        self.assertEqual(r.data["total_cartao"], "1771.00")
+        # vendedor é o próprio usuário logado
+        self.assertEqual(r.data["vendedor"], self.vendedor.id)
+
+    def test_material_recusa_acabamento(self):
+        self.client.force_authenticate(self.vendedor)
+        r = self.client.post("/api/orcamentos/", {
+            "cliente": self.cliente.id, "tipo": "material", "area_m2": "23",
+            "forro": self.forro.id, "acabamento": self.sanca.id,
+        }, format="json")
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("acabamento", r.data)
+
+    def test_material_com_itens_soma_tudo(self):
+        self.client.force_authenticate(self.vendedor)
+        r = self.client.post("/api/orcamentos/", {
+            "cliente": self.cliente.id, "tipo": "material", "area_m2": "23", "forro": self.forro.id,
+            "itens": [{"descricao": "Perfil 6 m", "unidade": "und",
+                       "quantidade": "10", "preco_unitario": "25.00"}],
+        }, format="json")
+        self.assertEqual(r.status_code, 201, r.data)
+        self.assertEqual(r.data["total_vista"], "1027.40")   # 777,40 + 250,00
+
+
+class OrdemServicoApiTest(ApiBase):
+    def nova(self, vendedor=None, criado_por=None):
+        dono = vendedor or self.vendedor
+        return OrdemServico.objects.create(
+            cliente=self.cliente, endereco=self.endereco,
+            vendedor=dono, criado_por=criado_por or dono, valor_total=D("1000.00"),
+        )
+
+    def test_vendedor_so_ve_as_proprias_os_e_nao_ve_financeiro(self):
+        self.nova(vendedor=self.diretor)          # alheia: nem comissão nem lançamento dele
+        self.client.force_authenticate(self.vendedor)
+
+        painel = self.client.get("/api/painel/").data
+        self.assertNotIn("financeiro", painel)
+
+        lista = self.client.get("/api/ordens-servico/").data
+        self.assertEqual(lista["count"], 0)
+
+    def test_vendedor_ve_a_os_que_ele_lancou_para_outro(self):
+        """Lançou a O.S., continua enxergando — mesmo que a comissão seja de outro."""
+        self.nova(vendedor=self.diretor, criado_por=self.vendedor)
+        self.client.force_authenticate(self.vendedor)
+        lista = self.client.get("/api/ordens-servico/").data
+        self.assertEqual(lista["count"], 1)
+
+    def test_diretor_ve_financeiro_no_painel(self):
+        self.nova()
+        self.client.force_authenticate(self.diretor)
+        painel = self.client.get("/api/painel/").data
+        self.assertIn("financeiro", painel)
+        self.assertIn("comissoes", painel)
+
+    def test_vendedor_nao_finaliza_pela_api(self):
+        os_ = self.nova()
+        self.client.force_authenticate(self.vendedor)
+        r = self.client.post(f"/api/ordens-servico/{os_.id}/finalizar/", {}, format="json")
+        self.assertEqual(r.status_code, 403)
+
+    def test_diretor_finaliza_lancando_pagamento(self):
+        os_ = self.nova()
+        self.client.force_authenticate(self.diretor)
+        r = self.client.post(f"/api/ordens-servico/{os_.id}/finalizar/", {
+            "pagamentos": [{"forma": "pix", "valor": "1000.00"}],
+            "observacao": "Pago no ato",
+        }, format="json")
+        self.assertEqual(r.status_code, 200, r.data)
+        self.assertEqual(r.data["status"], StatusOS.FINALIZADA)
+        self.assertEqual(r.data["saldo"], "0.00")
+
+    def test_vendedor_nao_troca_quem_trouxe_o_cliente(self):
+        os_ = self.nova()
+        self.client.force_authenticate(self.vendedor)
+        r = self.client.patch(f"/api/ordens-servico/{os_.id}/",
+                              {"vendedor": self.diretor.id}, format="json")
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("vendedor", r.data)
+
+    def test_diretor_troca_quem_trouxe_o_cliente(self):
+        os_ = self.nova()
+        self.client.force_authenticate(self.diretor)
+        r = self.client.patch(f"/api/ordens-servico/{os_.id}/",
+                              {"vendedor": self.diretor.id}, format="json")
+        self.assertEqual(r.status_code, 200, r.data)
+        self.assertEqual(r.data["vendedor"], self.diretor.id)
+
+
+class AgendaApiTest(ApiBase):
+    def test_disponibilidade_traz_vagas_por_turno(self):
+        cfg = ConfiguracaoAgenda.obter()
+        cfg.capacidade_turno = 2
+        cfg.dias_sem_atendimento = "6"
+        cfg.save()
+
+        self.client.force_authenticate(self.vendedor)
+        hoje = timezone.localdate()
+        r = self.client.get("/api/agenda/disponibilidade/",
+                            {"de": str(hoje), "ate": str(hoje + timedelta(days=13))})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(len(r.data["dias"]), 14)
+
+        util = next(d for d in r.data["dias"] if d["atende"])
+        self.assertEqual(len(util["turnos"]), 2)              # manhã e tarde
+        self.assertEqual(util["turnos"][0]["livre"], 2)       # 2 vagas por turno
+        self.assertEqual(util["livre_total"], 4)              # 4 por dia
+
+        domingos = [d for d in r.data["dias"] if not d["atende"]]
+        self.assertTrue(domingos, "deveria haver ao menos um domingo em 14 dias")
+
+
+class GerarOSDoOrcamentoTest(ApiBase):
+    """Converter orçamento em O.S. agendando entrega e instalação num passo só."""
+
+    def orcamento(self):
+        self.client.force_authenticate(self.vendedor)
+        return self.client.post("/api/orcamentos/", {
+            "cliente": self.cliente.id, "tipo": "instalado", "area_m2": "23",
+            "forro": self.forro.id, "acabamento": self.sanca.id,
+        }, format="json").data
+
+    def dia_util(self, somar):
+        d = timezone.localdate() + timedelta(days=somar)
+        return str(d + timedelta(days=1) if d.weekday() == 6 else d)
+
+    def test_gera_os_herdando_cliente_e_valor_do_orcamento(self):
+        orc = self.orcamento()
+        r = self.client.post("/api/ordens-servico/", {
+            "orcamento": orc["id"], "endereco": self.endereco.id,
+            "agendar_entrega": {"data": self.dia_util(2), "turno": "manha"},
+            "agendar_instalacao": {"data": self.dia_util(3), "turno": "tarde"},
+        }, format="json")
+        self.assertEqual(r.status_code, 201, r.data)
+        self.assertEqual(r.data["valor_total"], "1656.00")        # herdado do orçamento
+        self.assertEqual(r.data["cliente"], self.cliente.id)
+        self.assertEqual(r.data["cliente_detalhe"]["nome"], "Maria Souza")
+        self.assertEqual(len(r.data["agendamentos"]), 2)
+        # o orçamento passa a constar como convertido
+        self.assertEqual(self.client.get(f"/api/orcamentos/{orc['id']}/").data["status"], "convertido")
+
+    def test_turno_cheio_desfaz_a_os_inteira(self):
+        cfg = ConfiguracaoAgenda.obter()
+        cfg.capacidade_turno = 1
+        cfg.save()
+        dia = self.dia_util(2)
+
+        primeira = self.client.post("/api/ordens-servico/", {
+            "orcamento": self.orcamento()["id"], "endereco": self.endereco.id,
+            "agendar_instalacao": {"data": dia, "turno": "manha"},
+        }, format="json")
+        self.assertEqual(primeira.status_code, 201, primeira.data)
+        antes = OrdemServico.objects.count()
+
+        segunda = self.client.post("/api/ordens-servico/", {
+            "orcamento": self.orcamento()["id"], "endereco": self.endereco.id,
+            "agendar_instalacao": {"data": dia, "turno": "manha"},
+        }, format="json")
+        self.assertEqual(segunda.status_code, 400)
+        self.assertIn("agendar_instalacao", segunda.data)
+        # nada de O.S. órfã criada sem agendamento
+        self.assertEqual(OrdemServico.objects.count(), antes)

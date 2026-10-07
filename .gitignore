@@ -1,4 +1,21 @@
+# dependências
 node_modules/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# ambiente e dados locais
+.env
+*.sqlite3
+sistema/backend/media/
+sistema/backend/staticfiles/
+
+# build
+dist/
+*.log
+
+# sistema operacional
 .DS_Store
 Thumbs.db
-*.log
+desktop.ini

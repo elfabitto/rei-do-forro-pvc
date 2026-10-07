@@ -1,0 +1,77 @@
+/* =========================================================================
+   Cores de status — carregado por último, manda nas anteriores.
+
+   ORÇAMENTO   Aberto laranja · Convertido verde · Perdido vermelho
+   O.S.        Gerada laranja · Em execução azul · Finalizada verde · Cancelada vermelho
+
+   A etiqueta sempre traz o rótulo escrito: a cor reforça, nunca carrega sozinha
+   o significado — é o que mantém a leitura para quem não distingue as cores.
+   ========================================================================= */
+
+:root{
+  --st-laranja:#ee6a1e;  --st-laranja-bg:#fdf1e8;  --st-laranja-tx:#a8430c;
+  --st-azul:#2a78d6;     --st-azul-bg:#eaf2fc;     --st-azul-tx:#1b5496;
+  --st-verde:#0ca30c;    --st-verde-bg:#e7f6e7;    --st-verde-tx:#0a6b0a;
+  --st-vermelho:#d03b3b; --st-vermelho-bg:#fbeaea; --st-vermelho-tx:#9b2727;
+}
+
+/* ---------- etiquetas ---------- */
+.tag.t-aberto,
+.tag.t-gerada       {background:var(--st-laranja-bg);  color:var(--st-laranja-tx)}
+.tag.t-em_execucao  {background:var(--st-azul-bg);     color:var(--st-azul-tx)}
+.tag.t-convertido,
+.tag.t-finalizada   {background:var(--st-verde-bg);    color:var(--st-verde-tx)}
+.tag.t-perdido,
+.tag.t-cancelada    {background:var(--st-vermelho-bg); color:var(--st-vermelho-tx)}
+
+.tag.t-atrasado{background:var(--st-vermelho);color:#fff;font-weight:800}
+.tag.t-atrasado::before{background:#fff}
+
+/* ---------- borda superior do card ---------- */
+.cardItem.st-aberto,
+.cardItem.st-gerada      {border-top-color:var(--st-laranja)}
+.cardItem.st-em_execucao {border-top-color:var(--st-azul)}
+.cardItem.st-convertido,
+.cardItem.st-finalizada  {border-top-color:var(--st-verde)}
+.cardItem.st-perdido,
+.cardItem.st-cancelada   {border-top-color:var(--st-vermelho)}
+
+.cardItem.atrasado{border-top-color:var(--st-vermelho);box-shadow:0 0 0 1px var(--st-vermelho-bg),var(--shadow)}
+
+/* cartão encerrado recua: o que importa é o que ainda está em aberto */
+.cardItem.st-cancelada,.cardItem.st-perdido{opacity:.82}
+
+/* ---------- botões de ação coloridos ---------- */
+.btn.azul{background:var(--st-azul);border-color:var(--st-azul);color:#fff;font-weight:700}
+.btn.azul:hover{background:#1f63b6;border-color:#1f63b6}
+.btn.verde{background:var(--st-verde);border-color:var(--st-verde);color:#fff;font-weight:700}
+.btn.verde:hover{background:#0a8a0a;border-color:#0a8a0a}
+.btn.vermelho{background:#fff;border-color:var(--st-vermelho);color:var(--st-vermelho-tx);font-weight:700}
+.btn.vermelho:hover{background:var(--st-vermelho-bg)}
+.btn.zap{background:#fff;border-color:#25d366;color:#0b7a3b;font-weight:700}
+.btn.zap:hover{background:#eafaf0}
+.btn.azul:disabled,.btn.verde:disabled,.btn.vermelho:disabled,.btn.zap:disabled{
+  background:#fff;border-color:var(--line);color:var(--muted);font-weight:600}
+
+/* ---------- aviso de atraso ---------- */
+.aviso.critico{background:var(--st-vermelho-bg);border-color:#f0c2c2;color:var(--st-vermelho-tx)}
+.sub2.atraso{color:var(--st-vermelho-tx);font-weight:700}
+tr.linhaAtrasada{background:#fdf5f5}
+tr.linhaAtrasada:hover{background:#fbeaea}
+.ev.atrasado{box-shadow:inset 3px 0 0 var(--st-vermelho)!important;
+             background:var(--st-vermelho-bg)!important;color:var(--st-vermelho-tx)!important}
+
+/* ---------- fechamento da O.S. ---------- */
+.resumoFechamento{background:var(--surface-2);border:1px solid var(--line);border-radius:7px;
+                  padding:11px 13px;display:grid;gap:5px;margin-top:4px}
+.resumoFechamento > div{display:flex;align-items:baseline;gap:10px;font-size:13.5px}
+.resumoFechamento span{color:var(--muted)}
+.resumoFechamento b{margin-left:auto;font-variant-numeric:tabular-nums}
+.resumoFechamento .destaque{border-top:1px solid var(--line);padding-top:7px;margin-top:2px}
+.resumoFechamento .destaque span{color:var(--ink);font-weight:700}
+.resumoFechamento .destaque b{font-size:18px;color:var(--orange-dk)}
+
+.conferencia{display:flex;align-items:center;gap:7px;margin:12px 0 16px;padding:9px 12px;
+             border-radius:6px;font-size:12.5px;font-weight:600;
+             background:var(--st-vermelho-bg);color:var(--st-vermelho-tx)}
+.conferencia.ok{background:var(--st-verde-bg);color:var(--st-verde-tx)}

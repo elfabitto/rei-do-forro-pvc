@@ -1,0 +1,78 @@
+from django.contrib import admin
+
+from .models import (
+    Agendamento,
+    Bloqueio,
+    ConfiguracaoAgenda,
+    HistoricoOS,
+    OrdemServico,
+    Pagamento,
+)
+
+
+class AgendamentoInline(admin.TabularInline):
+    model = Agendamento
+    extra = 0
+
+
+class PagamentoInline(admin.TabularInline):
+    model = Pagamento
+    extra = 0
+    readonly_fields = ["registrado_por", "registrado_em"]
+
+
+class HistoricoInline(admin.TabularInline):
+    model = HistoricoOS
+    extra = 0
+    can_delete = False
+    readonly_fields = ["de_status", "para_status", "usuario", "em", "observacao"]
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(OrdemServico)
+class OrdemServicoAdmin(admin.ModelAdmin):
+    list_display = ["numero", "cliente", "status", "vendedor", "modalidade", "valor_total", "saldo", "atrasado", "criado_em"]
+    list_filter = ["status", "vendedor", "criado_em"]
+    search_fields = ["numero", "cliente__nome"]
+    readonly_fields = ["numero", "criado_por", "criado_em", "finalizada_por", "finalizada_em",
+                       "cancelada_por", "cancelada_em"]
+    inlines = [AgendamentoInline, PagamentoInline, HistoricoInline]
+
+    @admin.display(description="saldo")
+    def saldo(self, obj):
+        return f"R$ {obj.saldo}"
+
+    @admin.display(description="atrasado", boolean=True)
+    def atrasado(self, obj):
+        return obj.atrasado
+
+    def save_model(self, request, obj, form, change):
+        if not change:
+            obj.criado_por = request.user
+        super().save_model(request, obj, form, change)
+
+
+@admin.register(Agendamento)
+class AgendamentoAdmin(admin.ModelAdmin):
+    list_display = ["ordem", "tipo", "data", "turno", "responsavel", "concluido"]
+    list_filter = ["tipo", "turno", "concluido", "data"]
+    date_hierarchy = "data"
+
+
+@admin.register(Bloqueio)
+class BloqueioAdmin(admin.ModelAdmin):
+    list_display = ["data", "turno", "motivo"]
+    list_filter = ["turno"]
+
+
+@admin.register(ConfiguracaoAgenda)
+class ConfiguracaoAgendaAdmin(admin.ModelAdmin):
+    list_display = ["__str__", "capacidade_turno", "dias_sem_atendimento"]
+
+    def has_add_permission(self, request):
+        return not ConfiguracaoAgenda.objects.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        return False

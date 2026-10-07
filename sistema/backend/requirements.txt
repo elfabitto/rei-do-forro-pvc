@@ -1,0 +1,12 @@
+# Faixas em vez de pins exatos: o ambiente local roda Python 3.14 e o de produção
+# pode diferir. Para congelar a versão exata de um deploy, use `pip freeze > requirements.lock.txt`.
+Django>=5.2,<6.0
+djangorestframework>=3.15,<4.0
+djangorestframework-simplejwt>=5.3,<6.0
+django-cors-headers>=4.4,<5.0
+django-filter>=24.3
+psycopg[binary]>=3.2
+dj-database-url>=2.2
+python-decouple>=3.8
+gunicorn>=23.0
+whitenoise>=6.7

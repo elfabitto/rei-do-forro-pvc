@@ -1,0 +1,167 @@
+/* =========================================================================
+   Layout responsivo, menu recolhível, ícones e cards de listagem.
+   Carregado depois de estilos.css e componentes.css — sobrescreve o que precisa.
+   ========================================================================= */
+
+/* ---------------------------------------------------------------- ícones */
+.ic{flex:0 0 auto;vertical-align:-3px}
+.btn .ic, .chip .ic{margin-right:6px;vertical-align:-3px}
+.btn{display:inline-flex;align-items:center;gap:0;justify-content:center}
+.ic-ent{color:var(--s-entrega)}
+.ic-ins{color:var(--s-instalacao)}
+
+/* ---------------------------------------------------------------- app ---- */
+.app{display:grid;grid-template-columns:238px 1fr;min-height:100vh}
+.menuScrim{display:none}
+
+aside{background:var(--surface);border-right:1px solid var(--line);z-index:35}
+.logo{display:flex;align-items:center;gap:11px;padding:16px 16px;border-bottom:1px solid var(--line-2)}
+.logo img{height:38px;width:auto;flex:0 0 auto}
+.fecharMenu{display:none;margin-left:auto;border:1px solid var(--line);background:#fff;
+            border-radius:6px;width:30px;height:30px;cursor:pointer;color:var(--muted);
+            align-items:center;justify-content:center;flex:0 0 auto}
+
+nav a{display:flex;align-items:center;gap:11px;padding:10px 11px;border-radius:7px;
+      color:var(--ink-2);text-decoration:none;font-weight:600;font-size:14px}
+nav a .ic{color:var(--muted);transition:color .12s}
+nav a:hover{background:var(--surface-2)}
+nav a:hover .ic{color:var(--orange)}
+nav a.on{background:var(--ink);color:#fff}
+nav a.on .ic{color:var(--orange)}
+
+/* topo */
+.top{display:flex;align-items:center;gap:12px;background:var(--surface);
+     border-bottom:1px solid var(--line);padding:11px 20px;position:sticky;top:0;z-index:20}
+.abrirMenu{display:none;border:1px solid var(--line);background:#fff;border-radius:7px;
+           width:38px;height:38px;cursor:pointer;color:var(--ink);
+           align-items:center;justify-content:center;flex:0 0 auto}
+.marcaTopo{display:none;align-items:center;gap:8px;font-weight:800;font-size:14px;letter-spacing:.3px}
+.marcaTopo img{height:30px}
+.marcaTopo i{font-style:normal;color:var(--orange)}
+.quem{display:flex;align-items:center;gap:10px;margin-left:auto}
+.quem b{display:block;font-size:13.5px;line-height:1.2}
+.sairBtn{flex:0 0 auto}
+.sairBtn .ic{margin-right:6px}
+
+/* ---------------------------------------------------------------- páginas */
+.pagina{padding:22px 24px 40px}
+.paginaTopo{display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+.paginaTopo h1{margin:0 0 2px;font-size:20px}
+.paginaTopo .sub{margin:0;color:var(--muted);font-size:13.5px}
+.paginaTopo .grande{margin-left:auto;padding:11px 18px;font-size:14px}
+
+.barraFiltros{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:18px}
+.chip{border:1px solid var(--line);background:#fff;color:var(--ink-2);padding:7px 14px;
+      border-radius:999px;font:600 13px inherit;cursor:pointer;white-space:nowrap}
+.chip:hover{border-color:var(--ink)}
+.chip.on{background:var(--ink);border-color:var(--ink);color:#fff;font-weight:700}
+.contagem{margin-left:auto;font-size:12.5px;color:var(--muted)}
+
+/* ---------------------------------------------------------------- cards -- */
+.cardGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:16px}
+
+.cardItem{background:var(--surface);border:1px solid var(--line);border-radius:10px;
+          box-shadow:var(--shadow);display:flex;flex-direction:column;overflow:hidden;
+          border-top:3px solid var(--deemph)}
+.cardItem.st-aberto,.cardItem.st-gerada{border-top-color:#2a78d6}
+.cardItem.st-convertido,.cardItem.st-em_execucao{border-top-color:var(--orange)}
+.cardItem.st-finalizada{border-top-color:var(--good)}
+.cardItem.st-perdido{border-top-color:#9aa0aa}
+.cardItem.st-cancelada{border-top-color:var(--critical)}
+
+.cardItem > header{display:flex;align-items:center;gap:10px;padding:12px 16px 0}
+.cardItem .numero{margin-left:auto;font-size:12.5px;font-weight:800;color:var(--muted);
+                  letter-spacing:.4px;font-variant-numeric:tabular-nums}
+
+.cardItem .corpo{padding:12px 16px 14px;flex:1 1 auto}
+.cardItem .titulo{display:flex;align-items:center;gap:8px;font-size:15.5px;font-weight:700;
+                  line-height:1.25}
+.cardItem .titulo .ic{color:var(--muted)}
+.cardItem .titulo .pend{font-weight:500;color:var(--orange-dk);font-size:14px}
+.cardItem .sublinha{display:flex;align-items:center;gap:6px;font-size:12.5px;
+                    color:var(--muted);margin-top:3px}
+
+.cardItem .linhas{display:grid;gap:7px;margin:13px 0;padding:11px 0;
+                  border-top:1px solid var(--line-2);border-bottom:1px solid var(--line-2)}
+.cardItem .li{display:flex;align-items:center;gap:8px;font-size:13px;min-width:0}
+.cardItem .li .rot{color:var(--muted);font-weight:600;flex:0 0 auto}
+.cardItem .li .val{margin-left:auto;text-align:right;font-weight:600;
+                   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cardItem .li .pend{color:var(--muted);font-weight:500}
+
+.cardItem .valores{display:flex;gap:10px;background:var(--orange-bg);border-radius:7px;
+                   padding:10px 12px;margin-bottom:11px}
+.cardItem .valores > div{display:flex;flex-direction:column;gap:1px;min-width:0}
+.cardItem .valores span{font-size:10.5px;font-weight:700;letter-spacing:.8px;
+                        text-transform:uppercase;color:var(--muted)}
+.cardItem .valores b{font-variant-numeric:tabular-nums;white-space:nowrap}
+.cardItem .valores .v1{flex:1 1 auto}
+.cardItem .valores .v1 b{font-size:19px;color:var(--orange-dk);letter-spacing:-.4px}
+.cardItem .valores .v2{text-align:right;margin-left:auto}
+.cardItem .valores .v2 b{font-size:14px;color:var(--ink-2)}
+.cardItem .valores .devendo{color:var(--critical)}
+.cardItem .valores .quitado{color:var(--good)}
+
+.cardItem .rodape{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:11.5px;color:var(--muted)}
+.cardItem .rodape span{display:inline-flex;align-items:center;gap:5px}
+
+.cardItem > footer{display:flex;gap:7px;flex-wrap:wrap;align-items:center;
+                   padding:11px 16px;border-top:1px solid var(--line-2);background:var(--surface-2)}
+.cardItem > footer .btn{padding:7px 12px;font-size:12.5px}
+.cardItem .selo{margin-left:auto;font-size:11.5px;font-weight:700;color:var(--good);
+                font-variant-numeric:tabular-nums}
+
+/* ---------------------------------------------------------------- grupos de ação */
+.grupoAcoes{margin-top:16px;border:1px solid var(--line);border-radius:9px;
+            padding:13px 15px;background:var(--surface)}
+.grupoAcoes.destaque{border-color:#f0cdb0;background:#fffaf6}
+.grupoTit{display:flex;align-items:center;gap:7px;font-size:11px;font-weight:800;
+          letter-spacing:1.1px;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
+.grupoAcoes.destaque .grupoTit{color:var(--orange-dk)}
+.grupoAcoes .acts{padding:0}
+.grupoNota{margin:10px 0 0;font-size:12px;color:var(--muted);line-height:1.45}
+
+/* ---------------------------------------------------------------- celular */
+@media (max-width:900px){
+  .app{grid-template-columns:1fr}
+
+  aside{position:fixed;top:0;bottom:0;left:0;width:252px;
+        transform:translateX(-100%);transition:transform .22s ease;
+        box-shadow:4px 0 24px -8px rgba(0,0,0,.25)}
+  aside.aberto{transform:translateX(0)}
+  .fecharMenu{display:flex}
+
+  .app.comMenu .menuScrim{display:block;position:fixed;inset:0;
+                          background:rgba(21,22,26,.45);z-index:34}
+
+  .abrirMenu{display:flex}
+  .marcaTopo{display:flex}
+  .quemTexto{display:none}
+  .sairBtn span{display:none}
+  .sairBtn{padding:9px 11px}
+  .sairBtn .ic{margin-right:0}
+
+  .pagina{padding:18px 14px 36px}
+  .paginaTopo .grande{margin-left:0;width:100%}
+  .cardGrid{grid-template-columns:1fr}
+  .cols.c-2,.cols.c-4{grid-template-columns:1fr}
+  .two{grid-template-columns:1fr}
+  .contagem{width:100%;margin-left:0}
+
+  .modal{max-height:92vh}
+  .drawer{width:100%}
+  .acts .btn,.acts a.btn{flex:1 1 auto;justify-content:center}
+}
+
+@media (max-width:520px){
+  .cardItem .valores{flex-direction:column;gap:6px}
+  .cardItem .valores .v2{text-align:left;margin-left:0}
+  .cardItem > footer .btn{flex:1 1 auto;justify-content:center}
+  .paginaTopo h1{font-size:18px}
+}
+
+/* cores dos ícones nos indicadores do painel */
+.ic-azul{color:var(--s-entrega)}
+.ic-laranja{color:var(--orange)}
+.ic-verde{color:var(--good)}
+.tile .lab{display:flex;align-items:center;gap:6px}

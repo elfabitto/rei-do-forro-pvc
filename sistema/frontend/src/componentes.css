@@ -1,0 +1,225 @@
+/* =========================================================================
+   Formulários, gaveta, documento do orçamento e cardápio de materiais.
+   Complementa estilos.css, que traz o layout e as cores do sistema.
+   ========================================================================= */
+
+/* ---------- navegação ---------- */
+nav .grp{font-size:10.5px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;
+         color:var(--muted);padding:14px 11px 5px}
+.logo{display:flex;align-items:center;gap:11px}
+.logo img{height:40px;width:auto}
+
+/* ---------- etapas numeradas ---------- */
+.step{margin-bottom:24px}
+.step:last-child{margin-bottom:0}
+.step > .h{display:flex;align-items:center;gap:8px;margin-bottom:9px}
+.step > .h .n{width:19px;height:19px;border-radius:50%;background:var(--ink);color:#fff;flex:0 0 auto;
+              font-size:11px;font-weight:800;display:grid;place-items:center}
+.step > .h .t{font-size:11.5px;font-weight:800;letter-spacing:1.1px;text-transform:uppercase;color:var(--ink-2)}
+
+.lbl{display:block;font-size:11.5px;font-weight:700;letter-spacing:.9px;
+     text-transform:uppercase;color:var(--muted);margin-bottom:7px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+textarea{width:100%;padding:11px 12px;font:inherit;border:1px solid var(--line);
+         border-radius:6px;background:#fff;outline:none;resize:vertical}
+textarea:focus{border-color:var(--orange);box-shadow:0 0 0 3px rgba(238,106,30,.14)}
+.dica{display:block;font-size:11.5px;color:var(--muted);margin-top:5px;font-weight:400;
+      letter-spacing:0;text-transform:none}
+.erroCampo{display:block;font-size:11.5px;color:var(--critical);margin-top:5px;font-weight:600;
+           letter-spacing:0;text-transform:none}
+.check{display:flex;align-items:center;gap:8px;font-size:13.5px;cursor:pointer}
+.check input{width:auto;accent-color:var(--orange)}
+.busca{width:260px;padding:8px 11px;font-size:13px}
+@media (max-width:700px){.busca{width:100%}}
+
+/* ---------- segmentado ---------- */
+.seg{display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.seg button{flex:1;padding:10px 6px;border:0;border-right:1px solid var(--line);cursor:pointer;
+            background:#f7f8f9;color:var(--ink-2);font:600 13px inherit}
+.seg button:last-child{border-right:0}
+.seg button.on{background:var(--ink);color:#fff;font-weight:700}
+
+.calc{display:flex;justify-content:space-between;align-items:baseline;background:var(--surface-2);
+      border:1px solid var(--line);border-radius:6px;padding:9px 12px;font-size:13px;color:var(--muted)}
+.calc b{font-size:16px;color:var(--ink);font-variant-numeric:tabular-nums}
+
+.ref{display:flex;align-items:center;gap:11px;padding:11px 12px;margin-top:12px;
+     background:var(--surface-2);border:1px solid var(--line);border-radius:6px}
+.ref .sw{width:36px;height:36px;border-radius:4px;border:1px solid var(--line);flex:0 0 auto}
+.ref .tx{font-size:11.5px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase}
+.ref .tx b{display:block;font-size:13.5px;color:var(--ink);letter-spacing:0;text-transform:none;
+           font-variant-numeric:tabular-nums;margin-top:1px}
+
+/* ---------- opções em cartão ---------- */
+.opts{display:grid;gap:7px}
+.opt{display:flex;align-items:center;gap:10px;cursor:pointer;border:1px solid var(--line);
+     border-radius:6px;padding:11px 12px;transition:border-color .12s,background .12s}
+.opt:hover{border-color:#c9ced6}
+.opt.on{border-color:var(--orange);background:var(--orange-bg)}
+.opt input{accent-color:var(--orange);width:16px;height:16px;cursor:pointer;flex:0 0 auto;margin:0}
+.opt .t{font-size:14.5px;font-weight:600}
+.opt .t small{display:block;font-size:12px;font-weight:400;color:var(--muted);margin-top:1px}
+.opt .v{margin-left:auto;font-size:12.5px;font-weight:700;color:var(--orange-dk);
+        font-variant-numeric:tabular-nums;white-space:nowrap}
+.opt .v.z{color:var(--muted);font-weight:600}
+
+/* ---------- cardápio de materiais ---------- */
+.matgrp{font-size:11px;font-weight:800;letter-spacing:1.1px;text-transform:uppercase;color:var(--muted);
+        margin:16px 0 6px;padding-top:12px;border-top:1px solid var(--line-2)}
+.mat{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line-2)}
+.mat .i{min-width:0}
+.mat .i b{display:block;font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mat .i small{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.mat .i small em{font-style:normal;color:#a7adb6}
+.mat .q{margin-left:auto;display:flex;align-items:center;gap:6px;flex:0 0 auto}
+.mat .q input{width:62px;padding:7px 8px;text-align:right;font-size:14px;font-variant-numeric:tabular-nums}
+.mat .un{font-size:11.5px;font-weight:700;color:var(--muted);width:26px;letter-spacing:.3px}
+.mat .sb{width:84px;text-align:right;font-size:13.5px;font-weight:700;font-variant-numeric:tabular-nums}
+.mat.on{background:var(--orange-bg);box-shadow:inset 3px 0 0 var(--orange);
+        margin:0 -8px;padding:8px;border-radius:3px}
+.mat.on .un{color:var(--orange-dk)}
+.nota{font-size:12px;color:var(--muted);margin:14px 0 0;line-height:1.45}
+
+/* ---------- documento do orçamento ---------- */
+.doc{background:var(--surface);border:1px solid var(--line);border-radius:8px;
+     box-shadow:var(--shadow);overflow:hidden}
+.doc-top{display:flex;align-items:center;gap:12px;padding:16px 22px;border-bottom:1px solid var(--line-2)}
+.doc-top img{height:44px;width:auto}
+.doc-top .n{font-weight:800;font-size:15px;letter-spacing:.3px;line-height:1.2}
+.doc-top .n i{font-style:normal;color:var(--orange)}
+.doc-top .n s{display:block;text-decoration:none;font-weight:600;font-size:10.5px;color:var(--muted);
+              letter-spacing:1.3px;text-transform:uppercase;margin-top:2px}
+.doc-top .mod{margin-left:auto;font-size:11px;letter-spacing:1.2px;text-transform:uppercase;
+              color:var(--muted);font-weight:700}
+.doc-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--ink);
+         color:#fff;padding:11px 22px;font-size:12px;font-weight:800;letter-spacing:2px;text-transform:uppercase}
+.doc-bar .m{color:var(--orange);letter-spacing:1.4px;white-space:nowrap}
+
+.rows{padding:6px 22px 2px}
+.row{display:flex;align-items:baseline;gap:14px;padding:11px 0;border-bottom:1px solid var(--line-2)}
+.row:last-child{border-bottom:0}
+.row .k{font-size:11.5px;font-weight:700;letter-spacing:.9px;text-transform:uppercase;
+        color:var(--muted);flex:0 0 132px}
+.row .v{margin-left:auto;text-align:right;font-weight:700;font-size:15.5px;font-variant-numeric:tabular-nums}
+.row.sm .v{font-size:14.5px;font-weight:600}
+.row.item{padding:10px 0}
+.row.item .k{flex:1 1 auto;font-size:13.5px;font-weight:500;letter-spacing:0;
+             text-transform:none;color:var(--ink-2)}
+.sect{padding:14px 22px 6px;font-size:11.5px;font-weight:800;letter-spacing:1.3px;
+      text-transform:uppercase;color:var(--ink);border-top:1px solid var(--line-2)}
+.obs{padding:2px 22px 14px;font-size:12px;color:var(--muted);line-height:1.45;margin:0}
+.totais{border-top:1px solid var(--line);background:var(--orange-bg);padding:14px 22px}
+.tot{display:flex;align-items:baseline;gap:14px;padding:5px 0}
+.tot .k{font-size:12px;font-weight:800;letter-spacing:1.1px;text-transform:uppercase;color:var(--ink-2)}
+.tot .v{margin-left:auto;font-weight:800;font-size:28px;color:var(--orange-dk);
+        font-variant-numeric:tabular-nums;letter-spacing:-.5px}
+.tot.b .k{color:var(--muted)}
+.tot.b .v{font-size:19px;color:var(--ink-2);font-weight:700}
+
+.acts{display:flex;flex-wrap:wrap;gap:8px;padding:14px 0 0}
+.btn.ok{background:var(--good);border-color:var(--good);color:#fff}
+.btn.ruim{background:#fbeaea;border-color:#f0c2c2;color:#9b2727}
+.lnk{color:var(--orange-dk);font-weight:700;cursor:pointer;background:none;border:0;padding:0;font-size:13px}
+.lnk:hover{text-decoration:underline}
+.lnk:disabled{color:var(--muted);cursor:not-allowed;text-decoration:none}
+.lnk.ok{color:var(--good)}
+.acoes{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.sub2{color:var(--muted);font-size:12px}
+.compacto{font-size:12.5px}
+
+details.raw{margin-top:14px;border-top:1px solid var(--line-2);padding-top:10px}
+details.raw summary{cursor:pointer;font-size:12px;font-weight:700;letter-spacing:.6px;
+                    text-transform:uppercase;color:var(--muted);list-style:none}
+details.raw summary::-webkit-details-marker{display:none}
+details.raw summary::before{content:"+ ";color:var(--orange)}
+details[open].raw summary::before{content:"\2212 "}
+details.raw pre{margin:10px 0 0;white-space:pre-wrap;word-break:break-word;
+                font-family:ui-monospace,Consolas,"Courier New",monospace;
+                font-size:12.5px;line-height:1.7;color:var(--ink-2)}
+
+/* ---------- estado vazio com checklist ---------- */
+.empty{background:var(--surface);border:1px dashed #c9ced6;border-radius:8px;
+       padding:48px 24px;text-align:center}
+.empty b{display:block;color:var(--ink-2);font-size:15px;margin-bottom:14px}
+.empty ol{display:inline-block;text-align:left;margin:0;padding:0;list-style:none;
+          font-size:14px;color:var(--muted)}
+.empty li{padding:4px 0}
+.empty li.ok{color:var(--good)}
+.empty li::before{content:"\25CB  ";font-weight:700}
+.empty li.ok::before{content:"\2713  "}
+
+/* ---------- gaveta ---------- */
+.scrim{position:fixed;inset:0;background:rgba(21,22,26,.45);z-index:40}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(580px,100%);background:var(--surface);
+        z-index:41;display:flex;flex-direction:column;box-shadow:-10px 0 40px -12px rgba(0,0,0,.3)}
+.dh{display:flex;align-items:center;gap:12px;padding:16px 20px;border-bottom:1px solid var(--line);flex:0 0 auto}
+.dh h3{margin:0;font-size:16px}
+.dh .x{margin-left:auto;border:1px solid var(--line);background:#fff;border-radius:6px;
+       width:30px;height:30px;cursor:pointer;font-size:15px;color:var(--muted)}
+.dcorpo{overflow-y:auto;flex:1 1 auto}
+.drodape{border-top:1px solid var(--line);background:var(--surface-2);flex:0 0 auto}
+.sec{padding:16px 20px;border-bottom:1px solid var(--line-2)}
+.sec h4{margin:0 0 10px;font-size:11px;font-weight:800;letter-spacing:1.1px;
+        text-transform:uppercase;color:var(--muted)}
+.kv{display:grid;grid-template-columns:130px 1fr;gap:7px 12px;font-size:13.5px;margin:0}
+.kv dt{color:var(--muted);font-weight:600}
+.kv dd{margin:0;font-weight:600}
+.kv dd.wk{font-weight:500}
+.nada{color:var(--muted);font-size:13px;margin:0}
+.obsbox{margin:12px 0 0;font-size:13px;color:var(--ink-2);background:var(--surface-2);
+        border-left:3px solid var(--line);padding:9px 11px;border-radius:0 5px 5px 0}
+.linha-acao{margin-top:12px;display:grid;gap:8px}
+.btnrow{display:flex;gap:8px;flex-wrap:wrap;padding:14px 20px}
+.pagbox{margin-top:14px;padding:14px;background:var(--surface-2);border:1px solid var(--line);border-radius:6px}
+
+.agenda-lista{display:grid;gap:8px}
+.agenda-item{display:flex;align-items:center;gap:10px;font-size:13.5px}
+.agenda-item .feito{font-size:11.5px;font-weight:700;color:var(--good)}
+.agbox{border:1px solid var(--line);border-radius:6px;padding:12px;margin-bottom:12px}
+.agtit{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.agoff{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer}
+.agoff input{width:auto;accent-color:var(--orange)}
+
+.tl{list-style:none;margin:0;padding:0}
+.tl li{position:relative;padding:0 0 14px 20px;font-size:13px;font-weight:600}
+.tl li::before{content:"";position:absolute;left:0;top:5px;width:9px;height:9px;
+               border-radius:50%;background:var(--deemph)}
+.tl li.done::before{background:var(--orange)}
+.tl li.cancel::before{background:var(--critical)}
+.tl li::after{content:"";position:absolute;left:4px;top:14px;bottom:0;width:1px;background:var(--line)}
+.tl li:last-child{padding-bottom:0}
+.tl li:last-child::after{display:none}
+.tl small{display:block;color:var(--muted);font-size:12px;font-weight:400}
+
+.aviso{display:flex;gap:9px;background:#fef9ec;border:1px solid #f3dca6;border-radius:6px;
+       padding:10px 12px;font-size:12.5px;color:#7a5a00;margin:12px 0}
+.aviso .ic{flex:0 0 auto}
+
+/* ---------- catálogo ---------- */
+.comSwatch{display:flex;align-items:center;gap:9px}
+.comSwatch .sw{width:22px;height:22px;border-radius:4px;border:1px solid var(--line);flex:0 0 auto}
+input.preco{width:94px;padding:6px 8px;text-align:right;font-size:13.5px;
+            font-variant-numeric:tabular-nums}
+input.preco.ok{border-color:var(--good);background:#f2fbf2}
+input.preco.erro{border-color:var(--critical);background:#fdf2f2}
+
+/* ---------- modal central ---------- */
+.modal{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+       width:calc(100% - 32px);max-height:88vh;background:var(--surface);border-radius:10px;
+       z-index:41;display:flex;flex-direction:column;box-shadow:0 24px 60px -16px rgba(0,0,0,.4)}
+.mh{display:flex;align-items:flex-start;gap:12px;padding:18px 20px 14px;
+    border-bottom:1px solid var(--line);flex:0 0 auto}
+.mh h3{margin:0;font-size:17px}
+.msub{margin:4px 0 0;font-size:12.5px;color:var(--muted);line-height:1.4}
+.mh .x{margin-left:auto;border:1px solid var(--line);background:#fff;border-radius:6px;
+       width:30px;height:30px;cursor:pointer;font-size:15px;color:var(--muted);flex:0 0 auto}
+.mcorpo{overflow-y:auto;flex:1 1 auto;padding:18px 20px}
+.mrodape{border-top:1px solid var(--line);background:var(--surface-2);padding:14px 20px;flex:0 0 auto}
+
+/* ---------- cliente pendente na geração da O.S. ---------- */
+.clientebox{display:flex;align-items:center;gap:12px;padding:12px 14px;margin-bottom:16px;
+            background:var(--surface-2);border:1px solid var(--line);border-radius:6px}
+.clientebox b{font-size:15px}
+.clientebox b.pendente{color:var(--orange-dk)}
+.clientebox button{margin-left:auto;flex:0 0 auto}
+.lnk.destaque{color:var(--orange-dk)}
