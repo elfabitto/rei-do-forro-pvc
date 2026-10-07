@@ -26,7 +26,7 @@
     font-family:"Segoe UI",-apple-system,BlinkMacSystemFont,Roboto,Helvetica,Arial,sans-serif;
     font-size:15px;line-height:1.5;
   }
-  .wrap{max-width:1120px;margin:0 auto;padding:0 20px}
+  .wrap{max-width:1180px;margin:0 auto;padding:0 20px}
 
   /* ---------- Topo ---------- */
   .topbar{background:var(--card);border-bottom:3px solid var(--orange);box-shadow:var(--shadow)}
@@ -42,9 +42,8 @@
   h1{font-size:21px;margin:32px 0 2px;letter-spacing:-.3px}
   .sub{color:var(--muted);font-size:14px;margin:0 0 22px}
 
-  /* ---------- Grid ---------- */
-  .grid{display:grid;grid-template-columns:minmax(0,380px) minmax(0,1fr);gap:22px;align-items:start;padding-bottom:56px}
-  @media (max-width:880px){.grid{grid-template-columns:1fr}}
+  .grid{display:grid;grid-template-columns:minmax(0,420px) minmax(0,1fr);gap:22px;align-items:start;padding-bottom:56px}
+  @media (max-width:940px){.grid{grid-template-columns:1fr}}
 
   .panel{background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow)}
   .panel > header{
@@ -53,11 +52,22 @@
   }
   .panel > .body{padding:20px}
 
-  label.f{display:block;margin-bottom:18px}
-  label.f > span,.lbl{
-    display:block;font-size:11.5px;font-weight:700;letter-spacing:.9px;
-    text-transform:uppercase;color:var(--muted);margin-bottom:7px;
+  /* etapas numeradas */
+  .step{margin-bottom:24px}
+  .step:last-child{margin-bottom:0}
+  .step > .h{display:flex;align-items:center;gap:8px;margin-bottom:9px}
+  .step > .h .n{
+    width:19px;height:19px;border-radius:50%;background:var(--ink);color:#fff;flex:0 0 auto;
+    font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;
   }
+  .step > .h .t{font-size:11.5px;font-weight:800;letter-spacing:1.1px;text-transform:uppercase;color:var(--ink-2)}
+
+  .lbl{display:block;font-size:11.5px;font-weight:700;letter-spacing:.9px;
+       text-transform:uppercase;color:var(--muted);margin-bottom:7px}
+  label.f{display:block;margin-bottom:14px}
+  label.f > span{display:block;font-size:11.5px;font-weight:700;letter-spacing:.9px;
+                 text-transform:uppercase;color:var(--muted);margin-bottom:7px}
+
   input[type=text],select{
     width:100%;padding:11px 12px;font:inherit;font-size:15px;color:var(--ink);
     background:#fff;border:1px solid var(--line);border-radius:6px;outline:none;
@@ -69,8 +79,9 @@
     background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='11' height='7'><path d='M1 1l4.5 4.5L10 1' stroke='%2315161a' stroke-width='1.8' fill='none' stroke-linecap='round'/></svg>");
     background-repeat:no-repeat;background-position:right 13px center;
   }
+  select:invalid{color:var(--muted)}
 
-  .seg{display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;margin-bottom:18px}
+  .seg{display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
   .seg button{
     flex:1;padding:10px 6px;border:0;border-right:1px solid var(--line);cursor:pointer;
     background:#f7f8f9;color:var(--ink-2);font:600 13px inherit;transition:background .12s,color .12s;
@@ -82,12 +93,12 @@
   .calc{
     display:flex;justify-content:space-between;align-items:baseline;
     background:#f7f8f9;border:1px solid var(--line);border-radius:6px;
-    padding:9px 12px;margin:-6px 0 18px;font-size:13px;color:var(--muted);
+    padding:9px 12px;font-size:13px;color:var(--muted);
   }
   .calc b{font-size:16px;color:var(--ink);font-variant-numeric:tabular-nums}
 
   .ref{
-    display:flex;align-items:center;gap:11px;padding:11px 12px;margin-bottom:20px;
+    display:flex;align-items:center;gap:11px;padding:11px 12px;margin-top:12px;
     background:#f7f8f9;border:1px solid var(--line);border-radius:6px;
   }
   .ref .sw{width:36px;height:36px;border-radius:4px;border:1px solid var(--line);flex:0 0 auto}
@@ -95,6 +106,7 @@
   .ref .tx b{display:block;font-size:14px;color:var(--ink);letter-spacing:0;text-transform:none;
              font-variant-numeric:tabular-nums;margin-top:1px}
 
+  /* opções em cartão */
   .opts{display:grid;gap:7px}
   .opt{
     display:flex;align-items:center;gap:10px;cursor:pointer;
@@ -104,11 +116,29 @@
   .opt:has(input:checked){border-color:var(--orange);background:var(--orange-bg)}
   .opt input{accent-color:var(--orange);width:16px;height:16px;cursor:pointer;flex:0 0 auto;margin:0}
   .opt .t{font-size:14.5px;font-weight:600}
-  .opt .v{margin-left:auto;font-size:12.5px;font-weight:700;color:var(--orange-dk);font-variant-numeric:tabular-nums}
+  .opt .t small{display:block;font-size:12px;font-weight:400;color:var(--muted);margin-top:1px}
+  .opt .v{margin-left:auto;font-size:12.5px;font-weight:700;color:var(--orange-dk);
+          font-variant-numeric:tabular-nums;white-space:nowrap}
   .opt .v.z{color:var(--muted);font-weight:600}
 
+  /* cardápio de materiais */
+  .matgrp{font-size:11px;font-weight:800;letter-spacing:1.1px;text-transform:uppercase;
+          color:var(--muted);margin:16px 0 6px;padding-top:12px;border-top:1px solid var(--line-2)}
+  .matgrp:first-child{margin-top:0;padding-top:0;border-top:0}
+  .mat{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line-2)}
+  .mat .i{min-width:0}
+  .mat .i b{display:block;font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .mat .i small{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+  .mat .q{margin-left:auto;display:flex;align-items:center;gap:7px;flex:0 0 auto}
+  .mat .q input{width:66px;padding:7px 8px;text-align:right;font-size:14px;font-variant-numeric:tabular-nums}
+  .mat .sb{width:84px;text-align:right;font-size:13.5px;font-weight:700;color:var(--ink);
+           font-variant-numeric:tabular-nums}
+  .mat .sb:empty::before{content:"—";color:#c4c9d0;font-weight:400}
+  .mat.on{background:var(--orange-bg);box-shadow:inset 3px 0 0 var(--orange);
+          margin:0 -8px;padding-left:8px;padding-right:8px;border-radius:3px}
+  .nota{font-size:12px;color:var(--muted);margin:14px 0 0;line-height:1.45}
+
   /* ---------- Documento ---------- */
-  .docs{display:grid;gap:22px}
   .doc{background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow);overflow:hidden}
   .doc-top{display:flex;align-items:center;gap:12px;padding:16px 22px;border-bottom:1px solid var(--line-2)}
   .doc-top img{height:44px;width:auto}
@@ -116,29 +146,32 @@
   .doc-top .n i{font-style:normal;color:var(--orange)}
   .doc-top .n s{display:block;text-decoration:none;font-weight:600;font-size:10.5px;
                 color:var(--muted);letter-spacing:1.3px;text-transform:uppercase;margin-top:2px}
-  .doc-top .mod{
-    margin-left:auto;text-align:right;font-size:11px;letter-spacing:1.2px;
-    text-transform:uppercase;color:var(--muted);font-weight:700;
-  }
+  .doc-top .mod{margin-left:auto;text-align:right;font-size:11px;letter-spacing:1.2px;
+                text-transform:uppercase;color:var(--muted);font-weight:700}
   .doc-bar{
     display:flex;align-items:center;justify-content:space-between;gap:12px;
     background:var(--ink);color:#fff;padding:11px 22px;
     font-size:12px;font-weight:800;letter-spacing:2px;text-transform:uppercase;
   }
-  .doc-bar .m{color:var(--orange);letter-spacing:1.4px;text-align:right}
+  .doc-bar .m{color:var(--orange);letter-spacing:1.4px;text-align:right;white-space:nowrap}
 
   .rows{padding:6px 22px 2px}
   .row{display:flex;align-items:baseline;gap:14px;padding:11px 0;border-bottom:1px solid var(--line-2)}
   .row:last-child{border-bottom:0}
-  .row .k{font-size:11.5px;font-weight:700;letter-spacing:.9px;text-transform:uppercase;color:var(--muted);flex:0 0 132px}
+  .row .k{font-size:11.5px;font-weight:700;letter-spacing:.9px;text-transform:uppercase;
+          color:var(--muted);flex:0 0 132px}
   .row .v{margin-left:auto;text-align:right;font-weight:700;font-size:15.5px;font-variant-numeric:tabular-nums}
   .row.sm .v{font-size:14.5px;font-weight:600}
+  .row.item{padding:10px 0}
+  .row.item .k{flex:1 1 auto;font-size:13.5px;font-weight:500;letter-spacing:0;
+               text-transform:none;color:var(--ink-2)}
+  .row.item .v{font-size:14.5px}
 
-  .sect{
-    padding:14px 22px 6px;font-size:11.5px;font-weight:800;letter-spacing:1.3px;
-    text-transform:uppercase;color:var(--ink);border-top:1px solid var(--line-2);
-  }
+  .sect{padding:14px 22px 6px;font-size:11.5px;font-weight:800;letter-spacing:1.3px;
+        text-transform:uppercase;color:var(--ink);border-top:1px solid var(--line-2)}
   .sect span{color:var(--muted);font-weight:600;letter-spacing:.4px;text-transform:none;margin-left:6px}
+
+  .obs{padding:2px 22px 14px;font-size:12px;color:var(--muted);line-height:1.45}
 
   .totais{border-top:1px solid var(--line);background:var(--orange-bg);padding:14px 22px}
   .tot{display:flex;align-items:baseline;gap:14px;padding:5px 0}
@@ -150,7 +183,7 @@
 
   .acts{display:flex;flex-wrap:wrap;gap:8px;padding:14px 22px;border-top:1px solid var(--line)}
   .btn{
-    border:1px solid var(--line);background:#fff;color:var(--ink);
+    border:1px solid var(--line);background:#fff;color:var(--ink);text-decoration:none;
     padding:9px 15px;border-radius:6px;font:600 13px inherit;cursor:pointer;white-space:nowrap;
     transition:border-color .12s,background .12s,color .12s;
   }
@@ -160,23 +193,23 @@
   .btn.ok{background:#0f8a43;border-color:#0f8a43;color:#fff}
 
   details.raw{border-top:1px solid var(--line-2)}
-  details.raw summary{
-    padding:11px 22px;cursor:pointer;font-size:12px;font-weight:700;letter-spacing:.6px;
-    text-transform:uppercase;color:var(--muted);list-style:none;
-  }
+  details.raw summary{padding:11px 22px;cursor:pointer;font-size:12px;font-weight:700;
+                      letter-spacing:.6px;text-transform:uppercase;color:var(--muted);list-style:none}
   details.raw summary::-webkit-details-marker{display:none}
   details.raw summary::before{content:"+ ";color:var(--orange)}
   details[open].raw summary::before{content:"− "}
-  details.raw pre{
-    margin:0;padding:0 22px 18px;white-space:pre-wrap;word-break:break-word;
-    font-family:ui-monospace,Consolas,"Courier New",monospace;font-size:12.5px;line-height:1.7;color:var(--ink-2);
-  }
+  details.raw pre{margin:0;padding:0 22px 18px;white-space:pre-wrap;word-break:break-word;
+                  font-family:ui-monospace,Consolas,"Courier New",monospace;
+                  font-size:12.5px;line-height:1.7;color:var(--ink-2)}
 
-  .empty{
-    background:var(--card);border:1px dashed #c9ced6;border-radius:8px;
-    padding:64px 24px;text-align:center;color:var(--muted);font-size:14px;
-  }
-  .empty b{display:block;color:var(--ink-2);font-size:15px;margin-bottom:4px}
+  .empty{background:var(--card);border:1px dashed #c9ced6;border-radius:8px;padding:48px 24px;text-align:center}
+  .empty b{display:block;color:var(--ink-2);font-size:15px;margin-bottom:14px}
+  .empty ol{display:inline-block;text-align:left;margin:0;padding:0;list-style:none;
+            font-size:14px;color:var(--muted)}
+  .empty li{padding:4px 0}
+  .empty li.ok{color:#0f8a43}
+  .empty li::before{content:"○  ";font-weight:700}
+  .empty li.ok::before{content:"✓  "}
 
   footer{border-top:1px solid var(--line);padding:22px 0 40px;color:var(--muted);font-size:12.5px}
   footer .wrap{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
@@ -197,56 +230,79 @@
 
 <div class="wrap">
   <h1>Novo orçamento</h1>
-  <p class="sub">Informe a área e o tipo de forro para gerar o orçamento pronto para envio.</p>
+  <p class="sub">Preencha as etapas para gerar o orçamento pronto para envio.</p>
 
   <div class="grid">
 
     <!-- ENTRADA -->
     <section class="panel">
-      <header>Dados da obra</header>
+      <header>Dados do orçamento</header>
       <div class="body">
 
-        <div class="lbl">Medida</div>
-        <div class="seg">
-          <button type="button" id="tabArea" class="on">Área em m²</button>
-          <button type="button" id="tabMed">Largura × Comprimento</button>
-        </div>
-
-        <div id="paneArea">
-          <label class="f">
-            <span>Área do compartimento (m²)</span>
-            <input type="text" id="area" inputmode="decimal" placeholder="Ex.: 23">
-          </label>
-        </div>
-
-        <div id="paneMed" hidden>
-          <div class="two">
-            <label class="f"><span>Largura (m)</span>
-              <input type="text" id="larg" inputmode="decimal" placeholder="Ex.: 4,60"></label>
-            <label class="f"><span>Comprimento (m)</span>
-              <input type="text" id="comp" inputmode="decimal" placeholder="Ex.: 5"></label>
+        <!-- 1. medida -->
+        <div class="step">
+          <div class="h"><span class="n">1</span><span class="t">Medida</span></div>
+          <div class="seg" style="margin-bottom:14px">
+            <button type="button" id="tabArea" class="on">Área em m²</button>
+            <button type="button" id="tabMed">Largura × Comprimento</button>
           </div>
-          <div class="calc"><span>Área calculada</span><b id="areaCalc">—</b></div>
+          <div id="paneArea">
+            <label class="f" style="margin-bottom:0">
+              <span>Área do compartimento (m²)</span>
+              <input type="text" id="area" inputmode="decimal" placeholder="Ex.: 23">
+            </label>
+          </div>
+          <div id="paneMed" hidden>
+            <div class="two">
+              <label class="f"><span>Largura (m)</span>
+                <input type="text" id="larg" inputmode="decimal" placeholder="Ex.: 4,60"></label>
+              <label class="f"><span>Comprimento (m)</span>
+                <input type="text" id="comp" inputmode="decimal" placeholder="Ex.: 5"></label>
+            </div>
+            <div class="calc"><span>Área calculada</span><b id="areaCalc">—</b></div>
+          </div>
         </div>
 
-        <label class="f">
-          <span>Tipo de forro</span>
-          <select id="forro"></select>
-        </label>
-
-        <div class="ref">
-          <div class="sw" id="swatch"></div>
-          <div class="tx">Preço do m² — só o forro<b id="precoBase">—</b></div>
+        <!-- 2. forro -->
+        <div class="step">
+          <div class="h"><span class="n">2</span><span class="t">Tipo de forro</span></div>
+          <select id="forro" required></select>
+          <div class="ref" id="refBox" hidden>
+            <div class="sw" id="swatch"></div>
+            <div class="tx">Preço do m² — só o forro<b id="precoBase">—</b></div>
+          </div>
         </div>
 
-        <div class="lbl">Acabamento</div>
-        <div class="opts">
-          <label class="opt"><input type="radio" name="acab" value="0" checked>
-            <span class="t">Acabamento normal (Perfil)</span><span class="v z">Incluso</span></label>
-          <label class="opt"><input type="radio" name="acab" value="4">
-            <span class="t">Moldura (4 cm)</span><span class="v">+ R$ 4,00/m²</span></label>
-          <label class="opt"><input type="radio" name="acab" value="8">
-            <span class="t">Sanca (8 cm)</span><span class="v">+ R$ 8,00/m²</span></label>
+        <!-- 3. tipo de orçamento -->
+        <div class="step">
+          <div class="h"><span class="n">3</span><span class="t">Tipo de orçamento</span></div>
+          <div class="opts">
+            <label class="opt"><input type="radio" name="tipo" value="material">
+              <span class="t">Material<small>Só o forro + lista de materiais</small></span></label>
+            <label class="opt"><input type="radio" name="tipo" value="instalado">
+              <span class="t">Instalado<small>Instalação completa, preço por m²</small></span></label>
+          </div>
+        </div>
+
+        <!-- 4a. acabamento (instalado) -->
+        <div class="step" id="stepAcab" hidden>
+          <div class="h"><span class="n">4</span><span class="t">Acabamento</span></div>
+          <div class="opts">
+            <label class="opt"><input type="radio" name="acab" value="0" checked>
+              <span class="t">Acabamento normal (Perfil)</span><span class="v z">Incluso</span></label>
+            <label class="opt"><input type="radio" name="acab" value="4">
+              <span class="t">Moldura (4 cm)</span><span class="v">+ R$ 4,00/m²</span></label>
+            <label class="opt"><input type="radio" name="acab" value="8">
+              <span class="t">Sanca (8 cm)</span><span class="v">+ R$ 8,00/m²</span></label>
+          </div>
+        </div>
+
+        <!-- 4b. materiais -->
+        <div class="step" id="stepMat" hidden>
+          <div class="h"><span class="n">4</span><span class="t">Materiais</span></div>
+          <div id="listaMat"></div>
+          <p class="nota">Informe a quantidade dos itens que entram no orçamento.
+             Deixe em branco o que não for usado.</p>
         </div>
 
       </div>
@@ -265,7 +321,9 @@
 
 <script src="logo-data.js"></script>
 <script>
-/* ---------- Catálogo (R$/m²) ---------- */
+/* ============ Tabela de preços ============ */
+
+/* Forro, R$/m² */
 const CATALOGO = [
   { nome:"BRANCO GERMINADO",         forroVista:22.90, forroCartao:24.70, instVista:50.00, instCartao:54.00, cor:"repeating-linear-gradient(90deg,#fff 0 7px,#dfe3e8 7px 9px)" },
   { nome:"BRANCO LISO FOSCO",        forroVista:24.00, forroCartao:25.90, instVista:54.00, instCartao:58.30, cor:"#f1f2f4" },
@@ -281,23 +339,60 @@ const CATALOGO = [
   { nome:"ADESIVADO FREIJÓ COLONIAL",forroVista:46.00, forroCartao:49.70, instVista:80.00, instCartao:86.40, cor:"linear-gradient(135deg,#d9a86d,#bd8a50)" },
 ];
 
+/* Materiais avulsos — só entram no orçamento de MATERIAL.
+   `nome` aparece na tela (sob o título do grupo); `rotulo` vai no orçamento, completo. */
+const MATERIAIS = [
+  { id:"perfil",  grupo:"",          nome:"Perfil 6 m",   rotulo:"Perfil 6 m",          unid:"und",   preco:25.00 },
+  { id:"moldura", grupo:"",          nome:"Moldura 6 m",  rotulo:"Moldura 6 m",         unid:"und",   preco:40.00 },
+  { id:"sanca",   grupo:"",          nome:"Sanca 6 m",    rotulo:"Sanca 6 m",           unid:"und",   preco:50.00 },
+  { id:"rip-cut", grupo:"Ripão 4 m", nome:"Cutiuba",      rotulo:"Ripão 4 m Cutiuba",   unid:"dúzia", preco:150.00 },
+  { id:"rip-cup", grupo:"Ripão 4 m", nome:"Cupiuba",      rotulo:"Ripão 4 m Cupiuba",   unid:"dúzia", preco:180.00 },
+  { id:"prg-212", grupo:"Pregos",    nome:"Prego 2 × 12", rotulo:"Prego 2 × 12",        unid:"kg",    preco:30.00 },
+  { id:"prg-116", grupo:"Pregos",    nome:"Prego 1 × 16", rotulo:"Prego 1 × 16",        unid:"kg",    preco:40.00 },
+];
+
+/* Acréscimo do cartão sobre os materiais avulsos.
+   A tabela só traz preço único para eles, então o padrão é 0 (sem acréscimo).
+   Para cobrar os mesmos ~8% que o forro tem no cartão, use 0.08. */
+const ACRESCIMO_CARTAO_MATERIAIS = 0;
+
 const ACABAMENTOS = { 0:"ACABAMENTO NORMAL (PERFIL)", 4:"MOLDURA (4 cm)", 8:"SANCA (8 cm)" };
 
-/* ---------- Helpers ---------- */
+/* ============ Helpers ============ */
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
 const num = v => { const n = parseFloat(String(v).replace(/\./g,"").replace(",",".")); return isFinite(n) && n > 0 ? n : 0; };
 const brl = n => n.toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2});
 const m2  = n => n.toLocaleString("pt-BR",{maximumFractionDigits:2});
+const qtd = n => n.toLocaleString("pt-BR",{maximumFractionDigits:2});
+/* "1 dúzia" / "2 dúzias"; und e kg não flexionam */
+const unid = (q, u) => u === "dúzia" && q > 1 ? "dúzias" : u;
+const itemDesc = i => `${i.rotulo} — ${qtd(i.q)} ${unid(i.q, i.unid)} × R$ ${brl(i.preco)}`;
 
 $("logoTop").src = LOGO;
 
-/* ---------- Select ---------- */
+/* ============ Monta os campos ============ */
 const sel = $("forro");
+sel.add(new Option("Selecione o tipo de forro", "", true, true));
+sel.options[0].disabled = true;
 CATALOGO.forEach((p,i) => sel.add(new Option(`${p.nome} — R$ ${brl(p.forroVista)}/m²`, i)));
-sel.value = 2;
 
-/* ---------- Abas ---------- */
+/* cardápio de materiais, montado uma única vez (não é redesenhado a cada tecla) */
+$("listaMat").innerHTML = MATERIAIS.map((m,i) => {
+  const cab = m.grupo && (i === 0 || MATERIAIS[i-1].grupo !== m.grupo)
+            ? `<div class="matgrp">${esc(m.grupo)}</div>` : "";
+  const primeiroSemGrupo = !m.grupo && i === 0 ? `<div class="matgrp">Avulsos</div>` : "";
+  return cab + primeiroSemGrupo + `
+    <div class="mat" id="row-${m.id}">
+      <div class="i"><b>${esc(m.nome)}</b><small>R$ ${brl(m.preco)} / ${esc(m.unid)}</small></div>
+      <div class="q">
+        <input type="text" id="q-${m.id}" inputmode="decimal" placeholder="0" aria-label="${esc(m.nome)}">
+        <span class="sb" id="sb-${m.id}"></span>
+      </div>
+    </div>`;
+}).join("");
+
+/* ============ Estado ============ */
 let modo = "area";
 function setModo(m){
   modo = m;
@@ -310,25 +405,31 @@ function setModo(m){
 $("tabArea").onclick = () => setModo("area");
 $("tabMed").onclick  = () => setModo("med");
 
-function getArea(){
-  if (modo === "area") return num($("area").value);
-  return Math.round(num($("larg").value) * num($("comp").value) * 100) / 100;
-}
+const getArea = () => modo === "area"
+  ? num($("area").value)
+  : Math.round(num($("larg").value) * num($("comp").value) * 100) / 100;
 
-/* ---------- Modelo do orçamento ---------- */
-function bloco(titulo, area, forro, vistaM2, cartaoM2, acab){
-  const v = vistaM2 + acab, c = cartaoM2 + acab;
+const getTipo = () => (document.querySelector("input[name=tipo]:checked") || {}).value || "";
+
+/* ============ Modelo do orçamento ============ */
+
+/* Instalado: preço por m² da tabela + acabamento */
+function orcInstalado(area, p, acab){
+  const v = p.instVista + acab, c = p.instCartao + acab;
   const d = {
-    titulo, area, forro, acab, acabNome: ACABAMENTOS[acab],
-    vistaM2:v, cartaoM2:c, totalVista: area * v, totalCartao: area * c,
+    titulo:"INSTALAÇÃO COMPLETA", area, forro:p.nome,
+    resumo:[ ["Área", `${m2(area)} m²`], ["Forro", p.nome], ["Acabamento", ACABAMENTOS[acab]] ],
+    secao:"Valor do metro quadrado",
+    linhas:[ ["À vista", `R$ ${brl(v)}/m²`], ["No cartão", `R$ ${brl(c)}/m²`] ],
+    obs:"", totalVista: area * v, totalCartao: area * c,
   };
   d.texto = `*ORÇAMENTO — REI DO FORRO*
 ----------
 *Área:* ${m2(area)}m²
-*Forro:* ${forro}
-*Acabamento:* ${d.acabNome}
+*Forro:* ${p.nome}
+*Acabamento:* ${ACABAMENTOS[acab]}
 
-*${titulo}*
+*INSTALAÇÃO COMPLETA*
 _valor do metro quadrado_
 *À vista*: R$ ${brl(v)}/m²
 *No cartão*: R$ ${brl(c)}/m²
@@ -339,8 +440,51 @@ _valor do metro quadrado_
   return d;
 }
 
-/* ---------- Documento em HTML ---------- */
-function docHTML(d, idx){
+/* Material: forro por m² + itens escolhidos */
+function orcMaterial(area, p, itens){
+  const forroVista  = area * p.forroVista;
+  const forroCartao = area * p.forroCartao;
+  const matTotal    = itens.reduce((s,i) => s + i.total, 0);
+
+  const d = {
+    titulo:"MATERIAL", area, forro:p.nome,
+    resumo:[ ["Área", `${m2(area)} m²`], ["Forro", p.nome] ],
+    secao:"Itens do orçamento",
+    linhas:[
+      [`Forro ${m2(area)} m² × R$ ${brl(p.forroVista)}/m²`, `R$ ${brl(forroVista)}`],
+      ...itens.map(i => [itemDesc(i), `R$ ${brl(i.total)}`]),
+    ],
+    obs:`No cartão o forro sai a R$ ${brl(p.forroCartao)}/m²`
+        + (ACRESCIMO_CARTAO_MATERIAIS
+           ? ` e os materiais têm acréscimo de ${m2(ACRESCIMO_CARTAO_MATERIAIS*100)}%.`
+           : " e os demais materiais não têm acréscimo."),
+    totalVista:  forroVista + matTotal,
+    totalCartao: forroCartao + matTotal * (1 + ACRESCIMO_CARTAO_MATERIAIS),
+  };
+
+  const lista = [
+    `• Forro ${m2(area)}m² × R$ ${brl(p.forroVista)}/m² = R$ ${brl(forroVista)}`,
+    ...itens.map(i => `• ${itemDesc(i)} = R$ ${brl(i.total)}`),
+  ].join("\n");
+
+  d.texto = `*ORÇAMENTO DE MATERIAL — REI DO FORRO*
+----------
+*Área:* ${m2(area)}m²
+*Forro:* ${p.nome}
+
+*ITENS*
+${lista}
+----------
+*VALOR TOTAL*
+💵 *À vista*: R$ ${brl(d.totalVista)}
+💳 *No cartão*: R$ ${brl(d.totalCartao)}
+
+_${d.obs}_`;
+  return d;
+}
+
+/* ============ Documento em HTML ============ */
+function docHTML(d){
   return `<article class="doc">
     <div class="doc-top">
       <img src="${LOGO}" alt="">
@@ -349,17 +493,13 @@ function docHTML(d, idx){
     </div>
     <div class="doc-bar"><span>${esc(d.titulo)}</span><span class="m">${m2(d.area)} m²</span></div>
 
-    <div class="rows">
-      <div class="row"><span class="k">Área</span><span class="v">${m2(d.area)} m²</span></div>
-      <div class="row"><span class="k">Forro</span><span class="v">${esc(d.forro)}</span></div>
-      <div class="row"><span class="k">Acabamento</span><span class="v">${esc(d.acabNome)}</span></div>
-    </div>
+    <div class="rows">${d.resumo.map(([k,v]) =>
+      `<div class="row"><span class="k">${esc(k)}</span><span class="v">${esc(v)}</span></div>`).join("")}</div>
 
-    <div class="sect">Valor do metro quadrado <span>· ${esc(d.titulo.toLowerCase())}</span></div>
-    <div class="rows">
-      <div class="row sm"><span class="k">À vista</span><span class="v">R$ ${brl(d.vistaM2)}/m²</span></div>
-      <div class="row sm"><span class="k">No cartão</span><span class="v">R$ ${brl(d.cartaoM2)}/m²</span></div>
-    </div>
+    <div class="sect">${esc(d.secao)}</div>
+    <div class="rows">${d.linhas.map(([k,v]) =>
+      `<div class="row sm item"><span class="k">${esc(k)}</span><span class="v">${esc(v)}</span></div>`).join("")}</div>
+    ${d.obs ? `<p class="obs">${esc(d.obs)}</p>` : ""}
 
     <div class="totais">
       <div class="tot"><span class="k">Total à vista</span><span class="v">R$ ${brl(d.totalVista)}</span></div>
@@ -367,93 +507,104 @@ function docHTML(d, idx){
     </div>
 
     <div class="acts">
-      <button class="btn p" data-act="imagem" data-i="${idx}">Copiar imagem</button>
-      <button class="btn"   data-act="texto"  data-i="${idx}">Copiar texto</button>
-      <button class="btn"   data-act="baixar" data-i="${idx}">Baixar PNG</button>
-      <a class="btn" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(d.texto)}">WhatsApp</a>
+      <button class="btn p" data-act="imagem">Copiar imagem</button>
+      <button class="btn"   data-act="texto">Copiar texto</button>
+      <button class="btn"   data-act="baixar">Baixar PNG</button>
+      <a class="btn" target="_blank" rel="noopener"
+         href="https://wa.me/?text=${encodeURIComponent(d.texto)}">WhatsApp</a>
     </div>
 
     <details class="raw"><summary>Texto para WhatsApp</summary><pre>${esc(d.texto)}</pre></details>
   </article>`;
 }
 
-/* ---------- Imagem (canvas, sem biblioteca) ---------- */
+/* ============ Imagem (canvas, sem biblioteca) ============ */
 const logoImg = new Image();
 const logoPronta = new Promise(ok => { logoImg.onload = ok; logoImg.onerror = ok; logoImg.src = LOGO; });
 const FF = '"Segoe UI", Arial, Helvetica, sans-serif';
 
 function desenhar(d){
-  const W = 1000, PAD = 56;
+  const W = 1000, PAD = 56, MAXT = W - PAD * 2;
   const C = { ink:"#15161a", ink2:"#464a52", muted:"#7c828d", line:"#e4e7eb",
               orange:"#ee6a1e", orangeDk:"#cf5513", orangeBg:"#fdf1e8" };
 
   const itens = [];
   const add = (h, draw) => itens.push({ h, draw });
+  const ls = (x, v) => { if (x.letterSpacing !== undefined) x.letterSpacing = v; };
+
+  /* reduz a fonte até o texto caber na largura disponível */
+  const cabe = (x, txt, max, base, peso) => {
+    let f = base;
+    while (f > 13){ x.font = `${peso} ${f}px ${FF}`; if (x.measureText(txt).width <= max) break; f -= 1; }
+    return f;
+  };
 
   const linha = (k, v, o = {}) => add(o.h || 56, (x, y) => {
-    x.textAlign = "left";
-    x.font = `700 20px ${FF}`; x.fillStyle = C.muted;
-    if (x.letterSpacing !== undefined) x.letterSpacing = "1px";
-    x.fillText(k.toUpperCase(), PAD, y);
-    if (x.letterSpacing !== undefined) x.letterSpacing = "0px";
     x.textAlign = "right";
-    x.font = `${o.peso || 700} ${o.fv || 28}px ${FF}`; x.fillStyle = o.cor || C.ink;
+    x.font = `${o.peso || 700} ${o.fv || 28}px ${FF}`;
+    const wv = x.measureText(v).width;
+    x.fillStyle = o.cor || C.ink;
     x.fillText(v, W - PAD, y);
+
     x.textAlign = "left";
+    const max = MAXT - wv - 24;
+    if (o.item){
+      x.fillStyle = C.ink2; cabe(x, k, max, 21, 500);
+      x.fillText(k, PAD, y);
+    } else {
+      x.fillStyle = C.muted; ls(x, "1px");
+      x.font = `700 20px ${FF}`;
+      x.fillText(k.toUpperCase(), PAD, y);
+      ls(x, "0px");
+    }
     x.strokeStyle = C.line; x.lineWidth = 1;
     x.beginPath(); x.moveTo(PAD, y + 17.5); x.lineTo(W - PAD, y + 17.5); x.stroke();
   });
 
-  const titulo = txt => add(50, (x, y) => {
-    x.font = `800 19px ${FF}`; x.fillStyle = C.ink;
-    if (x.letterSpacing !== undefined) x.letterSpacing = "1.4px";
-    x.fillText(txt.toUpperCase(), PAD, y);
-    if (x.letterSpacing !== undefined) x.letterSpacing = "0px";
+  const secao = txt => add(50, (x, y) => {
+    x.textAlign = "left"; x.font = `800 19px ${FF}`; x.fillStyle = C.ink; ls(x, "1.4px");
+    x.fillText(txt.toUpperCase(), PAD, y); ls(x, "0px");
   });
 
-  const nomeFonte = d.forro.length > 22 ? 24 : 28;
-  linha("Área", `${m2(d.area)} m²`);
-  linha("Forro", d.forro, { fv: nomeFonte });
-  linha("Acabamento", d.acabNome, { fv: 24 });
+  /* corpo */
+  d.resumo.forEach(([k, v]) => linha(k, v, { fv: v.length > 22 ? 24 : 28 }));
   add(14, () => {});
-  titulo(`Valor do metro quadrado · ${d.titulo}`);
-  linha("À vista", `R$ ${brl(d.vistaM2)}/m²`, { h: 52, fv: 25 });
-  linha("No cartão", `R$ ${brl(d.cartaoM2)}/m²`, { h: 52, fv: 25 });
+  secao(d.secao);
+  d.linhas.forEach(([k, v]) => linha(k, v, { h: 50, fv: 24, item: k.length > 16 }));
+
+  if (d.obs) add(44, (x, y) => {
+    x.textAlign = "left"; x.font = `400 18px ${FF}`; x.fillStyle = C.muted;
+    x.fillText(d.obs, PAD, y + 4);
+  });
 
   const HEAD = 118, BAR = 56, TOT = 176, FOOT = 54;
-  const corpo = itens.reduce((s, i) => s + i.h, 0) + 30;
-  const H = HEAD + BAR + corpo + TOT + FOOT;
+  const H = HEAD + BAR + itens.reduce((s, i) => s + i.h, 0) + 30 + TOT + FOOT;
 
   const cv = document.createElement("canvas");
   cv.width = W; cv.height = H;
   const x = cv.getContext("2d");
   x.textBaseline = "alphabetic";
-
   x.fillStyle = "#fff"; x.fillRect(0, 0, W, H);
 
-  /* cabeçalho branco com a logo */
+  /* cabeçalho com a logo */
   if (logoImg.naturalWidth) x.drawImage(logoImg, PAD - 10, 12, 92, 92);
-  x.textAlign = "left";
-  x.font = `800 26px ${FF}`;
+  x.textAlign = "left"; x.font = `800 26px ${FF}`;
   const bx = PAD + 92, t1 = "REI DO ", w1 = x.measureText(t1).width;
   x.fillStyle = C.ink;    x.fillText(t1, bx, 56);
   x.fillStyle = C.orange; x.fillText("FORRO", bx + w1, 56);
-  x.font = `600 15px ${FF}`; x.fillStyle = C.muted;
-  if (x.letterSpacing !== undefined) x.letterSpacing = "2px";
+  x.font = `600 15px ${FF}`; x.fillStyle = C.muted; ls(x, "2px");
   x.fillText("FORRO DE PVC", bx, 80);
-  x.textAlign = "right";
-  x.font = `700 16px ${FF}`; x.fillStyle = C.muted;
+  x.textAlign = "right"; x.font = `700 16px ${FF}`; x.fillStyle = C.muted;
   x.fillText("ORÇAMENTO", W - PAD, 60);
-  if (x.letterSpacing !== undefined) x.letterSpacing = "0px";
+  ls(x, "0px");
 
   /* faixa preta */
   x.fillStyle = C.ink; x.fillRect(0, HEAD, W, BAR);
-  x.textAlign = "left"; x.fillStyle = "#fff"; x.font = `800 22px ${FF}`;
-  if (x.letterSpacing !== undefined) x.letterSpacing = "3px";
+  x.textAlign = "left"; x.fillStyle = "#fff"; x.font = `800 22px ${FF}`; ls(x, "3px");
   x.fillText(d.titulo, PAD, HEAD + 37);
-  x.textAlign = "right"; x.fillStyle = C.orange; x.font = `800 22px ${FF}`;
+  x.textAlign = "right"; x.fillStyle = C.orange;
   x.fillText(`${m2(d.area)} M²`, W - PAD, HEAD + 37);
-  if (x.letterSpacing !== undefined) x.letterSpacing = "0px";
+  ls(x, "0px");
 
   let y = HEAD + BAR + 46;
   for (const it of itens){ it.draw(x, y); y += it.h; }
@@ -462,11 +613,10 @@ function desenhar(d){
   const ty = H - FOOT - TOT;
   x.fillStyle = C.orangeBg; x.fillRect(0, ty, W, TOT);
   x.fillStyle = C.orange;   x.fillRect(0, ty, W, 4);
-  x.textAlign = "left"; x.font = `800 20px ${FF}`; x.fillStyle = C.ink2;
-  if (x.letterSpacing !== undefined) x.letterSpacing = "1.2px";
+  x.textAlign = "left"; x.font = `800 20px ${FF}`; x.fillStyle = C.ink2; ls(x, "1.2px");
   x.fillText("TOTAL À VISTA", PAD, ty + 62);
   x.fillStyle = C.muted; x.fillText("TOTAL NO CARTÃO", PAD, ty + 130);
-  if (x.letterSpacing !== undefined) x.letterSpacing = "0px";
+  ls(x, "0px");
   x.textAlign = "right";
   x.font = `800 54px ${FF}`; x.fillStyle = C.orangeDk;
   x.fillText(`R$ ${brl(d.totalVista)}`, W - PAD, ty + 70);
@@ -490,38 +640,61 @@ function baixar(blob, nome){
 }
 
 function nomeArquivo(d){
-  const acentos = new RegExp("[\\u0300-\\u036f]", "g");   // marcas de acento soltas pelo NFD
+  const acentos = new RegExp("[\\u0300-\\u036f]", "g");   // marcas soltas pelo NFD
   const slug = s => s.toLowerCase().normalize("NFD").replace(acentos, "")
                      .replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
-  return `orcamento-${slug(d.forro)}-${slug(d.titulo)}-${slug(m2(d.area))}m2.png`;
+  return `orcamento-${slug(d.titulo)}-${slug(d.forro)}-${slug(m2(d.area))}m2.png`;
 }
 
-/* ---------- Render ---------- */
+/* ============ Render ============ */
+function pendencias(area, p, tipo){
+  return `<div class="empty"><b>Complete as etapas para gerar o orçamento</b><ol>
+    <li class="${area ? "ok" : ""}">Informar a medida</li>
+    <li class="${p ? "ok" : ""}">Escolher o tipo de forro</li>
+    <li class="${tipo ? "ok" : ""}">Escolher o tipo de orçamento</li>
+  </ol></div>`;
+}
+
 function render(){
-  const p = CATALOGO[sel.value];
-  const acab = parseFloat(document.querySelector("input[name=acab]:checked").value);
-
-  $("swatch").style.background = p.cor;
-  $("precoBase").textContent = `R$ ${brl(p.forroVista)} à vista · R$ ${brl(p.forroCartao)} cartão`;
-
+  const p = sel.value === "" ? null : CATALOGO[sel.value];
+  const tipo = getTipo();
   const area = getArea();
+
+  /* referência do forro */
+  $("refBox").hidden = !p;
+  if (p){
+    $("swatch").style.background = p.cor;
+    $("precoBase").textContent = `R$ ${brl(p.forroVista)} à vista · R$ ${brl(p.forroCartao)} cartão`;
+  }
   $("areaCalc").textContent = area ? `${m2(area)} m²` : "—";
 
-  if (!area){
-    $("out").innerHTML = `<div class="empty"><b>Nenhum orçamento gerado</b>
-      Informe a área ou as medidas do compartimento.</div>`;
+  /* etapa 4 conforme o tipo */
+  $("stepAcab").hidden = tipo !== "instalado";
+  $("stepMat").hidden  = tipo !== "material";
+
+  /* subtotais do cardápio (só textContent: não perde o foco do campo) */
+  const itens = [];
+  for (const m of MATERIAIS){
+    const q = num($("q-" + m.id).value);
+    const total = q * m.preco;
+    $("sb-" + m.id).textContent = q ? `R$ ${brl(total)}` : "";
+    $("row-" + m.id).classList.toggle("on", q > 0);
+    if (q) itens.push({ ...m, q, total });
+  }
+
+  if (!area || !p || !tipo){
+    $("out").innerHTML = pendencias(area, p, tipo);
     return;
   }
 
-  const dados = {
-    1: bloco("SÓ O FORRO", area, p.nome, p.forroVista, p.forroCartao, acab),
-    2: bloco("INSTALAÇÃO COMPLETA", area, p.nome, p.instVista, p.instCartao, acab),
-  };
+  const d = tipo === "material"
+    ? orcMaterial(area, p, itens)
+    : orcInstalado(area, p, parseFloat(document.querySelector("input[name=acab]:checked").value));
 
-  $("out").innerHTML = `<div class="docs">${docHTML(dados[1],1)}${docHTML(dados[2],2)}</div>`;
+  $("out").innerHTML = docHTML(d);
 
   $("out").querySelectorAll("button[data-act]").forEach(b => b.onclick = async () => {
-    const d = dados[b.dataset.i], original = b.textContent;
+    const original = b.textContent;
     const feedback = msg => {
       b.textContent = msg; b.classList.add("ok");
       setTimeout(() => { b.textContent = original; b.classList.remove("ok"); }, 1800);

@@ -17,15 +17,48 @@ contenha imagem de outra origem — com o data URI, o PNG é gerado inclusive ab
 
 ## Como usar
 
-1. Escolha **Área em m²** ou **Largura × Comprimento** (a área é calculada automaticamente).
-2. Selecione o **tipo de forro** no menu suspenso.
-3. Escolha o **acabamento**:
-   - **Acabamento normal (Perfil)** — padrão, já incluso no preço
-   - **Moldura (4 cm)** — soma R$ 4,00/m²
-   - **Sanca (8 cm)** — soma R$ 8,00/m²
-4. São gerados dois orçamentos — **Só o forro** e **Instalação completa**.
+1. **Medida** — informe a área em m² ou largura × comprimento (a área é calculada).
+2. **Tipo de forro** — o menu começa em "Selecione o tipo de forro"; nenhum vem marcado.
+3. **Tipo de orçamento** — Material ou Instalado. É gerado **um** orçamento por vez, conforme a escolha.
+4. A quarta etapa muda conforme o tipo escolhido (veja abaixo).
 
-O acréscimo do acabamento entra no preço do m² nas duas modalidades, à vista e no cartão.
+### Instalado
+
+Preço por m² da coluna *instalado* da tabela, mais o acabamento:
+
+| Acabamento | Acréscimo |
+|---|---|
+| Acabamento normal (Perfil) | incluso, sem acréscimo |
+| Moldura (4 cm) | + R$ 4,00/m² |
+| Sanca (8 cm) | + R$ 8,00/m² |
+
+O acréscimo entra no preço do m² tanto à vista quanto no cartão.
+**O acabamento não existe no orçamento de Material** — lá cada peça é cobrada por unidade.
+
+### Material
+
+O forro continua pela tabela por m² (coluna *só o forro*), e a pessoa monta a lista de materiais
+informando a quantidade de cada item:
+
+| Item | Unidade | Preço |
+|---|---|---|
+| Perfil 6 m | und | R$ 25,00 |
+| Moldura 6 m | und | R$ 40,00 |
+| Sanca 6 m | und | R$ 50,00 |
+| Ripão 4 m Cutiuba | dúzia | R$ 150,00 |
+| Ripão 4 m Cupiuba | dúzia | R$ 180,00 |
+| Prego 2 × 12 | kg | R$ 30,00 |
+| Prego 1 × 16 | kg | R$ 40,00 |
+
+Quem ficar em branco não entra no orçamento. O total à vista e o total no cartão diferem apenas
+na parte do forro — a tabela traz preço único para os materiais avulsos. Para cobrar deles o mesmo
+acréscimo de cartão que o forro tem (~8%), mude no `index.html`:
+
+```js
+const ACRESCIMO_CARTAO_MATERIAIS = 0;      // use 0.08 para 8%
+```
+
+Os itens e preços ficam no array `MATERIAIS`, logo acima dessa constante.
 
 ### Botões de cada orçamento
 
@@ -63,7 +96,8 @@ A tabela fica no array `CATALOGO`, no `<script>` do `index.html`:
 ```
 
 `cor` é apenas o quadradinho de amostra na tela (qualquer valor CSS de `background`).
-Os valores de moldura e sanca ficam nos `value` dos rádios de acabamento, no HTML.
+Os acréscimos de moldura e sanca do orçamento *Instalado* ficam nos `value` dos rádios
+de acabamento, no HTML. Os materiais avulsos ficam no array `MATERIAIS`.
 
 ## Tabela vigente (R$/m²)
 
