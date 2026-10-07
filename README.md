@@ -40,15 +40,19 @@ O acréscimo entra no preço do m² tanto à vista quanto no cartão.
 O forro continua pela tabela por m² (coluna *só o forro*), e a pessoa monta a lista de materiais
 informando a quantidade de cada item:
 
-| Item | Unidade | Preço |
-|---|---|---|
-| Perfil 6 m | und | R$ 25,00 |
-| Moldura 6 m | und | R$ 40,00 |
-| Sanca 6 m | und | R$ 50,00 |
-| Ripão 4 m Cutiuba | dúzia | R$ 150,00 |
-| Ripão 4 m Cupiuba | dúzia | R$ 180,00 |
-| Prego 2 × 12 | kg | R$ 30,00 |
-| Prego 1 × 16 | kg | R$ 40,00 |
+| Item | Lançado em | Preço aplicado | Cotação de tabela |
+|---|---|---|---|
+| Perfil 6 m | und | R$ 25,00 | — |
+| Moldura 6 m | und | R$ 40,00 | — |
+| Sanca 6 m | und | R$ 50,00 | — |
+| Ripão 4 m Cutiuba | **und** | R$ 12,50 | R$ 150,00 a dúzia |
+| Ripão 4 m Cupiuba | **und** | R$ 15,00 | R$ 180,00 a dúzia |
+| Prego 2 × 12 | kg | R$ 30,00 | — |
+| Prego 1 × 16 | kg | R$ 40,00 | — |
+
+A unidade de lançamento aparece ao lado de cada campo. O ripão é cotado por dúzia mas lançado
+por **unidade**, com valor proporcional (`preço da dúzia ÷ 12`): 6 un de Cutiuba = R$ 75,00 e
+12 un = R$ 150,00, que é a dúzia fechada.
 
 Quem ficar em branco não entra no orçamento. O total à vista e o total no cartão diferem apenas
 na parte do forro — a tabela traz preço único para os materiais avulsos. Para cobrar deles o mesmo
@@ -58,7 +62,13 @@ acréscimo de cartão que o forro tem (~8%), mude no `index.html`:
 const ACRESCIMO_CARTAO_MATERIAIS = 0;      // use 0.08 para 8%
 ```
 
-Os itens e preços ficam no array `MATERIAIS`, logo acima dessa constante.
+Os itens e preços ficam no array `MATERIAIS`, logo acima dessa constante. Nele, `unid` e `preco`
+são sempre a unidade de lançamento e o preço dela; `base` é opcional e serve só para exibir a
+cotação original quando ela é outra:
+
+```js
+{ id:"rip-cut", nome:"Cutiuba", unid:"und", preco:150.00/12, base:{ preco:150.00, unid:"dúzia" } }
+```
 
 ### Botões de cada orçamento
 
