@@ -131,8 +131,8 @@
   .mat .i small{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
   .mat .i small em{font-style:normal;color:#a7adb6}
   .mat .q{margin-left:auto;display:flex;align-items:center;gap:6px;flex:0 0 auto}
-  .mat .q input{width:62px;padding:7px 8px;text-align:right;font-size:14px;font-variant-numeric:tabular-nums}
-  .mat .un{font-size:11.5px;font-weight:700;color:var(--muted);width:26px;letter-spacing:.3px}
+  .mat .q input{width:58px;padding:7px 8px;text-align:right;font-size:14px;font-variant-numeric:tabular-nums}
+  .mat .un{font-size:11.5px;font-weight:700;color:var(--muted);min-width:38px;letter-spacing:.3px}
   .mat.on .un{color:var(--orange-dk)}
   .mat .sb{width:84px;text-align:right;font-size:13.5px;font-weight:700;color:var(--ink);
            font-variant-numeric:tabular-nums}
@@ -305,7 +305,7 @@
           <div class="h"><span class="n">4</span><span class="t">Materiais</span></div>
           <div id="listaMat"></div>
           <p class="nota">Informe a quantidade na unidade indicada ao lado de cada campo.
-             O ripão é cotado por dúzia, mas lançado por <b>unidade</b> — o valor sai proporcional.
+             O ripão é lançado por <b>dúzia</b> — para meia dúzia, use 0,5.
              Deixe em branco o que não for usado.</p>
         </div>
 
@@ -345,17 +345,16 @@ const CATALOGO = [
 
 /* Materiais avulsos — só entram no orçamento de MATERIAL.
    `nome` aparece na tela (sob o título do grupo); `rotulo` vai no orçamento, completo.
-   `unid` é SEMPRE a unidade em que a quantidade é digitada, e `preco` o valor dessa unidade.
-   `base` existe quando a tabela cota por outra medida (o ripão é cotado por dúzia,
-   mas digitado por unidade): o preço unitário sai proporcional — 150,00 / 12 = 12,50. */
+   `unid` é a unidade em que a quantidade é digitada, e `preco` o valor dessa unidade.
+   O ripão é cotado e lançado por dúzia; meia dúzia é 0,5. */
 const MATERIAIS = [
-  { id:"perfil",  grupo:"",          nome:"Perfil 6 m",   rotulo:"Perfil 6 m",        unid:"und", preco:25.00 },
-  { id:"moldura", grupo:"",          nome:"Moldura 6 m",  rotulo:"Moldura 6 m",       unid:"und", preco:40.00 },
-  { id:"sanca",   grupo:"",          nome:"Sanca 6 m",    rotulo:"Sanca 6 m",         unid:"und", preco:50.00 },
-  { id:"rip-cut", grupo:"Ripão 4 m", nome:"Cutiuba",      rotulo:"Ripão 4 m Cutiuba", unid:"und", preco:150.00/12, base:{ preco:150.00, unid:"dúzia" } },
-  { id:"rip-cup", grupo:"Ripão 4 m", nome:"Cupiuba",      rotulo:"Ripão 4 m Cupiuba", unid:"und", preco:180.00/12, base:{ preco:180.00, unid:"dúzia" } },
-  { id:"prg-212", grupo:"Pregos",    nome:"Prego 2 × 12", rotulo:"Prego 2 × 12",      unid:"kg",  preco:30.00 },
-  { id:"prg-116", grupo:"Pregos",    nome:"Prego 1 × 16", rotulo:"Prego 1 × 16",      unid:"kg",  preco:40.00 },
+  { id:"perfil",  grupo:"",          nome:"Perfil 6 m",   rotulo:"Perfil 6 m",        unid:"und",   preco:25.00 },
+  { id:"moldura", grupo:"",          nome:"Moldura 6 m",  rotulo:"Moldura 6 m",       unid:"und",   preco:40.00 },
+  { id:"sanca",   grupo:"",          nome:"Sanca 6 m",    rotulo:"Sanca 6 m",         unid:"und",   preco:50.00 },
+  { id:"rip-cut", grupo:"Ripão 4 m", nome:"Cutiuba",      rotulo:"Ripão 4 m Cutiuba", unid:"dúzia", preco:150.00 },
+  { id:"rip-cup", grupo:"Ripão 4 m", nome:"Cupiuba",      rotulo:"Ripão 4 m Cupiuba", unid:"dúzia", preco:180.00 },
+  { id:"prg-212", grupo:"Pregos",    nome:"Prego 2 × 12", rotulo:"Prego 2 × 12",      unid:"kg",    preco:30.00 },
+  { id:"prg-116", grupo:"Pregos",    nome:"Prego 1 × 16", rotulo:"Prego 1 × 16",      unid:"kg",    preco:40.00 },
 ];
 
 /* Acréscimo do cartão sobre os materiais avulsos.
@@ -373,7 +372,9 @@ const brl = n => n.toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFracti
 const m2  = n => n.toLocaleString("pt-BR",{maximumFractionDigits:2});
 const qtd = n => n.toLocaleString("pt-BR",{maximumFractionDigits:2});
 const cent = n => Math.round(n * 100) / 100;
-const itemDesc = i => `${i.rotulo} — ${qtd(i.q)} ${i.unid} × R$ ${brl(i.preco)}`;
+/* "1 dúzia" / "2 dúzias"; und e kg não flexionam */
+const unid = (q, u) => (u === "dúzia" && q > 1 ? "dúzias" : u);
+const itemDesc = i => `${i.rotulo} — ${qtd(i.q)} ${unid(i.q, i.unid)} × R$ ${brl(i.preco)}`;
 
 $("logoTop").src = LOGO;
 
@@ -388,9 +389,7 @@ $("listaMat").innerHTML = MATERIAIS.map((m,i) => {
   const cab = m.grupo && (i === 0 || MATERIAIS[i-1].grupo !== m.grupo)
             ? `<div class="matgrp">${esc(m.grupo)}</div>` : "";
   const primeiroSemGrupo = !m.grupo && i === 0 ? `<div class="matgrp">Avulsos</div>` : "";
-  const ref = m.base
-    ? `R$ ${brl(m.preco)} / ${esc(m.unid)} <em>· R$ ${brl(m.base.preco)} a ${esc(m.base.unid)}</em>`
-    : `R$ ${brl(m.preco)} / ${esc(m.unid)}`;
+  const ref = `R$ ${brl(m.preco)} / ${esc(m.unid)}`;
   return cab + primeiroSemGrupo + `
     <div class="mat" id="row-${m.id}">
       <div class="i"><b>${esc(m.nome)}</b><small>${ref}</small></div>
