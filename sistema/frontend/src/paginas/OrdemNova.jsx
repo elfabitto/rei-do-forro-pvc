@@ -1,76 +1,23 @@
 /**
  * Converte um orçamento em Ordem de Serviço.
  *
- * O agendamento consulta a disponibilidade real: só aparecem dia e turno com
- * vaga livre, e a capacidade é conferida de novo no backend ao gravar — se o
- * turno encheu nesse meio-tempo, a O.S. inteira é desfeita em vez de nascer
- * sem agendamento.
+ * O agendamento é feito no calendário, com a disponibilidade real de cada dia à
+ * vista; a capacidade é conferida de novo no backend ao gravar — se o turno
+ * encheu nesse meio-tempo, a O.S. inteira é desfeita em vez de nascer sem
+ * agendamento.
+ *
+ * Instalação só existe quando o orçamento é de instalação: fornecimento de
+ * material tem entrega e ponto.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api, brl, num } from "../api";
 import { useAuth } from "../auth";
+import CalendarioVagas from "../calendario";
 import { BotaoAcao, Campo, Estado, Selecao, linhas, useApi } from "../componentes";
+import { VERBA, quantidadeTexto } from "../orcamentoDoc";
+import Icone from "../icones";
 import ClienteModal from "./ClienteModal";
-
-const hojeISO = () => new Date().toISOString().slice(0, 10);
-const maisDias = (n) => {
-  const d = new Date();
-  d.setDate(d.getDate() + n);
-  return d.toISOString().slice(0, 10);
-};
-const rotuloData = (iso) =>
-  new Date(iso + "T00:00:00").toLocaleDateString("pt-BR", {
-    weekday: "short", day: "2-digit", month: "2-digit",
-  });
-
-/** Seletor de data + turno que só oferece o que tem vaga. */
-function Agendamento({ titulo, tipo, dias, valor, aoMudar, opcional }) {
-  // A vaga é do turno: entrega e instalação disputam o mesmo limite.
-  const comVaga = useMemo(
-    () => dias.filter((d) => d.atende && d.turnos.some((t) => t.livre > 0)),
-    [dias]
-  );
-  const dia = comVaga.find((d) => d.data === valor?.data);
-  const turnos = dia ? dia.turnos.filter((t) => t.livre > 0) : [];
-
-  return (
-    <div className="agbox">
-      <div className="agtit">
-        <span className={`pill p-${tipo}`}>{titulo}</span>
-        {opcional && (
-          <label className="agoff">
-            <input type="checkbox" checked={!valor}
-                   onChange={(e) => aoMudar(e.target.checked ? null : { data: "", turno: "" })} />
-            não se aplica
-          </label>
-        )}
-      </div>
-
-      {valor && (
-        <div className="two">
-          <Campo rotulo="Data">
-            <Selecao valor={valor.data} vazio="Escolha o dia"
-                     aoMudar={(d) => aoMudar({ data: d, turno: "" })}
-                     opcoes={comVaga.map((d) => ({
-                       valor: d.data,
-                       rotulo: `${rotuloData(d.data)} — ${d.livre_total} vaga(s)`,
-                     }))} />
-          </Campo>
-          <Campo rotulo="Turno">
-            <Selecao valor={valor.turno} vazio={dia ? "Escolha o turno" : "Escolha o dia antes"}
-                     disabled={!dia}
-                     aoMudar={(t) => aoMudar({ ...valor, turno: t })}
-                     opcoes={turnos.map((t) => ({
-                       valor: t.turno,
-                       rotulo: `${t.turno_display} — ${t.livre} de ${t.total} livre(s)`,
-                     }))} />
-          </Campo>
-        </div>
-      )}
-    </div>
-  );
-}
 
 export default function OrdemNova() {
   const [params] = useSearchParams();
@@ -79,13 +26,13 @@ export default function OrdemNova() {
 
   const orcamentoId = params.get("orcamento");
   const orcamento = useApi(orcamentoId ? `/orcamentos/${orcamentoId}/` : "/orcamentos/", null, [orcamentoId]);
-  const disponibilidade = useApi("/agenda/disponibilidade/", { de: hojeISO(), ate: maisDias(60) });
   const usuarios = useApi("/usuarios/");
 
   const [enderecoId, setEnderecoId] = useState("");
   const [vendedorId, setVendedorId] = useState("");
   const [entrega, setEntrega] = useState({ data: "", turno: "" });
   const [instalacao, setInstalacao] = useState({ data: "", turno: "" });
+  const [modalidade, setModalidade] = useState("");
   const [observacoes, setObservacoes] = useState("");
   const [erro, setErro] = useState("");
 
@@ -94,14 +41,10 @@ export default function OrdemNova() {
   const [clienteNovo, setClienteNovo] = useState(null);   // {cliente, endereco} recém-criados
 
   const orc = orcamentoId ? orcamento.dados : null;
+  const comInstalacao = orc?.tipo === "instalado";
   const clienteId = clienteNovo?.cliente ?? orc?.cliente ?? null;
   const enderecos = useApi(clienteId ? "/enderecos/" : null, clienteId ? { cliente: clienteId } : null, [clienteId]);
   const listaEnderecos = linhas(enderecos.dados);
-
-  // instalação só faz sentido no orçamento Instalado
-  useEffect(() => {
-    if (orc && orc.tipo === "material") setInstalacao(null);
-  }, [orc]);
 
   useEffect(() => {
     if (listaEnderecos.length && !enderecoId) {
@@ -128,10 +71,9 @@ export default function OrdemNova() {
     if (orc && !vendedorId) setVendedorId(String(orc.vendedor));
   }, [orc, vendedorId]);
 
-  const dias = disponibilidade.dados?.dias ?? [];
-  const entregaOk = entrega && entrega.data && entrega.turno;
-  const instalacaoOk = !instalacao || (instalacao.data && instalacao.turno);
-  const podeGravar = orc && clienteId && enderecoId && entregaOk && instalacaoOk;
+  const entregaOk = entrega.data && entrega.turno;
+  const instalacaoOk = !comInstalacao || (instalacao.data && instalacao.turno);
+  const podeGravar = orc && clienteId && enderecoId && entregaOk && instalacaoOk && modalidade;
 
   async function gerar() {
     setErro("");
@@ -140,12 +82,13 @@ export default function OrdemNova() {
         orcamento: orc.id,
         endereco: Number(enderecoId),
         vendedor: pode("trocarVendedor") ? Number(vendedorId) : undefined,
+        modalidade,
         observacoes,
         agendar_entrega: entrega,
-        agendar_instalacao: instalacao?.data ? instalacao : null,
+        agendar_instalacao: comInstalacao ? instalacao : null,
       });
       navegar(`/ordens?abrir=${os.id}`);
-      return "O.S. gerada";
+      return "serviço gerado";
     } catch (e) {
       setErro(e.message);
       throw e;
@@ -173,9 +116,10 @@ export default function OrdemNova() {
                       <td>{o.forro_nome}</td>
                       <td className="num">{brl(o.total_vista)}</td>
                       <td>
-                        <button className="btn p"
+                        <button className="btn p" disabled={!o.pode_editar}
+                                title={o.pode_editar ? "" : `Orçamento de ${o.vendedor_nome}`}
                                 onClick={() => navegar(`/ordens/nova?orcamento=${o.id}`)}>
-                          Gerar O.S.
+                          Gerar Serviço
                         </button>
                       </td>
                     </tr>
@@ -194,8 +138,7 @@ export default function OrdemNova() {
       <h1>Gerar Ordem de Serviço</h1>
       <p className="sub">A partir do orçamento {orc?.numero ?? "…"}</p>
 
-      <Estado carregando={orcamento.carregando || disponibilidade.carregando}
-              erro={orcamento.erro || disponibilidade.erro}>
+      <Estado carregando={orcamento.carregando} erro={orcamento.erro}>
         {orc && (
           <div className="cols c-2">
             <section className="card">
@@ -239,15 +182,38 @@ export default function OrdemNova() {
                              .map((u) => ({ valor: u.id, rotulo: u.nome }))} />
                 </Campo>
 
+                {/* ----------------------------------------- pagamento */}
+                <div className="lbl" style={{ marginTop: 20 }}>Forma de pagamento escolhida</div>
+                <div className="opts">
+                  <label className={`opt${modalidade === "vista" ? " on" : ""}`}>
+                    <input type="radio" name="mod" checked={modalidade === "vista"}
+                           onChange={() => setModalidade("vista")} />
+                    <span className="t">À vista<small>Dinheiro, PIX, débito ou transferência</small></span>
+                    <span className="v">{brl(orc.total_vista)}</span>
+                  </label>
+                  <label className={`opt${modalidade === "cartao" ? " on" : ""}`}>
+                    <input type="radio" name="mod" checked={modalidade === "cartao"}
+                           onChange={() => setModalidade("cartao")} />
+                    <span className="t">No cartão<small>Crédito, valor da tabela de cartão</small></span>
+                    <span className="v">{brl(orc.total_cartao)}</span>
+                  </label>
+                </div>
+                <p className="nota">
+                  É só a escolha do cliente — quem executa o serviço precisa saber o que foi
+                  combinado. Os valores recebidos são lançados na finalização, e aí a forma
+                  pode ser trocada se o cliente mudar de ideia.
+                </p>
+
+                {/* ----------------------------------------- agendamento */}
                 <div className="lbl" style={{ marginTop: 20 }}>Agendamento</div>
-                <Agendamento titulo="Entrega" tipo="entrega" dias={dias}
-                             valor={entrega} aoMudar={setEntrega} />
-                {orc.tipo === "instalado" ? (
-                  <Agendamento titulo="Instalação" tipo="instalacao" dias={dias} opcional
-                               valor={instalacao} aoMudar={setInstalacao} />
+                <CalendarioVagas titulo="Entrega" tipo="entrega"
+                                 valor={entrega} aoMudar={setEntrega} />
+                {comInstalacao ? (
+                  <CalendarioVagas titulo="Instalação" tipo="instalacao"
+                                   valor={instalacao} aoMudar={setInstalacao} />
                 ) : (
                   <p className="nota">
-                    Orçamento de Material: não há instalação a agendar, só a entrega.
+                    Fornecimento de material: não há instalação a agendar, só a entrega.
                   </p>
                 )}
 
@@ -258,7 +224,7 @@ export default function OrdemNova() {
               </div>
               <div className="acts">
                 <BotaoAcao classe="btn p" aoClicar={gerar} desabilitado={!podeGravar}>
-                  Gerar Ordem de Serviço
+                  <Icone nome="ordem" tamanho={15} /> Gerar Ordem de Serviço
                 </BotaoAcao>
                 <button className="btn" onClick={() => navegar("/orcamentos")}>Cancelar</button>
               </div>
@@ -270,7 +236,8 @@ export default function OrdemNova() {
                 <div className="row"><span className="k">Orçamento</span><span className="v">{orc.numero}</span></div>
                 <div className="row"><span className="k">Cliente</span>
                   <span className="v">{orc.cliente_detalhe?.nome}</span></div>
-                <div className="row"><span className="k">Tipo</span><span className="v">{orc.tipo_display}</span></div>
+                <div className="row"><span className="k">Tipo</span>
+                  <span className="v">{comInstalacao ? "Instalação Completa" : "Fornecimento de Material"}</span></div>
                 <div className="row"><span className="k">Área</span><span className="v">{num(orc.area_m2)} m²</span></div>
                 <div className="row"><span className="k">Forro</span><span className="v">{orc.forro_nome}</span></div>
                 {orc.acabamento_nome && (
@@ -280,11 +247,15 @@ export default function OrdemNova() {
               </div>
               {orc.itens?.length > 0 && (
                 <>
-                  <div className="sect">Materiais</div>
+                  <div className="sect">Itens</div>
                   <div className="rows">
                     {orc.itens.map((i) => (
                       <div className="row sm item" key={i.id}>
-                        <span className="k">{i.descricao} — {num(i.quantidade)} {i.unidade}</span>
+                        <span className="k">
+                          {i.unidade === VERBA
+                            ? i.descricao
+                            : `${i.descricao} — ${quantidadeTexto(i.quantidade, i.unidade)}`}
+                        </span>
                         <span className="v">{brl(i.total)}</span>
                       </div>
                     ))}
@@ -292,14 +263,20 @@ export default function OrdemNova() {
                 </>
               )}
               <div className="totais">
-                <div className="tot"><span className="k">Total à vista</span>
-                  <span className="v">{brl(orc.total_vista)}</span></div>
-                <div className="tot b"><span className="k">Total no cartão</span>
-                  <span className="v">{brl(orc.total_cartao)}</span></div>
+                <div className={`tot${modalidade === "cartao" ? "" : " b"}`}>
+                  <span className="k">Total à vista</span>
+                  <span className="v">{brl(orc.total_vista)}</span>
+                </div>
+                <div className={`tot${modalidade === "cartao" ? " b" : ""}`}>
+                  <span className="k">Total no cartão</span>
+                  <span className="v">{brl(orc.total_cartao)}</span>
+                </div>
               </div>
               <p className="obs">
-                A O.S. nasce com o valor à vista. Desconto e forma de pagamento são
-                lançados na finalização, pela diretoria.
+                {modalidade
+                  ? `O serviço nasce com o valor ${modalidade === "cartao" ? "do cartão" : "à vista"}.
+                     Desconto e recebimentos são lançados na finalização, pela diretoria.`
+                  : "Escolha a forma de pagamento para definir o valor do serviço."}
               </p>
             </section>
           </div>

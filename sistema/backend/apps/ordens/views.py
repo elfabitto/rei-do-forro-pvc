@@ -1,4 +1,5 @@
 from datetime import date, timedelta
+from decimal import Decimal
 
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db.models import Count, DecimalField, Q, Sum
@@ -10,10 +11,11 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from apps.core.permissions import SomenteDiretor
+from apps.core.permissions import DonoOuSuperior, SomenteDiretor
 from apps.orcamentos.models import Orcamento, StatusOrcamento
 
 from .models import (
+    COMISSAO_POR_M2,
     Agendamento,
     ConfiguracaoAgenda,
     OrdemServico,
@@ -35,21 +37,22 @@ ZERO = Coalesce(Sum("valor"), 0, output_field=DecimalField(max_digits=12, decima
 
 
 class OrdemServicoViewSet(viewsets.ModelViewSet):
+    """
+    Serviço é informação de equipe: todos veem a lista inteira, porque o
+    instalador precisa saber o que está marcado. Alterar continua sendo de quem
+    lançou e da diretoria; finalizar e cancelar, só da diretoria.
+    """
+
     queryset = OrdemServico.objects.select_related(
-        "cliente", "endereco", "vendedor", "orcamento", "criado_por"
-    ).prefetch_related("agendamentos", "pagamentos", "historico__usuario")
-    filterset_fields = ["status", "vendedor", "cliente"]
+        "cliente", "endereco", "vendedor", "orcamento__forro", "orcamento__acabamento", "criado_por"
+    ).prefetch_related("agendamentos", "pagamentos", "historico__usuario", "orcamento__itens")
+    permission_classes = [DonoOuSuperior]
+    filterset_fields = ["status", "vendedor", "cliente", "tipo"]
     search_fields = ["numero", "cliente__nome", "endereco__bairro"]
     ordering_fields = ["criado_em", "numero", "valor_total"]
 
     def get_serializer_class(self):
         return OrdemServicoListaSerializer if self.action == "list" else OrdemServicoSerializer
-
-    def get_queryset(self):
-        qs = super().get_queryset()
-        if not self.request.user.pode_ver_tudo:
-            qs = qs.filter(Q(vendedor=self.request.user) | Q(criado_por=self.request.user))
-        return qs
 
     def perform_create(self, serializer):
         """
@@ -66,7 +69,10 @@ class OrdemServicoViewSet(viewsets.ModelViewSet):
             Orcamento.objects.filter(pk=os_.orcamento_id).update(status=StatusOrcamento.CONVERTIDO)
 
     # ------------------------------------------------------------------ ações
-    @action(detail=True, methods=["post"])
+    # Quem executa o serviço não é necessariamente quem o lançou: o instalador
+    # precisa poder marcar "em execução". As regras duras (só a diretoria
+    # finaliza ou cancela) continuam dentro de `mudar_status` no modelo.
+    @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated])
     def mudar_status(self, request, pk=None):
         os_ = self.get_object()
         s = MudarStatusSerializer(data=request.data)
@@ -114,6 +120,28 @@ class OrdemServicoViewSet(viewsets.ModelViewSet):
             os_.mudar_status(StatusOS.FINALIZADA, request.user, v.get("observacao", ""))
         except DjangoValidationError as e:
             raise ValidationError(e.messages)
+        return Response(OrdemServicoSerializer(os_, context={"request": request}).data)
+
+    @action(detail=True, methods=["post"], permission_classes=[SomenteDiretor])
+    def pagar_comissao(self, request, pk=None):
+        """Dá baixa na comissão de quem trouxe o cliente — controle da diretoria."""
+        os_ = self.get_object()
+        if os_.status != StatusOS.FINALIZADA:
+            raise ValidationError({"comissao": "A comissão só é paga depois do serviço finalizado."})
+        os_.comissao_paga = True
+        os_.comissao_paga_em = timezone.now()
+        os_.comissao_paga_por = request.user
+        os_.save(update_fields=["comissao_paga", "comissao_paga_em", "comissao_paga_por"])
+        return Response(OrdemServicoSerializer(os_, context={"request": request}).data)
+
+    @action(detail=True, methods=["post"], permission_classes=[SomenteDiretor])
+    def estornar_comissao(self, request, pk=None):
+        """Desfaz a baixa, para quando a diretoria marca a comissão errada."""
+        os_ = self.get_object()
+        os_.comissao_paga = False
+        os_.comissao_paga_em = None
+        os_.comissao_paga_por = None
+        os_.save(update_fields=["comissao_paga", "comissao_paga_em", "comissao_paga_por"])
         return Response(OrdemServicoSerializer(os_, context={"request": request}).data)
 
     @action(detail=True, methods=["post"], url_path=r"reagendar/(?P<agendamento>\d+)")
@@ -214,6 +242,79 @@ def agenda_disponibilidade(request):
     return Response({"de": str(de), "ate": str(ate), "capacidade_turno": limite, "dias": dias})
 
 
+# ----------------------------------------------------------------- comissões
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def comissoes(request):
+    """
+    Comissões dos serviços finalizados: R$ 2,00 por m² para quem trouxe o
+    cliente. "Em aberto" é o que a diretoria ainda deve repassar — a baixa é
+    feita em /ordens-servico/<id>/pagar_comissao/.
+
+    Quem não vê o financeiro enxerga só as próprias comissões.
+    """
+    user = request.user
+    qs = (
+        OrdemServico.objects.filter(status=StatusOS.FINALIZADA)
+        .select_related("cliente", "vendedor", "orcamento")
+        .order_by("-finalizada_em")
+    )
+    if not user.pode_ver_financeiro:
+        qs = qs.filter(vendedor=user)
+
+    if (vendedor := request.query_params.get("vendedor")):
+        qs = qs.filter(vendedor_id=vendedor)
+    if (de := request.query_params.get("de")):
+        qs = qs.filter(finalizada_em__date__gte=de)
+    if (ate := request.query_params.get("ate")):
+        qs = qs.filter(finalizada_em__date__lte=ate)
+
+    itens, por_vendedor = [], {}
+    aberto = pago = Decimal("0")
+
+    for os_ in qs:
+        valor = os_.comissao_valor
+        itens.append({
+            "id": os_.id,
+            "numero": os_.numero,
+            "tipo_display": os_.get_tipo_display(),
+            "cliente": os_.cliente.nome,
+            "area_m2": os_.area_m2,
+            "valor": valor,
+            "vendedor": os_.vendedor_id,
+            "vendedor_nome": os_.vendedor.get_full_name() or os_.vendedor.username,
+            "finalizada_em": os_.finalizada_em,
+            "paga": os_.comissao_paga,
+            "paga_em": os_.comissao_paga_em,
+        })
+        linha = por_vendedor.setdefault(
+            os_.vendedor_id,
+            {"vendedor": os_.vendedor_id,
+             "nome": os_.vendedor.get_full_name() or os_.vendedor.username,
+             "ordens": 0, "aberto": Decimal("0"), "pago": Decimal("0")},
+        )
+        linha["ordens"] += 1
+        if os_.comissao_paga:
+            linha["pago"] += valor
+            pago += valor
+        else:
+            linha["aberto"] += valor
+            aberto += valor
+
+    situacao = request.query_params.get("situacao")
+    if situacao == "aberto":
+        itens = [i for i in itens if not i["paga"]]
+    elif situacao == "pago":
+        itens = [i for i in itens if i["paga"]]
+
+    return Response({
+        "por_m2": COMISSAO_POR_M2,
+        "resumo": {"aberto": aberto, "pago": pago, "total": aberto + pago, "servicos": qs.count()},
+        "por_vendedor": sorted(por_vendedor.values(), key=lambda v: -v["aberto"]),
+        "itens": itens,
+    })
+
+
 # --------------------------------------------------------------------- painel
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
@@ -265,16 +366,20 @@ def painel(request):
             "recebido": pago,
             "faturado_mes": Pagamento.objects.filter(data__gte=inicio_mes).aggregate(v=ZERO)["v"],
         }
-        dados["comissoes"] = [
-            {
-                "usuario": r["vendedor__first_name"] or r["vendedor__username"],
-                "ordens": r["n"],
-                "valor": r["total"],
-            }
-            for r in ativas.values("vendedor__first_name", "vendedor__username")
-            .annotate(n=Count("id"), total=Coalesce(Sum("valor_total"), 0,
-                      output_field=DecimalField(max_digits=12, decimal_places=2)))
-            .order_by("-total")
-        ]
+        # Comissão é R$ 2,00 por m² finalizado, não um percentual do serviço:
+        # o painel mostra o que ainda está em aberto para a diretoria repassar.
+        porvendedor = {}
+        for os_ in (OrdemServico.objects.filter(status=StatusOS.FINALIZADA)
+                    .select_related("vendedor", "orcamento")):
+            linha = porvendedor.setdefault(
+                os_.vendedor_id,
+                {"usuario": os_.vendedor.get_full_name() or os_.vendedor.username,
+                 "ordens": 0, "valor": Decimal("0"), "aberto": Decimal("0")},
+            )
+            linha["ordens"] += 1
+            linha["valor"] += os_.comissao_valor
+            if not os_.comissao_paga:
+                linha["aberto"] += os_.comissao_valor
+        dados["comissoes"] = sorted(porvendedor.values(), key=lambda r: -r["aberto"])
 
     return Response(dados)

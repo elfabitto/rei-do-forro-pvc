@@ -3,15 +3,15 @@ import { useNavigate } from "react-router-dom";
 import { api, brl, dataHora, num } from "../api";
 import { useAuth } from "../auth";
 import {
-  BotaoAcao, DocumentoOrcamento, Estado, Etiqueta, Gaveta, linhas, useApi,
+  BotaoAcao, Confirmacao, DocumentoOrcamento, Estado, Etiqueta, Gaveta, linhas, useApi,
 } from "../componentes";
 import Icone from "../icones";
-import { baixarImagem, copiarImagem, copiarTexto, montarDocumento } from "../orcamentoDoc";
+import { VERBA, baixarImagem, copiarImagem, copiarTexto, montarDocumento } from "../orcamentoDoc";
 
 const FILTROS = [
   ["", "Todos"],
-  ["aberto", "Abertos"],
-  ["convertido", "Convertidos"],
+  ["aberto", "Em aberto"],
+  ["convertido", "Convertidos em Serviço"],
   ["perdido", "Perdidos"],
 ];
 
@@ -23,16 +23,23 @@ function VerOrcamento({ orcamento, aoFechar }) {
   const forro = linhas(forros.dados).find((f) => f.id === orcamento.forro);
   const acabamento = linhas(acabamentos.dados).find((a) => a.id === orcamento.acabamento);
 
+  // os itens gravados voltam separados: material de catálogo de um lado,
+  // "Outro" (verba) do outro — é como o documento os apresenta
+  const gravados = orcamento.itens ?? [];
   const doc = forro && montarDocumento({
     tipo: orcamento.tipo,
     area: Number(orcamento.area_m2),
     forro,
     acabamento,
-    itens: (orcamento.itens ?? []).map((i) => ({
+    itens: gravados.filter((i) => i.unidade !== VERBA).map((i) => ({
       rotulo: i.descricao,
       unidade: i.unidade,
       quantidade: Number(i.quantidade),
       preco: Number(i.preco_unitario),
+    })),
+    extras: gravados.filter((i) => i.unidade === VERBA).map((i) => ({
+      descricao: i.descricao,
+      valor: Number(i.total),
     })),
   });
 
@@ -43,8 +50,10 @@ function VerOrcamento({ orcamento, aoFechar }) {
         {doc && (
           <div style={{ padding: 20 }}>
             <DocumentoOrcamento doc={doc} />
-            <div className="grupoAcoes">
-              <span className="grupoTit">Enviar ao cliente</span>
+            <div className="grupoAcoes destaque">
+              <span className="grupoTit">
+                <Icone nome="whatsapp" tamanho={14} /> Enviar ao cliente
+              </span>
               <div className="acts">
                 <BotaoAcao classe="btn p" aoClicar={() => copiarImagem(doc)}>
                   <Icone nome="imagem" tamanho={15} /> Copiar imagem
@@ -55,7 +64,7 @@ function VerOrcamento({ orcamento, aoFechar }) {
                 <BotaoAcao aoClicar={() => baixarImagem(doc)}>
                   <Icone nome="baixar" tamanho={15} /> Baixar PNG
                 </BotaoAcao>
-                <a className="btn" target="_blank" rel="noopener noreferrer"
+                <a className="btn zap" target="_blank" rel="noopener noreferrer"
                    href={`https://wa.me/?text=${encodeURIComponent(doc.texto)}`}>
                   <Icone nome="whatsapp" tamanho={15} /> WhatsApp
                 </a>
@@ -79,8 +88,12 @@ function VerOrcamento({ orcamento, aoFechar }) {
   );
 }
 
-function CardOrcamento({ o, aoVer, aoGerarOS, aoPerder, aoReabrir }) {
+function CardOrcamento({ o, aoVer, aoGerarOS, aoPerder, aoReabrir, aoEditar }) {
   const material = o.tipo === "material";
+  // Lista aberta à equipe inteira; ação, só de quem lançou e da diretoria.
+  const meu = o.pode_editar;
+  const trava = meu ? "" : `Orçamento de ${o.vendedor_nome} — só quem lançou ou a diretoria altera`;
+
   return (
     <article className={`cardItem st-${o.status}`}>
       <header>
@@ -93,11 +106,15 @@ function CardOrcamento({ o, aoVer, aoGerarOS, aoPerder, aoReabrir }) {
           <Icone nome="usuario" tamanho={15} />
           {o.cliente_detalhe?.nome ?? <span className="pend">cliente ao fechar</span>}
         </div>
+        <span className="tipoServico">
+          {material ? "Fornecimento de Material" : "Instalação Completa"}
+        </span>
 
         <div className="linhas">
           <div className="li">
-            <Icone nome={material ? "entrega" : "instalacao"} tamanho={15} className={material ? "ic-ent" : "ic-ins"} />
-            <span className="rot">{material ? "Material" : "Instalado"}</span>
+            <Icone nome={material ? "entrega" : "instalacao"} tamanho={15}
+                   className={material ? "ic-ent" : "ic-ins"} />
+            <span className="rot">Forro</span>
             <span className="val">{o.forro_nome}</span>
           </div>
           {o.acabamento_nome && (
@@ -127,24 +144,35 @@ function CardOrcamento({ o, aoVer, aoGerarOS, aoPerder, aoReabrir }) {
 
       <footer>
         <button className="btn" onClick={() => aoVer(o)}>
-          <Icone nome="imagem" tamanho={15} /> Ver
+          <Icone nome="olho" tamanho={15} /> Ver e Enviar ao Cliente
         </button>
+
         {o.status === "aberto" && (
           <>
-            <button className="btn verde" onClick={() => aoGerarOS(o)}>
-              <Icone nome="fechado" tamanho={15} /> Gerar O.S.
+            <button className="btn verde" disabled={!meu} title={trava}
+                    onClick={() => aoGerarOS(o)}>
+              <Icone nome="fechado" tamanho={15} /> Gerar Serviço
             </button>
-            <BotaoAcao classe="btn vermelho" aoClicar={() => aoPerder(o)}>
+            <button className="btn vermelho" disabled={!meu} title={trava}
+                    onClick={() => aoPerder(o)}>
               <Icone nome="fechar" tamanho={15} /> Perdido
-            </BotaoAcao>
+            </button>
           </>
         )}
 
         {o.status === "perdido" && (
-          <BotaoAcao classe="btn p" aoClicar={() => aoReabrir(o)}>
+          <BotaoAcao classe="btn p" desabilitado={!meu} titulo={trava}
+                     aoClicar={() => aoReabrir(o)}>
             <Icone nome="relogio" tamanho={15} /> Reabrir
           </BotaoAcao>
         )}
+
+        {o.status !== "convertido" && (
+          <button className="btn" disabled={!meu} title={trava} onClick={() => aoEditar(o)}>
+            <Icone nome="editar" tamanho={15} /> Editar
+          </button>
+        )}
+
         {o.tem_os && <span className="selo">{o.tem_os}</span>}
       </footer>
     </article>
@@ -156,13 +184,15 @@ export default function Orcamentos() {
   const { pode } = useAuth();
   const [status, setStatus] = useState("");
   const [vendo, setVendo] = useState(null);
+  const [perdendo, setPerdendo] = useState(null);
 
   const { dados, erro, carregando, recarregar } =
     useApi("/orcamentos/", status ? { status } : null, [status]);
   const lista = linhas(dados);
 
-  async function marcarPerdido(o) {
-    await api.patch(`/orcamentos/${o.id}/`, { status: "perdido" });
+  async function marcarPerdido() {
+    await api.patch(`/orcamentos/${perdendo.id}/`, { status: "perdido" });
+    setPerdendo(null);
     recarregar();
     return "marcado";
   }
@@ -203,12 +233,25 @@ export default function Orcamentos() {
             <CardOrcamento key={o.id} o={o}
                            aoVer={setVendo}
                            aoGerarOS={(x) => navegar(`/ordens/nova?orcamento=${x.id}`)}
-                           aoPerder={marcarPerdido} aoReabrir={reabrir} />
+                           aoEditar={(x) => navegar(`/orcamentos/${x.id}/editar`)}
+                           aoPerder={setPerdendo} aoReabrir={reabrir} />
           ))}
         </div>
       </Estado>
 
       {vendo && <VerOrcamento orcamento={vendo} aoFechar={() => setVendo(null)} />}
+
+      {perdendo && (
+        <Confirmacao
+          titulo="Declarar orçamento perdido"
+          subtitulo={`${perdendo.numero} — ${perdendo.cliente_detalhe?.nome ?? "sem cliente"}`}
+          aviso="Confirma que o cliente não fechou o pedido? O orçamento sai da lista de
+                 abertos e deixa de contar como negócio em andamento. Dá para reabrir depois."
+          rotulo="Sim, o cliente não fechou"
+          aoFechar={() => setPerdendo(null)}
+          aoConfirmar={marcarPerdido}
+        />
+      )}
     </div>
   );
 }

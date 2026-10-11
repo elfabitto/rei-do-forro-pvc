@@ -27,16 +27,17 @@ FORROS = [
     ("ADESIVADO FREIJÓ COLONIAL",  "46.00", "49.70", "80.00", "86.40"),
 ]
 
-# O ripão é cotado por dúzia e lançado por unidade: preço unitário = dúzia / 12.
+# O ripão é cotado e lançado por dúzia, igual ao gerador do Pages:
+# meia dúzia é 0,5 e sai por R$ 75,00 no Cutiuba.
 MATERIAIS = [
-    # nome,          rótulo,                grupo,        unidade, preço,            cotação
-    ("Perfil 6 m",   "Perfil 6 m",          "",           "und", D("25.00"),  None),
-    ("Moldura 6 m",  "Moldura 6 m",         "",           "und", D("40.00"),  None),
-    ("Sanca 6 m",    "Sanca 6 m",           "",           "und", D("50.00"),  None),
-    ("Cutiuba",      "Ripão 4 m Cutiuba",   "Ripão 4 m",  "und", D("150.00") / 12, ("dúzia", D("150.00"))),
-    ("Cupiuba",      "Ripão 4 m Cupiuba",   "Ripão 4 m",  "und", D("180.00") / 12, ("dúzia", D("180.00"))),
-    ("Prego 2 × 12", "Prego 2 × 12",        "Pregos",     "kg",  D("30.00"),  None),
-    ("Prego 1 × 16", "Prego 1 × 16",        "Pregos",     "kg",  D("40.00"),  None),
+    # nome,          rótulo,                grupo,        unidade,  preço,       cotação
+    ("Perfil 6 m",   "Perfil 6 m",          "",           "und",   D("25.00"),  None),
+    ("Moldura 6 m",  "Moldura 6 m",         "",           "und",   D("40.00"),  None),
+    ("Sanca 6 m",    "Sanca 6 m",           "",           "und",   D("50.00"),  None),
+    ("Cutiuba",      "Ripão 4 m Cutiuba",   "Ripão 4 m",  "dúzia", D("150.00"), None),
+    ("Cupiuba",      "Ripão 4 m Cupiuba",   "Ripão 4 m",  "dúzia", D("180.00"), None),
+    ("Prego 2 × 12", "Prego 2 × 12",        "Pregos",     "kg",    D("30.00"),  None),
+    ("Prego 1 × 16", "Prego 1 × 16",        "Pregos",     "kg",    D("40.00"),  None),
 ]
 
 ACABAMENTOS = [

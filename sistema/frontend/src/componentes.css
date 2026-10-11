@@ -72,8 +72,9 @@ textarea:focus{border-color:var(--orange);box-shadow:0 0 0 3px rgba(238,106,30,.
 .mat .i small{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
 .mat .i small em{font-style:normal;color:#a7adb6}
 .mat .q{margin-left:auto;display:flex;align-items:center;gap:6px;flex:0 0 auto}
-.mat .q input{width:62px;padding:7px 8px;text-align:right;font-size:14px;font-variant-numeric:tabular-nums}
-.mat .un{font-size:11.5px;font-weight:700;color:var(--muted);width:26px;letter-spacing:.3px}
+.mat .q input{width:58px;padding:7px 8px;text-align:right;font-size:14px;font-variant-numeric:tabular-nums}
+/* min-width em vez de width: "dúzias" é mais largo que "und" e não pode quebrar */
+.mat .un{font-size:11.5px;font-weight:700;color:var(--muted);min-width:38px;letter-spacing:.3px}
 .mat .sb{width:84px;text-align:right;font-size:13.5px;font-weight:700;font-variant-numeric:tabular-nums}
 .mat.on{background:var(--orange-bg);box-shadow:inset 3px 0 0 var(--orange);
         margin:0 -8px;padding:8px;border-radius:3px}
@@ -223,3 +224,54 @@ input.preco.erro{border-color:var(--critical);background:#fdf2f2}
 .clientebox b.pendente{color:var(--orange-dk)}
 .clientebox button{margin-left:auto;flex:0 0 auto}
 .lnk.destaque{color:var(--orange-dk)}
+
+/* ---------------------------------------------------------------- calendário de vagas */
+/* Marcar no mês mostra o que o menu suspenso escondia: onde ainda cabe. */
+.calnav{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:13px}
+.calnav b{min-width:116px;text-align:center;text-transform:capitalize}
+.calnav .mini{border:1px solid var(--line);background:var(--surface);border-radius:5px;
+              width:26px;height:26px;cursor:pointer;line-height:1;color:var(--ink-2)}
+.calnav .mini:hover{border-color:var(--ink);background:var(--surface-2)}
+
+.calvagas{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.calvagas .hd{text-align:center;font-size:10.5px;font-weight:800;letter-spacing:.6px;
+              text-transform:uppercase;color:var(--muted);padding-bottom:3px}
+.cvd{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
+     min-height:52px;padding:4px 2px;border:1px solid var(--line);border-radius:6px;
+     background:var(--surface);cursor:pointer;font:inherit;color:var(--ink)}
+.cvd:hover:not(.off){border-color:var(--orange);background:var(--orange-bg)}
+.cvd .n{font-size:14px;font-weight:700;line-height:1}
+.cvd .v{font-size:9.5px;font-weight:700;color:var(--good);line-height:1.1}
+.cvd.hoje{box-shadow:inset 0 0 0 1px var(--ink)}
+.cvd.off{background:var(--surface-2);color:var(--muted);cursor:not-allowed;opacity:.65}
+.cvd.off .v{color:var(--muted)}
+.cvd.on{background:var(--ink);border-color:var(--ink);color:#fff}
+.cvd.on .v{color:#ffc7a3}
+
+.calturnos{display:flex;gap:8px;margin-top:10px}
+.cvt{flex:1;display:flex;flex-direction:column;gap:2px;padding:9px 10px;text-align:left;
+     border:1px solid var(--line);border-radius:6px;background:var(--surface);cursor:pointer;font:inherit}
+.cvt b{font-size:13.5px}
+.cvt small{font-size:11px;color:var(--muted)}
+.cvt:hover:not(:disabled){border-color:var(--orange)}
+.cvt.on{border-color:var(--orange);background:var(--orange-bg);box-shadow:inset 0 0 0 1px var(--orange)}
+.cvt:disabled{opacity:.5;cursor:not-allowed}
+
+/* ---------------------------------------------------------------- confirmação */
+.confirmaTexto{margin:0 0 4px;font-size:14px;line-height:1.55;color:var(--ink-2)}
+
+/* ---------------------------------------------------------------- campo travado */
+.travado{display:flex;align-items:center;gap:8px;padding:9px 11px;border:1px solid var(--line);
+         border-radius:6px;background:var(--surface-2);font-size:14px;font-weight:700}
+.travado small{margin-left:auto;font-weight:600;font-size:11.5px;color:var(--muted)}
+
+/* ---------------------------------------------------------------- item "Outro" */
+/* Descrição livre + valor fechado: o que não cabe na tabela de preços. */
+.extra{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.extra > input{flex:1 1 auto;min-width:0}
+.extra .vl{display:flex;align-items:center;gap:5px;flex:0 0 auto}
+.extra .vl .cifrao{font-size:12px;font-weight:700;color:var(--muted)}
+.extra .vl input{width:96px;text-align:right;font-variant-numeric:tabular-nums}
+.extra .x{flex:0 0 auto;width:30px;height:30px;border:1px solid var(--line);border-radius:6px;
+          background:var(--surface);color:var(--muted);font-size:17px;line-height:1;cursor:pointer}
+.extra .x:hover{border-color:var(--st-vermelho);color:var(--st-vermelho-tx);background:#fff}

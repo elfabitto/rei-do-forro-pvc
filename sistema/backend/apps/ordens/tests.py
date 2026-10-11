@@ -15,6 +15,7 @@ from .models import (
     Pagamento,
     StatusOS,
     TipoAgendamento,
+    TipoServico,
     Turno,
 )
 
@@ -253,3 +254,66 @@ class ModalidadeTest(BaseOS):
         os_ = self.nova_os()     # nasceu sem orçamento, sem os dois valores
         with self.assertRaises(ValidationError):
             os_.aplicar_modalidade("cartao")
+
+
+class NumeracaoTest(BaseOS):
+    """OS-MAT-… para material, OS-SERV-… para instalação, sequência anual única."""
+
+    def test_prefixo_segue_o_tipo(self):
+        ano = timezone.localdate().year
+        material = OrdemServico.objects.create(
+            cliente=self.cliente, endereco=self.endereco, vendedor=self.vendedor,
+            criado_por=self.vendedor, valor_total=D("100.00"), tipo=TipoServico.MATERIAL,
+        )
+        servico = self.nova_os()
+        self.assertEqual(material.numero, f"OS-MAT-{ano}0001")
+        self.assertEqual(servico.numero, f"OS-SERV-{ano}0002")
+
+    def test_sequencia_nao_se_repete_entre_os_tipos(self):
+        numeros = {self.nova_os().numero for _ in range(3)}
+        self.assertEqual(len(numeros), 3)
+
+
+class ComissaoTest(BaseOS):
+    """R$ 2,00 por m² orçado para quem trouxe o cliente."""
+
+    def com_orcamento(self, area="55.00"):
+        from apps.catalogo.models import Forro
+        from apps.orcamentos.models import Orcamento
+
+        forro = Forro.objects.create(
+            nome="Branco Liso", preco_material_vista=D("33.80"), preco_material_cartao=D("36.50"),
+            preco_instalado_vista=D("64.00"), preco_instalado_cartao=D("69.00"),
+        )
+        orcamento = Orcamento.objects.create(
+            tipo="instalado", area_m2=D(area), forro=forro,
+            preco_m2_vista=D("64.00"), preco_m2_cartao=D("69.00"),
+            vendedor=self.vendedor, criado_por=self.vendedor,
+        )
+        os_ = self.nova_os(valor=str(orcamento.total_vista))
+        os_.orcamento = orcamento
+        os_.save()
+        return os_
+
+    def test_valor_e_a_area_vezes_dois(self):
+        self.assertEqual(self.com_orcamento("55.00").comissao_valor, D("110.00"))
+
+    def test_sem_orcamento_nao_ha_comissao(self):
+        self.assertEqual(self.nova_os().comissao_valor, D("0.00"))
+
+    def test_cancelada_nao_gera_comissao(self):
+        os_ = self.com_orcamento()
+        os_.mudar_status(StatusOS.CANCELADA, self.diretor, "desistiu")
+        self.assertEqual(os_.comissao_valor, D("0.00"))
+
+    def test_em_aberto_so_depois_de_finalizar(self):
+        os_ = self.com_orcamento()
+        self.assertFalse(os_.comissao_em_aberto)
+        os_.mudar_status(StatusOS.EM_EXECUCAO, self.diretor)
+        Pagamento.objects.create(ordem=os_, forma="pix", valor=os_.valor_liquido,
+                                 registrado_por=self.diretor)
+        os_.mudar_status(StatusOS.FINALIZADA, self.diretor)
+        self.assertTrue(os_.comissao_em_aberto)
+
+        os_.comissao_paga = True
+        self.assertFalse(os_.comissao_em_aberto)

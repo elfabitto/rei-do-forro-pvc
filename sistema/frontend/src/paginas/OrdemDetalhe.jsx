@@ -5,17 +5,21 @@
  * que é quando a diretoria confere o que o cliente pagou. Aqui só se vê o que já
  * foi lançado.
  */
-import { useState } from "react";
-import { api, brl, data, dataHora } from "../api";
+import { Fragment, useState } from "react";
+import { api, brl, data, dataHora, num } from "../api";
 import { useAuth } from "../auth";
-import { BotaoAcao, Estado, Etiqueta, Gaveta, Pilula, Selecao, linhas, useApi } from "../componentes";
+import {
+  BotaoAcao, Confirmacao, Estado, Etiqueta, Gaveta, Pilula, Selecao, linhas, useApi,
+} from "../componentes";
 import Icone from "../icones";
-import { baixarImagemOS, compartilharOS, copiarImagemOS, montarOS } from "../osDoc";
+import {
+  baixarImagemOS, compartilharOS, copiarImagemOS, itensExtras, montarOS, resumoRipao,
+} from "../osDoc";
 import FinalizarModal from "./FinalizarModal";
 import ReagendarModal from "./ReagendarModal";
 
 const PASSOS = [
-  ["gerada", "Gerada"],
+  ["gerada", "Agendado"],
   ["em_execucao", "Em execução"],
   ["finalizada", "Finalizada"],
 ];
@@ -27,6 +31,7 @@ export default function OrdemDetalhe({ id, aoFechar, aoMudar }) {
 
   const [msg, setMsg] = useState("");
   const [finalizando, setFinalizando] = useState(false);
+  const [cancelando, setCancelando] = useState(false);
   const [remarcando, setRemarcando] = useState(null);
 
   function atualizar() {
@@ -46,6 +51,12 @@ export default function OrdemDetalhe({ id, aoFechar, aoMudar }) {
     }
   }
 
+  async function cancelar() {
+    await mudarStatus("cancelada", "Cancelada pela diretoria");
+    setCancelando(false);
+    return "cancelado";
+  }
+
   async function trocarVendedor(novo) {
     await api.patch(`/ordens-servico/${os.id}/`, { vendedor: Number(novo) });
     atualizar();
@@ -54,6 +65,9 @@ export default function OrdemDetalhe({ id, aoFechar, aoMudar }) {
 
   const encerrada = os && ["finalizada", "cancelada"].includes(os.status);
   const doc = os && montarOS(os, { verFinanceiro: pode("verFinanceiro") });
+  const orc = os?.orcamento_detalhe;
+  const ripao = orc ? resumoRipao(orc.itens) : "";
+  const extras = orc ? itensExtras(orc.itens) : [];
 
   return (
     <>
@@ -82,11 +96,11 @@ export default function OrdemDetalhe({ id, aoFechar, aoMudar }) {
                     onClick={() => setFinalizando(true)}>
               <Icone nome="fechado" tamanho={15} /> Finalizar serviço
             </button>
-            <BotaoAcao classe="btn vermelho" desabilitado={!pode("cancelarOS") || encerrada}
-                       titulo={pode("cancelarOS") ? "" : "Exclusivo da diretoria"}
-                       aoClicar={() => mudarStatus("cancelada", "Cancelada pela diretoria")}>
-              <Icone nome="fechar" tamanho={15} /> Cancelar
-            </BotaoAcao>
+            <button className="btn vermelho" disabled={!pode("cancelarOS") || encerrada}
+                    title={pode("cancelarOS") ? "" : "Exclusivo da diretoria"}
+                    onClick={() => setCancelando(true)}>
+              <Icone nome="fechar" tamanho={15} /> Cancelar Serviço
+            </button>
           </div>
         )}
       >
@@ -106,10 +120,10 @@ export default function OrdemDetalhe({ id, aoFechar, aoMudar }) {
               )}
 
               <section className="sec">
-                <h4>Enviar</h4>
+                <h4>Enviar para Gestão</h4>
                 <div className="acts" style={{ padding: 0 }}>
-                  <BotaoAcao classe="btn p" aoClicar={() => compartilharOS(doc)}>
-                    <Icone nome="whatsapp" tamanho={15} /> Compartilhar no WhatsApp
+                  <BotaoAcao classe="btn verde" aoClicar={() => compartilharOS(doc)}>
+                    <Icone nome="whatsapp" tamanho={15} /> Compartilhar
                   </BotaoAcao>
                   <BotaoAcao aoClicar={() => copiarImagemOS(doc)}>
                     <Icone nome="imagem" tamanho={15} /> Copiar imagem
@@ -147,23 +161,33 @@ export default function OrdemDetalhe({ id, aoFechar, aoMudar }) {
               <section className="sec">
                 <h4>Pedido</h4>
                 <dl className="kv">
+                  <dt>Tipo</dt><dd>{os.tipo_display}</dd>
                   <dt>Orçamento</dt><dd>{os.orcamento_numero ?? "—"}</dd>
-                  {pode("verFinanceiro") && (
+                  {orc && (
                     <>
-                      <dt>Valor cobrado</dt>
-                      <dd>{brl(os.valor_total)}{os.modalidade_display && ` · ${os.modalidade_display}`}</dd>
-                      {os.valor_vista != null && !os.modalidade && (
-                        <>
-                          <dt>Referência</dt>
-                          <dd className="wk">
-                            {brl(os.valor_vista)} à vista · {brl(os.valor_cartao)} cartão
-                          </dd>
-                        </>
+                      <dt>Área</dt><dd>{num(orc.area_m2)} m²</dd>
+                      <dt>Forro</dt><dd className="wk">{orc.forro_nome}</dd>
+                      {orc.acabamento_nome && (
+                        <><dt>Acabamento</dt><dd className="wk">{orc.acabamento_nome}</dd></>
                       )}
-                      {Number(os.desconto) > 0 && (
-                        <><dt>Desconto</dt><dd className="wk">− {brl(os.desconto)}</dd></>
-                      )}
+                      {ripao && <><dt>Ripão</dt><dd className="wk">{ripao}</dd></>}
+                      {extras.map((e) => (
+                        <Fragment key={e.id}>
+                          <dt>{e.descricao}</dt><dd className="wk">{brl(e.total)}</dd>
+                        </Fragment>
+                      ))}
+                      <dt>Valor do m²</dt>
+                      <dd className="wk">
+                        R$ {num(orc.preco_m2_vista)} à vista · R$ {num(orc.preco_m2_cartao)} cartão
+                      </dd>
                     </>
+                  )}
+                  <dt>Forma escolhida</dt>
+                  <dd>{os.modalidade_display || <span style={{ color: "var(--muted)" }}>a definir</span>}</dd>
+                  <dt>Valor cobrado</dt>
+                  <dd><b>{brl(os.valor_total)}</b></dd>
+                  {Number(os.desconto) > 0 && (
+                    <><dt>Desconto</dt><dd className="wk">− {brl(os.desconto)}</dd></>
                   )}
                 </dl>
                 {os.observacoes && <p className="obsbox">{os.observacoes}</p>}
@@ -194,7 +218,25 @@ export default function OrdemDetalhe({ id, aoFechar, aoMudar }) {
                   <dt>Trouxe o cliente</dt><dd>{os.vendedor_nome}</dd>
                   <dt>Lançada por</dt>
                   <dd className="wk">
-                    {linhas(usuarios.dados).find((u) => u.id === os.criado_por)?.nome ?? "—"}
+                    {os.criado_por_nome
+                      ?? linhas(usuarios.dados).find((u) => u.id === os.criado_por)?.nome
+                      ?? "—"}
+                  </dd>
+                  <dt>Base de cálculo</dt>
+                  <dd className="wk">
+                    {os.area_m2 ? `${num(os.area_m2)} m² × R$ 2,00` : "sem orçamento vinculado"}
+                  </dd>
+                  <dt>Comissão</dt>
+                  <dd><b>{brl(os.comissao_valor)}</b></dd>
+                  <dt>Situação</dt>
+                  <dd className="wk">
+                    {os.status === "cancelada"
+                      ? "serviço cancelado — não gera comissão"
+                      : os.comissao_paga
+                        ? `paga em ${dataHora(os.comissao_paga_em)}`
+                        : os.status === "finalizada"
+                          ? "em aberto, a pagar"
+                          : "a apurar na finalização"}
                   </dd>
                 </dl>
                 {pode("trocarVendedor") ? (
@@ -282,6 +324,17 @@ export default function OrdemDetalhe({ id, aoFechar, aoMudar }) {
       {finalizando && os && (
         <FinalizarModal os={os} aoFechar={() => setFinalizando(false)}
                         aoConcluir={() => { setFinalizando(false); atualizar(); }} />
+      )}
+      {cancelando && os && (
+        <Confirmacao
+          titulo="Cancelar serviço"
+          subtitulo={`${os.numero} — ${os.cliente_detalhe?.nome}`}
+          aviso="O serviço sai da agenda, as vagas dos turnos são liberadas e a comissão
+                 deixa de ser devida. O cancelamento não se desfaz."
+          rotulo="Sim, cancelar o serviço"
+          aoFechar={() => setCancelando(false)}
+          aoConfirmar={cancelar}
+        />
       )}
       {remarcando && os && (
         <ReagendarModal os={os} agendamento={remarcando} aoFechar={() => setRemarcando(null)}

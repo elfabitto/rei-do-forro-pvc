@@ -14,8 +14,8 @@ class TipoOrcamento(models.TextChoices):
 
 
 class StatusOrcamento(models.TextChoices):
-    ABERTO = "aberto", "Aberto"
-    CONVERTIDO = "convertido", "Convertido em O.S."
+    ABERTO = "aberto", "Em aberto"
+    CONVERTIDO = "convertido", "Convertido em Serviço"
     PERDIDO = "perdido", "Perdido"
 
 

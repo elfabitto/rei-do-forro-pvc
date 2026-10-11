@@ -1,3 +1,4 @@
+import re
 from decimal import Decimal
 
 from django.conf import settings
@@ -7,12 +8,24 @@ from django.utils import timezone
 
 CENTAVO = Decimal("0.01")
 
+# Comissão de quem trouxe o cliente: R$ 2,00 por m² orçado.
+# Ex.: 55 m² × 2 = R$ 110,00.
+COMISSAO_POR_M2 = Decimal("2.00")
+
 
 class StatusOS(models.TextChoices):
-    GERADA = "gerada", "Gerada"
+    # O valor "gerada" fica como está no banco; o rótulo é o que a equipe lê.
+    GERADA = "gerada", "Agendado"
     EM_EXECUCAO = "em_execucao", "Em execução"
     FINALIZADA = "finalizada", "Finalizada"
     CANCELADA = "cancelada", "Cancelada"
+
+
+class TipoServico(models.TextChoices):
+    """Espelha o tipo do orçamento e define o prefixo do número da O.S."""
+
+    MATERIAL = "material", "Fornecimento de Material"
+    INSTALADO = "instalado", "Instalação Completa"
 
 
 # Transições válidas. Qualquer outra é recusada no serviço de mudança de status.
@@ -52,7 +65,11 @@ class FormaPagamento(models.TextChoices):
 
 
 class OrdemServico(models.Model):
-    numero = models.CharField(max_length=16, unique=True, editable=False)
+    numero = models.CharField(max_length=24, unique=True, editable=False)
+
+    # Guardado na própria O.S. para que número, card e imagem continuem corretos
+    # mesmo sem orçamento vinculado.
+    tipo = models.CharField(max_length=12, choices=TipoServico.choices, default=TipoServico.INSTALADO)
 
     orcamento = models.OneToOneField(
         "orcamentos.Orcamento", on_delete=models.PROTECT, related_name="ordem_servico", null=True, blank=True
@@ -98,6 +115,14 @@ class OrdemServico(models.Model):
     cancelada_em = models.DateTimeField(null=True, blank=True)
     motivo_cancelamento = models.TextField(blank=True)
 
+    # Controle da diretoria: a comissão nasce em aberto quando o serviço é
+    # finalizado e só sai da lista quando a diretoria marca como paga.
+    comissao_paga = models.BooleanField(default=False)
+    comissao_paga_em = models.DateTimeField(null=True, blank=True)
+    comissao_paga_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="comissoes_pagas", null=True, blank=True
+    )
+
     class Meta:
         ordering = ["-criado_em"]
         verbose_name = "ordem de serviço"
@@ -111,22 +136,45 @@ class OrdemServico(models.Model):
         return f"{self.numero} — {self.cliente}"
 
     @staticmethod
-    def _proximo_numero():
+    def _proximo_numero(tipo):
+        """
+        OS-MAT-20260002 para fornecimento de material, OS-SERV-20260003 para
+        instalação. A sequência é anual e única entre os dois tipos, para não
+        existirem duas O.S. com o mesmo final no mesmo ano.
+        """
         ano = timezone.localdate().year
-        prefixo = f"OS-{ano}-"
-        ultimo = (
-            OrdemServico.objects.filter(numero__startswith=prefixo)
-            .order_by("-numero")
-            .values_list("numero", flat=True)
-            .first()
-        )
-        seq = int(ultimo.rsplit("-", 1)[1]) + 1 if ultimo else 1
-        return f"{prefixo}{seq:04d}"
+        sufixo = "MAT" if tipo == TipoServico.MATERIAL else "SERV"
+        final = re.compile(rf"{ano}(\d{{4}})$")
+
+        seq = 0
+        for numero in OrdemServico.objects.values_list("numero", flat=True):
+            achado = final.search(numero)
+            if achado:
+                seq = max(seq, int(achado.group(1)))
+        return f"OS-{sufixo}-{ano}{seq + 1:04d}"
 
     def save(self, *args, **kwargs):
         if not self.numero:
-            self.numero = self._proximo_numero()
+            self.numero = self._proximo_numero(self.tipo)
         return super().save(*args, **kwargs)
+
+    # --------------------------------------------------------------- comissão
+    @property
+    def area_m2(self):
+        """A metragem orçada — base da comissão e da ficha do pedido."""
+        return self.orcamento.area_m2 if self.orcamento_id else None
+
+    @property
+    def comissao_valor(self):
+        area = self.area_m2
+        if not area or self.status == StatusOS.CANCELADA:
+            return Decimal("0.00")
+        return (area * COMISSAO_POR_M2).quantize(CENTAVO)
+
+    @property
+    def comissao_em_aberto(self):
+        """Serviço entregue e comissão ainda não repassada."""
+        return self.status == StatusOS.FINALIZADA and not self.comissao_paga
 
     # --------------------------------------------------------------- financeiro
     @property

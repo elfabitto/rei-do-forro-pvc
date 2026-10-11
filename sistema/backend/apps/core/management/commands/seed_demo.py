@@ -21,10 +21,12 @@ from apps.orcamentos.models import Orcamento, OrcamentoItem, StatusOrcamento, Ti
 from apps.ordens.models import (
     Agendamento,
     ConfiguracaoAgenda,
+    Modalidade,
     OrdemServico,
     Pagamento,
     StatusOS,
     TipoAgendamento,
+    TipoServico,
     Turno,
 )
 
@@ -108,15 +110,25 @@ class Command(BaseCommand):
             observacoes="Entregar na obra, falar com o encarregado Paulo.",
         )
         OrcamentoItem.objects.create(orcamento=o2, material=perfil_6m, descricao=perfil_6m.rotulo,
-                                     unidade="und", quantidade=D("24"), preco_unitario=perfil_6m.preco)
+                                     unidade=perfil_6m.unidade, quantidade=D("24"),
+                                     preco_unitario=perfil_6m.preco)
+        # o ripão é lançado por dúzia: 3 dúzias, não 36 unidades
         OrcamentoItem.objects.create(orcamento=o2, material=ripao, descricao=ripao.rotulo,
-                                     unidade="und", quantidade=D("36"), preco_unitario=ripao.preco)
+                                     unidade=ripao.unidade, quantidade=D("3"),
+                                     preco_unitario=ripao.preco)
+        # item "Outro": o que não está na tabela entra como valor fechado
+        OrcamentoItem.objects.create(orcamento=o2, descricao="Frete até a obra",
+                                     unidade="verba", quantidade=D("1"), preco_unitario=D("180.00"))
         o2.save()
 
         o3 = Orcamento.objects.create(
             cliente=clientes[2], tipo=TipoOrcamento.INSTALADO, area_m2=D("31.5"),
             forro=mogno, acabamento=perfil, vendedor=segunda, criado_por=segunda,
         )
+        # "Outro" também vale no Instalado
+        OrcamentoItem.objects.create(orcamento=o3, descricao="Retirada do forro antigo",
+                                     unidade="verba", quantidade=D("1"), preco_unitario=D("320.00"))
+        o3.save()
         o4 = Orcamento.objects.create(
             cliente=clientes[3], tipo=TipoOrcamento.INSTALADO, area_m2=D("18"),
             forro=brilhoso, acabamento=perfil, vendedor=vendedor, criado_por=vendedor,
@@ -131,6 +143,7 @@ class Command(BaseCommand):
             orcamento=o1, cliente=clientes[0], endereco=clientes[0].endereco_principal,
             vendedor=vendedor, criado_por=vendedor, valor_total=o1.total_vista,
             valor_vista=o1.total_vista, valor_cartao=o1.total_cartao,
+            tipo=TipoServico.INSTALADO, modalidade=Modalidade.VISTA,
             observacoes="Sanca na sala e no corredor.",
         )
         Agendamento.objects.create(ordem=os1, tipo=TipoAgendamento.ENTREGA,
@@ -149,6 +162,7 @@ class Command(BaseCommand):
             orcamento=o2, cliente=clientes[1], endereco=clientes[1].endereco_principal,
             vendedor=diretor, criado_por=diretor, valor_total=o2.total_vista,
             valor_vista=o2.total_vista, valor_cartao=o2.total_cartao,
+            tipo=TipoServico.MATERIAL, modalidade=Modalidade.VISTA,
             observacoes="Somente material.",
         )
         Agendamento.objects.create(ordem=os2, tipo=TipoAgendamento.ENTREGA,
@@ -162,8 +176,9 @@ class Command(BaseCommand):
         # 3) recém-gerada, agendada para a semana que vem
         os3 = OrdemServico.objects.create(
             orcamento=o3, cliente=clientes[2], endereco=clientes[2].endereco_principal,
-            vendedor=vendedor, criado_por=vendedor, valor_total=o3.total_vista,
+            vendedor=vendedor, criado_por=vendedor, valor_total=o3.total_cartao,
             valor_vista=o3.total_vista, valor_cartao=o3.total_cartao,
+            tipo=TipoServico.INSTALADO, modalidade=Modalidade.CARTAO,
         )
         Agendamento.objects.create(ordem=os3, tipo=TipoAgendamento.ENTREGA,
                                    data=dia_util(hoje, 3), turno=Turno.TARDE)
@@ -181,6 +196,7 @@ class Command(BaseCommand):
             orcamento=o5, cliente=clientes[3], endereco=clientes[3].endereco_principal,
             vendedor=segunda, criado_por=segunda,
             valor_total=o5.total_vista, valor_vista=o5.total_vista, valor_cartao=o5.total_cartao,
+            tipo=TipoServico.INSTALADO, modalidade=Modalidade.VISTA,
             observacoes="Cliente não estava em casa na data combinada.",
         )
         Agendamento.objects.create(ordem=os4, tipo=TipoAgendamento.ENTREGA,
@@ -191,7 +207,8 @@ class Command(BaseCommand):
 
         self.stdout.write(self.style.SUCCESS("4 ordens de serviço (uma delas atrasada)"))
         self.stdout.write(self.style.SUCCESS(
-            f"Agenda: {cfg.capacidade_entrega} entregas e {cfg.capacidade_instalacao} instalações por turno"
+            f"Agenda: {cfg.capacidade_turno} compromissos por turno "
+            f"({cfg.capacidade_turno * 2} por dia, somando entrega e instalação)"
         ))
         self.stdout.write("")
         self.stdout.write(self.style.SUCCESS("Pronto. Entre com os usuários criados por criar_equipe."))

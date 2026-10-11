@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { brl, data, dataHora } from "../api";
+import { api, brl, data, dataHora } from "../api";
 import { useAuth } from "../auth";
-import { api } from "../api";
-import { BotaoAcao, Estado, Etiqueta, linhas, useApi } from "../componentes";
+import { BotaoAcao, Confirmacao, Estado, Etiqueta, linhas, useApi } from "../componentes";
 import Icone from "../icones";
 import { compartilharOS, montarOS } from "../osDoc";
 import FinalizarModal from "./FinalizarModal";
@@ -11,15 +10,25 @@ import OrdemDetalhe from "./OrdemDetalhe";
 
 const FILTROS = [
   ["", "Todas"],
-  ["gerada", "Gerada"],
+  ["gerada", "Agendado"],
   ["em_execucao", "Em execução"],
   ["finalizada", "Finalizada"],
   ["cancelada", "Cancelada"],
 ];
 
-function CardOS({ o, verFinanceiro, pode, aoAbrir, aoFinalizar, aoMudarStatus }) {
-  const saldo = Number(o.saldo ?? 0);
+/**
+ * A imagem precisa da ficha completa (endereço, pedido, preço do m²), que a
+ * listagem não carrega — por isso o card busca o detalhe antes de compartilhar.
+ */
+async function compartilharDaLista(o, verFinanceiro) {
+  const completa = await api.get(`/ordens-servico/${o.id}/`);
+  return compartilharOS(montarOS(completa, { verFinanceiro }));
+}
+
+function CardOS({ o, verFinanceiro, pode, aoAbrir, aoFinalizar, aoMudarStatus, aoCancelar }) {
   const encerrada = ["finalizada", "cancelada"].includes(o.status);
+  const meu = o.pode_editar;
+
   return (
     <article className={`cardItem st-${o.status}${o.atrasado ? " atrasado" : ""}`}>
       <header>
@@ -38,6 +47,7 @@ function CardOS({ o, verFinanceiro, pode, aoAbrir, aoFinalizar, aoMudarStatus })
             <Icone nome="local" tamanho={13} /> {o.cliente_detalhe.bairro}
           </div>
         )}
+        <span className="tipoServico">{o.tipo_display}</span>
 
         <div className="linhas">
           <div className="li">
@@ -53,26 +63,29 @@ function CardOS({ o, verFinanceiro, pode, aoAbrir, aoFinalizar, aoMudarStatus })
             <span className="val">
               {o.instalacao
                 ? `${data(o.instalacao.data)} · ${o.instalacao.turno_display}`
-                : <span className="pend">sem instalação</span>}
+                : <span className="pend">{o.tipo === "material" ? "não se aplica" : "sem instalação"}</span>}
             </span>
           </div>
         </div>
 
-        {verFinanceiro && (
-          <div className="valores">
-            <div className="v1"><span>Valor</span><b>{brl(o.valor_total)}</b></div>
-            <div className="v2">
-              <span>Saldo</span>
-              <b className={saldo > 0 ? "devendo" : "quitado"}>
-                {saldo > 0 ? brl(saldo) : "quitado"}
-              </b>
-            </div>
+        <div className="valores pagamento">
+          <div className="v1">
+            <span>Total {o.modalidade === "cartao" ? "no cartão" : "à vista"}</span>
+            <b>{brl(o.valor_total)}</b>
           </div>
-        )}
+          <span className="formaPg">{o.modalidade_display || "a definir"}</span>
+        </div>
+        <div className="refValores">
+          À vista {brl(o.valor_vista)} · Cartão {brl(o.valor_cartao)}
+        </div>
 
         <div className="rodape">
           <span><Icone nome="calendario" tamanho={13} /> {dataHora(o.criado_em)}</span>
-          <span><Icone nome="usuario" tamanho={13} /> {o.vendedor_nome}</span>
+          <span><Icone nome="usuario" tamanho={13} /> trouxe:{" "}
+            <span className="forma">{o.vendedor_nome}</span></span>
+          {verFinanceiro && Number(o.saldo) > 0 && (
+            <span className="saldoAberto">saldo {brl(o.saldo)}</span>
+          )}
         </div>
       </div>
 
@@ -82,7 +95,8 @@ function CardOS({ o, verFinanceiro, pode, aoAbrir, aoFinalizar, aoMudarStatus })
         </button>
 
         {o.status === "gerada" && (
-          <BotaoAcao classe="btn azul" aoClicar={() => aoMudarStatus(o, "em_execucao")}>
+          <BotaoAcao classe="btn azul" desabilitado={!meu && !pode("verTudo")}
+                     aoClicar={() => aoMudarStatus(o, "em_execucao")}>
             <Icone nome="relogio" tamanho={15} /> Em execução
           </BotaoAcao>
         )}
@@ -91,21 +105,20 @@ function CardOS({ o, verFinanceiro, pode, aoAbrir, aoFinalizar, aoMudarStatus })
           <button className="btn verde" disabled={!pode("finalizarOS")}
                   title={pode("finalizarOS") ? "" : "Exclusivo da diretoria"}
                   onClick={() => aoFinalizar(o)}>
-            <Icone nome="fechado" tamanho={15} /> Finalizar
+            <Icone nome="fechado" tamanho={15} /> Finalizar Serviço
           </button>
         )}
 
         {!encerrada && (
-          <BotaoAcao classe="btn vermelho" desabilitado={!pode("cancelarOS")}
-                     titulo={pode("cancelarOS") ? "" : "Exclusivo da diretoria"}
-                     aoClicar={() => aoMudarStatus(o, "cancelada", "Cancelada pela diretoria")}>
-            <Icone nome="fechar" tamanho={15} /> Cancelar
-          </BotaoAcao>
+          <button className="btn vermelho" disabled={!pode("cancelarOS")}
+                  title={pode("cancelarOS") ? "" : "Exclusivo da diretoria"}
+                  onClick={() => aoCancelar(o)}>
+            <Icone nome="fechar" tamanho={15} /> Cancelar Serviço
+          </button>
         )}
 
-        <BotaoAcao classe="btn zap"
-                   aoClicar={() => compartilharOS(montarOS(o, { verFinanceiro }))}>
-          <Icone nome="whatsapp" tamanho={15} /> WhatsApp
+        <BotaoAcao classe="btn zap" aoClicar={() => compartilharDaLista(o, verFinanceiro)}>
+          <Icone nome="whatsapp" tamanho={15} /> Compartilhar
         </BotaoAcao>
       </footer>
     </article>
@@ -120,6 +133,7 @@ export default function OrdensServico() {
   const [status, setStatus] = useState("");
   const [aberta, setAberta] = useState(null);
   const [finalizando, setFinalizando] = useState(null);
+  const [cancelando, setCancelando] = useState(null);
   const [erroAcao, setErroAcao] = useState("");
 
   const { dados, erro, carregando, recarregar } =
@@ -148,6 +162,12 @@ export default function OrdensServico() {
     }
   }
 
+  async function cancelar() {
+    await mudarStatus(cancelando, "cancelada", "Cancelada pela diretoria");
+    setCancelando(null);
+    return "cancelado";
+  }
+
   const atrasadas = lista.filter((o) => o.atrasado).length;
 
   return (
@@ -158,7 +178,7 @@ export default function OrdensServico() {
           <p className="sub">Do orçamento convertido até a finalização</p>
         </div>
         <button className="btn p grande" onClick={() => navegar("/ordens/nova")}>
-          <Icone nome="mais" tamanho={16} /> Gerar O.S.
+          <Icone nome="mais" tamanho={16} /> Gerar Serviço
         </button>
       </div>
 
@@ -185,7 +205,8 @@ export default function OrdensServico() {
         <div className="cardGrid">
           {lista.map((o) => (
             <CardOS key={o.id} o={o} verFinanceiro={pode("verFinanceiro")} pode={pode}
-                    aoAbrir={setAberta} aoFinalizar={setFinalizando} aoMudarStatus={mudarStatus} />
+                    aoAbrir={setAberta} aoFinalizar={setFinalizando}
+                    aoMudarStatus={mudarStatus} aoCancelar={setCancelando} />
           ))}
         </div>
       </Estado>
@@ -196,6 +217,17 @@ export default function OrdensServico() {
       {finalizando && (
         <FinalizarModal os={finalizando} aoFechar={() => setFinalizando(null)}
                         aoConcluir={() => { setFinalizando(null); recarregar(); }} />
+      )}
+      {cancelando && (
+        <Confirmacao
+          titulo="Cancelar serviço"
+          subtitulo={`${cancelando.numero} — ${cancelando.cliente_detalhe?.nome}`}
+          aviso="O serviço sai da agenda, as vagas dos turnos são liberadas e a comissão
+                 deixa de ser devida. O cancelamento não se desfaz."
+          rotulo="Sim, cancelar o serviço"
+          aoFechar={() => setCancelando(null)}
+          aoConfirmar={cancelar}
+        />
       )}
     </div>
   );

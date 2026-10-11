@@ -6,6 +6,8 @@ from rest_framework import serializers
 
 from apps.clientes.serializers import ClienteResumoSerializer, EnderecoSerializer
 from apps.contas.serializers import UsuarioSerializer
+from apps.core.permissions import pode_editar_registro
+from apps.orcamentos.serializers import OrcamentoResumoSerializer
 
 from .models import (
     Agendamento,
@@ -17,6 +19,7 @@ from .models import (
     Pagamento,
     StatusOS,
     TipoAgendamento,
+    TipoServico,
     Turno,
 )
 
@@ -91,19 +94,25 @@ class OrdemServicoListaSerializer(serializers.ModelSerializer):
     cliente_detalhe = ClienteResumoSerializer(source="cliente", read_only=True)
     vendedor_nome = serializers.CharField(source="vendedor.get_full_name", read_only=True)
     status_display = serializers.CharField(source="get_status_display", read_only=True)
+    tipo_display = serializers.CharField(source="get_tipo_display", read_only=True)
     entrega = serializers.SerializerMethodField()
     instalacao = serializers.SerializerMethodField()
     saldo = serializers.DecimalField(max_digits=11, decimal_places=2, read_only=True)
     atrasado = serializers.BooleanField(read_only=True)
     dias_atraso = serializers.IntegerField(read_only=True)
     modalidade_display = serializers.CharField(source="get_modalidade_display", read_only=True, default="")
+    area_m2 = serializers.DecimalField(max_digits=9, decimal_places=2, read_only=True)
+    comissao_valor = serializers.DecimalField(max_digits=11, decimal_places=2, read_only=True)
+    pode_editar = serializers.SerializerMethodField()
 
     class Meta:
         model = OrdemServico
-        fields = ["id", "numero", "cliente", "cliente_detalhe", "vendedor", "vendedor_nome",
-                  "status", "status_display", "valor_total", "valor_vista", "valor_cartao",
+        fields = ["id", "numero", "tipo", "tipo_display", "cliente", "cliente_detalhe",
+                  "vendedor", "vendedor_nome", "status", "status_display",
+                  "valor_total", "valor_vista", "valor_cartao",
                   "modalidade", "modalidade_display", "desconto", "saldo",
-                  "entrega", "instalacao", "criado_em", "atrasado", "dias_atraso"]
+                  "entrega", "instalacao", "criado_em", "atrasado", "dias_atraso",
+                  "area_m2", "comissao_valor", "comissao_paga", "pode_editar"]
 
     def get_entrega(self, obj):
         a = obj.agendamento_entrega
@@ -112,6 +121,10 @@ class OrdemServicoListaSerializer(serializers.ModelSerializer):
     def get_instalacao(self, obj):
         a = obj.agendamento_instalacao
         return AgendamentoSerializer(a).data if a else None
+
+    def get_pode_editar(self, obj):
+        pedido = self.context.get("request")
+        return bool(pedido and pode_editar_registro(pedido.user, obj))
 
 
 class AgendarSerializer(serializers.Serializer):
@@ -130,6 +143,9 @@ class OrdemServicoSerializer(OrdemServicoListaSerializer):
     total_pago = serializers.DecimalField(max_digits=11, decimal_places=2, read_only=True)
     valor_liquido = serializers.DecimalField(max_digits=11, decimal_places=2, read_only=True)
     orcamento_numero = serializers.CharField(source="orcamento.numero", read_only=True, default=None)
+    # ficha do pedido: área, forro, acabamento, itens e preço do m²
+    orcamento_detalhe = OrcamentoResumoSerializer(source="orcamento", read_only=True)
+    criado_por_nome = serializers.CharField(source="criado_por.get_full_name", read_only=True)
 
     # Agendar no mesmo passo em que a O.S. nasce — é como acontece no balcão.
     agendar_entrega = AgendarSerializer(write_only=True, required=False, allow_null=True)
@@ -137,15 +153,18 @@ class OrdemServicoSerializer(OrdemServicoListaSerializer):
 
     class Meta(OrdemServicoListaSerializer.Meta):
         fields = OrdemServicoListaSerializer.Meta.fields + [
-            "orcamento", "orcamento_numero", "endereco", "endereco_detalhe",
+            "orcamento", "orcamento_numero", "orcamento_detalhe",
+            "endereco", "endereco_detalhe",
             "vendedor_detalhe", "observacoes",
             "pagamentos", "historico", "agendamentos",
-            "total_pago", "valor_liquido", "criado_por", "finalizada_por", "finalizada_em",
+            "total_pago", "valor_liquido", "criado_por", "criado_por_nome",
+            "finalizada_por", "finalizada_em",
             "cancelada_por", "cancelada_em", "motivo_cancelamento",
-            "agendar_entrega", "agendar_instalacao",
+            "comissao_paga_em", "agendar_entrega", "agendar_instalacao",
         ]
         read_only_fields = ["numero", "criado_por", "finalizada_por", "finalizada_em",
-                            "cancelada_por", "cancelada_em", "status"]
+                            "cancelada_por", "cancelada_em", "status",
+                            "comissao_paga", "comissao_paga_em"]
         extra_kwargs = {
             # omitido = o próprio usuário logado (ver perform_create da view)
             "vendedor": {"required": False},
@@ -154,17 +173,31 @@ class OrdemServicoSerializer(OrdemServicoListaSerializer):
             # antes de chamar validate(), onde o preenchimento acontece.
             "valor_total": {"required": False},
             "cliente": {"required": False},
+            "tipo": {"required": False},
         }
 
     def validate(self, attrs):
-        """A O.S. herda cliente e valor do orçamento quando não vierem explícitos."""
+        """
+        A O.S. herda do orçamento o cliente, o tipo e os dois valores de
+        referência. A modalidade é a forma que o cliente escolheu ao fechar —
+        ela define qual dos dois valores vai ser cobrado, e pode ser trocada na
+        finalização se o cliente mudar de ideia.
+        """
         orcamento = attrs.get("orcamento") or getattr(self.instance, "orcamento", None)
         if orcamento:
             attrs.setdefault("cliente", orcamento.cliente)
-            attrs.setdefault("valor_total", orcamento.total_vista)
-            # guarda as duas referências: a modalidade é escolhida só no fechamento
+            attrs.setdefault("tipo", TipoServico(orcamento.tipo))
             attrs.setdefault("valor_vista", orcamento.total_vista)
             attrs.setdefault("valor_cartao", orcamento.total_cartao)
+
+        modalidade = attrs.get("modalidade") or getattr(self.instance, "modalidade", "")
+        if modalidade:
+            referencia = attrs.get("valor_cartao") if modalidade == Modalidade.CARTAO else attrs.get("valor_vista")
+            if referencia is not None:
+                attrs["valor_total"] = referencia
+        elif orcamento:
+            attrs.setdefault("valor_total", orcamento.total_vista)
+
         if not self.instance:
             faltando = {
                 campo: "Informe o valor ou vincule um orçamento."

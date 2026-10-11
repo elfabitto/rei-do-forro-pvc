@@ -12,16 +12,31 @@ const m2 = (n) => Number(n ?? 0).toLocaleString("pt-BR", { maximumFractionDigits
 const qtd = (n) => Number(n ?? 0).toLocaleString("pt-BR", { maximumFractionDigits: 2 });
 const cent = (n) => Math.round(Number(n) * 100) / 100;
 
+/** Unidade de um item "Outro": valor fechado, sem quantidade a multiplicar. */
+export const VERBA = "verba";
+export const ehExtra = (i) => i.unidade === VERBA;
+
+/* "1 dúzia" / "3,5 dúzias"; und e kg não flexionam */
+export const unidadePlural = (q, u) => (u === "dúzia" && Number(q) > 1 ? "dúzias" : u);
+export const quantidadeTexto = (q, u) => `${qtd(q)} ${unidadePlural(q, u)}`;
+
 export const descricaoItem = (i) =>
-  `${i.rotulo} — ${qtd(i.quantidade)} ${i.unidade} × R$ ${brl(i.preco)}`;
+  ehExtra(i)
+    ? i.rotulo
+    : `${i.rotulo} — ${quantidadeTexto(i.quantidade, i.unidade)} × R$ ${brl(i.preco)}`;
 
 /**
  * Monta o documento a partir do que está na tela.
- * Devolve resumo, seção de linhas, totais e o texto do WhatsApp — a mesma
+ * Devolve resumo, seções de linhas, totais e o texto do WhatsApp — a mesma
  * forma que `desenhar()` e o React consomem.
+ *
+ * `extras` são os itens "Outro": descrição livre e valor fechado, que existem
+ * nos dois tipos de orçamento para o que não cabe na tabela.
  */
-export function montarDocumento({ tipo, area, forro, acabamento, itens = [] }) {
+export function montarDocumento({ tipo, area, forro, acabamento, itens = [], extras = [] }) {
   const instalado = tipo === "instalado";
+  const somaExtras = extras.reduce((s, e) => s + cent(e.valor), 0);
+  const linhasExtras = extras.map((e) => [e.descricao, `R$ ${brl(cent(e.valor))}`]);
 
   const precoVista = Number(instalado ? forro.preco_instalado_vista : forro.preco_material_vista);
   const precoCartao = Number(instalado ? forro.preco_instalado_cartao : forro.preco_material_cartao);
@@ -43,15 +58,31 @@ export function montarDocumento({ tipo, area, forro, acabamento, itens = [] }) {
   doc.resumo = [["Área", `${m2(area)} m²`], ["Forro", forro.nome]];
   if (instalado && acabamento) doc.resumo.push(["Acabamento", acabamento.nome]);
 
+  /* Bloco de texto dos itens "Outro", usado nos dois tipos. */
+  const textoExtras = linhasExtras.length
+    ? "\n\n*OUTROS*\n" + extras.map((e) => `• ${e.descricao} = R$ ${brl(cent(e.valor))}`).join("\n")
+    : "";
+
   if (instalado) {
-    doc.secao = "Valor do metro quadrado";
-    doc.linhas = [
-      ["À vista", `R$ ${brl(m2Vista)}/m²`],
-      ["No cartão", `R$ ${brl(m2Cartao)}/m²`],
-    ];
+    doc.secoes = [{
+      titulo: "Valor do metro quadrado",
+      linhas: [
+        ["À vista", `R$ ${brl(m2Vista)}/m²`],
+        ["No cartão", `R$ ${brl(m2Cartao)}/m²`],
+      ],
+    }];
+    if (linhasExtras.length) {
+      doc.secoes.push({
+        titulo: "Outros",
+        linhas: [
+          [`Instalação ${m2(area)} m² × R$ ${brl(m2Vista)}/m²`, `R$ ${brl(cent(area * m2Vista))}`],
+          ...linhasExtras,
+        ],
+      });
+    }
     doc.obs = "";
-    doc.totalVista = cent(area * m2Vista);
-    doc.totalCartao = cent(area * m2Cartao);
+    doc.totalVista = cent(area * m2Vista + somaExtras);
+    doc.totalCartao = cent(area * m2Cartao + somaExtras);
 
     doc.texto = `*ORÇAMENTO — REI DO FORRO*
 ----------
@@ -62,7 +93,7 @@ export function montarDocumento({ tipo, area, forro, acabamento, itens = [] }) {
 *INSTALAÇÃO COMPLETA*
 _valor do metro quadrado_
 *À vista*: R$ ${brl(m2Vista)}/m²
-*No cartão*: R$ ${brl(m2Cartao)}/m²
+*No cartão*: R$ ${brl(m2Cartao)}/m²${textoExtras}
 ----------
 *VALOR TOTAL*
 💵 *À vista*: R$ ${brl(doc.totalVista)}
@@ -72,14 +103,18 @@ _valor do metro quadrado_
     const forroCartao = cent(area * precoCartao);
     const materiais = itens.reduce((s, i) => s + cent(i.quantidade * i.preco), 0);
 
-    doc.secao = "Itens do orçamento";
-    doc.linhas = [
-      [`Forro ${m2(area)} m² × R$ ${brl(precoVista)}/m²`, `R$ ${brl(forroVista)}`],
-      ...itens.map((i) => [descricaoItem(i), `R$ ${brl(cent(i.quantidade * i.preco))}`]),
-    ];
-    doc.obs = `No cartão o forro sai a R$ ${brl(precoCartao)}/m² e os demais materiais não têm acréscimo.`;
-    doc.totalVista = cent(forroVista + materiais);
-    doc.totalCartao = cent(forroCartao + materiais);
+    doc.secoes = [{
+      titulo: "Itens do orçamento",
+      linhas: [
+        [`Forro ${m2(area)} m² × R$ ${brl(precoVista)}/m²`, `R$ ${brl(forroVista)}`],
+        ...itens.map((i) => [descricaoItem(i), `R$ ${brl(cent(i.quantidade * i.preco))}`]),
+      ],
+    }];
+    if (linhasExtras.length) doc.secoes.push({ titulo: "Outros", linhas: linhasExtras });
+
+    doc.obs = `No cartão o forro sai a R$ ${brl(precoCartao)}/m² e os demais itens não têm acréscimo.`;
+    doc.totalVista = cent(forroVista + materiais + somaExtras);
+    doc.totalCartao = cent(forroCartao + materiais + somaExtras);
 
     const lista = [
       `• Forro ${m2(area)}m² × R$ ${brl(precoVista)}/m² = R$ ${brl(forroVista)}`,
@@ -92,7 +127,7 @@ _valor do metro quadrado_
 *Forro:* ${forro.nome}
 
 *ITENS*
-${lista}
+${lista}${textoExtras}
 ----------
 *VALOR TOTAL*
 💵 *À vista*: R$ ${brl(doc.totalVista)}
@@ -150,12 +185,14 @@ export function desenhar(d) {
   });
 
   d.resumo.forEach(([k, v]) => linha(k, v, { fv: String(v).length > 22 ? 24 : 28 }));
-  add(14, () => {});
-  add(50, (x, y) => {
-    x.textAlign = "left"; x.font = `800 19px ${FF}`; x.fillStyle = C.ink; ls(x, "1.4px");
-    x.fillText(d.secao.toUpperCase(), PAD, y); ls(x, "0px");
-  });
-  d.linhas.forEach(([k, v]) => linha(k, v, { h: 50, fv: 24, item: k.length > 16 }));
+  for (const secao of d.secoes) {
+    add(14, () => {});
+    add(50, (x, y) => {
+      x.textAlign = "left"; x.font = `800 19px ${FF}`; x.fillStyle = C.ink; ls(x, "1.4px");
+      x.fillText(secao.titulo.toUpperCase(), PAD, y); ls(x, "0px");
+    });
+    secao.linhas.forEach(([k, v]) => linha(k, v, { h: 50, fv: 24, item: k.length > 16 }));
+  }
   if (d.obs) add(44, (x, y) => {
     x.textAlign = "left"; x.font = `400 18px ${FF}`; x.fillStyle = C.muted;
     x.fillText(d.obs, PAD, y + 4);

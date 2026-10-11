@@ -40,8 +40,9 @@ class Endereco(models.Model):
     numero = models.CharField("número", max_length=20, blank=True)
     complemento = models.CharField(max_length=120, blank=True)
     bairro = models.CharField(max_length=80)
-    cidade = models.CharField(max_length=80, default="Rondonópolis")
-    uf = models.CharField(max_length=2, default="MT")
+    cidade = models.CharField(max_length=80, blank=True)
+    # A empresa atende no Pará; o estado é fixo no formulário.
+    uf = models.CharField(max_length=2, default="PA")
     cep = models.CharField(max_length=9, blank=True)
 
     ponto_referencia = models.CharField("ponto de referência", max_length=160, blank=True)

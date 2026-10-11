@@ -13,7 +13,7 @@ function GraficoConversao({ semanas }) {
   return (
     <>
       <div className="legend">
-        <span><i style={{ background: "var(--orange)" }} />Convertidos em O.S.</span>
+        <span><i style={{ background: "var(--orange)" }} />Convertidos em Serviço</span>
         <span><i style={{ background: "var(--deemph)" }} />Ainda abertos ou perdidos</span>
       </div>
 
@@ -70,6 +70,8 @@ function GraficoConversao({ semanas }) {
   );
 }
 
+/* R$ 2,00 por m² de serviço finalizado. A barra mostra o total apurado e o
+   número em destaque, o que ainda falta repassar — que é a pergunta da diretoria. */
 function Comissoes({ itens }) {
   const max = Math.max(...itens.map((i) => Number(i.valor)), 1);
   return (
@@ -78,7 +80,7 @@ function Comissoes({ itens }) {
         <div className="rk" key={i.usuario}>
           <div className="nm">{i.usuario}</div>
           <div className="tr"><div className="fl" style={{ width: `${(i.valor / max) * 100}%` }} /></div>
-          <div className="vl">{brl(i.valor)}</div>
+          <div className="vl">{brl(i.aberto)}</div>
         </div>
       ))}
     </div>
@@ -113,7 +115,7 @@ export default function Painel() {
                 <div className="lab"><Icone nome="ordem" tamanho={14} className="ic-laranja" /> O.S. em andamento</div>
                 <div className="val">{painel.dados.os_geradas + painel.dados.os_em_execucao}</div>
                 <div className="dl">
-                  {painel.dados.os_geradas} gerada(s) · {painel.dados.os_em_execucao} em execução
+                  {painel.dados.os_geradas} agendado(s) · {painel.dados.os_em_execucao} em execução
                 </div>
               </div>
               {painel.dados.financeiro ? (
@@ -139,7 +141,7 @@ export default function Painel() {
 
               {pode("verFinanceiro") && painel.dados.comissoes && (
                 <div className="card">
-                  <header><h2>Por quem trouxe o cliente</h2><span className="hint">base da comissão</span></header>
+                  <header><h2>Comissões a pagar</h2><span className="hint">R$ 2,00 por m² finalizado</span></header>
                   <div className="body"><Comissoes itens={painel.dados.comissoes} /></div>
                 </div>
               )}

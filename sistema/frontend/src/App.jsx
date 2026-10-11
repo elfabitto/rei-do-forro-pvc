@@ -6,6 +6,7 @@ import { LOGO } from "./logo";
 import Agenda from "./paginas/Agenda";
 import Catalogo from "./paginas/Catalogo";
 import Clientes from "./paginas/Clientes";
+import Comissoes from "./paginas/Comissoes";
 import Login from "./paginas/Login";
 import OrcamentoNovo from "./paginas/OrcamentoNovo";
 import Orcamentos from "./paginas/Orcamentos";
@@ -13,12 +14,15 @@ import OrdemNova from "./paginas/OrdemNova";
 import OrdensServico from "./paginas/OrdensServico";
 import Painel from "./paginas/Painel";
 
+/* `so` restringe o item a uma permissão calculada pelo backend. */
 const MENU = [
   { grupo: "Operação" },
   { to: "/", rotulo: "Painel", icone: "painel", fim: true },
   { to: "/orcamentos", rotulo: "Orçamentos", icone: "orcamento" },
   { to: "/ordens", rotulo: "Ordens de Serviço", icone: "ordem" },
   { to: "/agenda", rotulo: "Agenda", icone: "agenda" },
+  { grupo: "Diretoria" },
+  { to: "/comissoes", rotulo: "Comissões", icone: "comissao", so: "verFinanceiro" },
   { grupo: "Cadastros" },
   { to: "/clientes", rotulo: "Clientes", icone: "clientes" },
   { to: "/catalogo", rotulo: "Tabela de preços", icone: "precos" },
@@ -28,8 +32,19 @@ const MENU = [
 const ESTREITO = 900;
 const ehEstreito = () => window.innerWidth < ESTREITO;
 
+/** Tira os itens sem permissão e os títulos de grupo que ficaram vazios. */
+function menuVisivel(pode) {
+  const itens = MENU.filter((m) => m.grupo || !m.so || pode(m.so));
+  return itens.filter((m, i) => {
+    if (!m.grupo) return true;
+    const resto = itens.slice(i + 1);
+    const proximoGrupo = resto.findIndex((p) => p.grupo);
+    return (proximoGrupo === -1 ? resto : resto.slice(0, proximoGrupo)).length > 0;
+  });
+}
+
 export default function App() {
-  const { usuario, carregando, sair } = useAuth();
+  const { usuario, carregando, sair, pode } = useAuth();
   const local = useLocation();
 
   // No desktop o menu fica sempre aberto na lateral; no celular, recolhido.
@@ -65,7 +80,7 @@ export default function App() {
           </button>
         </div>
         <nav>
-          {MENU.map((m, i) =>
+          {menuVisivel(pode).map((m, i) =>
             m.grupo ? (
               <div className="grp" key={`g${i}`}>{m.grupo}</div>
             ) : (
@@ -107,9 +122,11 @@ export default function App() {
           <Route path="/" element={<Painel />} />
           <Route path="/orcamentos" element={<Orcamentos />} />
           <Route path="/orcamentos/novo" element={<OrcamentoNovo />} />
+          <Route path="/orcamentos/:id/editar" element={<OrcamentoNovo />} />
           <Route path="/ordens" element={<OrdensServico />} />
           <Route path="/ordens/nova" element={<OrdemNova />} />
           <Route path="/agenda" element={<Agenda />} />
+          <Route path="/comissoes" element={<Comissoes />} />
           <Route path="/clientes" element={<Clientes />} />
           <Route path="/catalogo" element={<Catalogo />} />
           <Route path="*" element={<Navigate to="/" replace />} />

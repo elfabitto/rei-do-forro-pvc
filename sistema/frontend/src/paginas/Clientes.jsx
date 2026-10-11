@@ -3,10 +3,13 @@ import { api } from "../api";
 import { BotaoAcao, Campo, Estado, Gaveta, linhas, useApi } from "../componentes";
 import Icone from "../icones";
 
+/* A empresa atende no Pará: o estado não é pergunta, é constante. */
+const UF = "PA";
+
 const CLIENTE_VAZIO = { nome: "", telefone: "", observacoes: "" };
 const ENDERECO_VAZIO = {
   logradouro: "", numero: "", complemento: "", bairro: "",
-  cidade: "Rondonópolis", uf: "MT", cep: "", ponto_referencia: "",
+  cidade: "", uf: UF, cep: "", ponto_referencia: "",
   link_localizacao: "", principal: true,
 };
 
@@ -79,8 +82,8 @@ function FormCliente({ cliente, aoFechar, aoSalvar }) {
             <input {...campoE("complemento")} />
           </Campo>
           <div className="two">
-            <Campo rotulo="Cidade"><input {...campoE("cidade")} /></Campo>
-            <Campo rotulo="UF"><input {...campoE("uf")} maxLength={2} /></Campo>
+            <Campo rotulo="Cidade"><input {...campoE("cidade")} placeholder="Marabá" /></Campo>
+            <Campo rotulo="Estado"><div className="travado">{UF}<small>fixo</small></div></Campo>
           </div>
           <Campo rotulo="Ponto de referência"><input {...campoE("ponto_referencia")} /></Campo>
           <Campo rotulo="Localização do WhatsApp"
@@ -134,8 +137,8 @@ function FormEndereco({ cliente, aoFechar, aoSalvar }) {
         </div>
         <Campo rotulo="Complemento"><input {...campo("complemento")} /></Campo>
         <div className="two">
-          <Campo rotulo="Cidade"><input {...campo("cidade")} /></Campo>
-          <Campo rotulo="UF"><input {...campo("uf")} maxLength={2} /></Campo>
+          <Campo rotulo="Cidade"><input {...campo("cidade")} placeholder="Marabá" /></Campo>
+          <Campo rotulo="Estado"><div className="travado">{UF}<small>fixo</small></div></Campo>
         </div>
         <Campo rotulo="Ponto de referência"><input {...campo("ponto_referencia")} /></Campo>
         <Campo rotulo="Localização do WhatsApp">

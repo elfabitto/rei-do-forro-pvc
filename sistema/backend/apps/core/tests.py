@@ -10,7 +10,7 @@ from django.urls import reverse
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
-from apps.catalogo.models import Acabamento, Forro
+from apps.catalogo.models import Acabamento, Forro, Material
 from apps.clientes.models import Cliente, Endereco
 from apps.ordens.models import ConfiguracaoAgenda, OrdemServico, StatusOS
 
@@ -101,15 +101,21 @@ class OrdemServicoApiTest(ApiBase):
             vendedor=dono, criado_por=criado_por or dono, valor_total=D("1000.00"),
         )
 
-    def test_vendedor_so_ve_as_proprias_os_e_nao_ve_financeiro(self):
-        self.nova(vendedor=self.diretor)          # alheia: nem comissão nem lançamento dele
+    def test_vendedor_ve_a_os_alheia_mas_nao_a_altera(self):
+        """A lista é da equipe inteira; mexer continua sendo de quem lançou."""
+        alheia = self.nova(vendedor=self.diretor)
         self.client.force_authenticate(self.vendedor)
 
         painel = self.client.get("/api/painel/").data
         self.assertNotIn("financeiro", painel)
 
         lista = self.client.get("/api/ordens-servico/").data
-        self.assertEqual(lista["count"], 0)
+        self.assertEqual(lista["count"], 1)
+        self.assertFalse(lista["results"][0]["pode_editar"])
+
+        r = self.client.patch(f"/api/ordens-servico/{alheia.id}/",
+                              {"observacoes": "não deveria entrar"}, format="json")
+        self.assertEqual(r.status_code, 403)
 
     def test_vendedor_ve_a_os_que_ele_lancou_para_outro(self):
         """Lançou a O.S., continua enxergando — mesmo que a comissão seja de outro."""
@@ -232,3 +238,121 @@ class GerarOSDoOrcamentoTest(ApiBase):
         self.assertIn("agendar_instalacao", segunda.data)
         # nada de O.S. órfã criada sem agendamento
         self.assertEqual(OrdemServico.objects.count(), antes)
+
+    def test_modalidade_escolhida_define_o_valor_cobrado(self):
+        """O cliente escolhe à vista ou cartão já na geração do serviço."""
+        orc = self.orcamento()
+        r = self.client.post("/api/ordens-servico/", {
+            "orcamento": orc["id"], "endereco": self.endereco.id, "modalidade": "cartao",
+            "agendar_entrega": {"data": self.dia_util(2), "turno": "manha"},
+        }, format="json")
+        self.assertEqual(r.status_code, 201, r.data)
+        self.assertEqual(r.data["modalidade"], "cartao")
+        self.assertEqual(r.data["valor_total"], r.data["valor_cartao"])
+        self.assertEqual(r.data["valor_total"], "1771.00")
+
+    def test_tipo_e_numero_vem_do_orcamento(self):
+        orc = self.orcamento()
+        r = self.client.post("/api/ordens-servico/", {
+            "orcamento": orc["id"], "endereco": self.endereco.id, "modalidade": "vista",
+            "agendar_entrega": {"data": self.dia_util(2), "turno": "manha"},
+        }, format="json")
+        self.assertEqual(r.data["tipo"], "instalado")
+        self.assertTrue(r.data["numero"].startswith("OS-SERV-"), r.data["numero"])
+
+
+class ComissoesApiTest(ApiBase):
+    """A aba Comissões: finalizados, em aberto a pagar, baixa pela diretoria."""
+
+    def finalizada(self):
+        self.client.force_authenticate(self.vendedor)
+        orc = self.client.post("/api/orcamentos/", {
+            "cliente": self.cliente.id, "tipo": "instalado", "area_m2": "55",
+            "forro": self.forro.id, "acabamento": self.sanca.id,
+        }, format="json").data
+        os_ = self.client.post("/api/ordens-servico/", {
+            "orcamento": orc["id"], "endereco": self.endereco.id, "modalidade": "vista",
+        }, format="json").data
+
+        self.client.force_authenticate(self.diretor)
+        self.client.post(f"/api/ordens-servico/{os_['id']}/finalizar/", {
+            "pagamentos": [{"forma": "pix", "valor": os_["valor_total"]}],
+        }, format="json")
+        return os_
+
+    def test_lista_traz_a_comissao_em_aberto(self):
+        self.finalizada()
+        r = self.client.get("/api/comissoes/", {"situacao": "aberto"})
+        self.assertEqual(r.status_code, 200, r.data)
+        self.assertEqual(r.data["resumo"]["aberto"], D("110.00"))   # 55 m² × 2
+        self.assertEqual(len(r.data["itens"]), 1)
+        self.assertFalse(r.data["itens"][0]["paga"])
+
+    def test_diretor_da_baixa_e_sai_do_aberto(self):
+        os_ = self.finalizada()
+        r = self.client.post(f"/api/ordens-servico/{os_['id']}/pagar_comissao/", {}, format="json")
+        self.assertEqual(r.status_code, 200, r.data)
+        self.assertTrue(r.data["comissao_paga"])
+
+        resumo = self.client.get("/api/comissoes/").data["resumo"]
+        self.assertEqual(resumo["aberto"], D("0"))
+        self.assertEqual(resumo["pago"], D("110.00"))
+
+    def test_vendedor_nao_da_baixa(self):
+        os_ = self.finalizada()
+        self.client.force_authenticate(self.vendedor)
+        r = self.client.post(f"/api/ordens-servico/{os_['id']}/pagar_comissao/", {}, format="json")
+        self.assertEqual(r.status_code, 403)
+
+    def test_vendedor_ve_so_as_proprias_comissoes(self):
+        self.finalizada()
+        self.client.force_authenticate(self.vendedor)
+        r = self.client.get("/api/comissoes/")
+        self.assertEqual(r.status_code, 200)
+        self.assertTrue(all(i["vendedor"] == self.vendedor.id for i in r.data["itens"]))
+
+
+class ItemOutroApiTest(ApiBase):
+    """Item "Outro" pela API: vale nos dois tipos; catálogo, só no Material."""
+
+    def setUp(self):
+        self.client.force_authenticate(self.vendedor)
+
+    def test_instalado_aceita_item_avulso(self):
+        r = self.client.post("/api/orcamentos/", {
+            "cliente": self.cliente.id, "tipo": "instalado", "area_m2": "23",
+            "forro": self.forro.id, "acabamento": self.sanca.id,
+            "itens": [{"descricao": "Retirada do forro antigo", "unidade": "verba",
+                       "quantidade": "1", "preco_unitario": "250.00"}],
+        }, format="json")
+        self.assertEqual(r.status_code, 201, r.data)
+        self.assertEqual(r.data["total_vista"], "1906.00")     # 1656 + 250
+        self.assertEqual(r.data["itens"][0]["total"], "250.00")
+
+    def test_instalado_recusa_material_de_catalogo(self):
+        material = Material.objects.create(nome="Perfil 6 m", rotulo="Perfil 6 m",
+                                           unidade="und", preco=D("25.00"))
+        r = self.client.post("/api/orcamentos/", {
+            "cliente": self.cliente.id, "tipo": "instalado", "area_m2": "23",
+            "forro": self.forro.id, "acabamento": self.sanca.id,
+            "itens": [{"material": material.id, "descricao": "Perfil 6 m", "unidade": "und",
+                       "quantidade": "10", "preco_unitario": "25.00"}],
+        }, format="json")
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("itens", r.data)
+
+    def test_material_aceita_catalogo_e_avulso_juntos(self):
+        material = Material.objects.create(nome="Perfil 6 m", rotulo="Perfil 6 m",
+                                           unidade="und", preco=D("25.00"))
+        r = self.client.post("/api/orcamentos/", {
+            "cliente": self.cliente.id, "tipo": "material", "area_m2": "23",
+            "forro": self.forro.id,
+            "itens": [
+                {"material": material.id, "descricao": "Perfil 6 m", "unidade": "und",
+                 "quantidade": "10", "preco_unitario": "25.00"},
+                {"descricao": "Frete", "unidade": "verba",
+                 "quantidade": "1", "preco_unitario": "100.00"},
+            ],
+        }, format="json")
+        self.assertEqual(r.status_code, 201, r.data)
+        self.assertEqual(r.data["total_vista"], "1127.40")     # 777,40 + 250 + 100

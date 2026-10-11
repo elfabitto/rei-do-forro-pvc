@@ -53,6 +53,12 @@ const FORMAS = {
   sair: <><path d="M14 20H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h8" /><path d="m16 15 4-3-4-3M20 12H9" /></>,
   grafico: <><path d="M4 20V4" /><path d="M4 20h16" /><rect x="8" y="12" width="3" height="5" rx="0.8" />
               <rect x="13.5" y="8" width="3" height="9" rx="0.8" /></>,
+  editar: <><path d="M4 20h4l10-10a2.8 2.8 0 0 0-4-4L4 16z" /><path d="M13.5 6.5 17.5 10.5" /></>,
+  olho: <><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z" />
+           <circle cx="12" cy="12" r="3" /></>,
+  comissao: <><circle cx="12" cy="12" r="9" /><path d="M9.5 9.5h5M9.5 14.5h5" />
+               <path d="M10.5 7v10M13.5 7v10" /></>,
+  enviar: <><path d="M21 3 10.5 13.5" /><path d="M21 3l-6.8 18-3.7-7.5L3 9.8z" /></>,
 };
 
 export default function Icone({ nome, tamanho = 18, className = "", ...resto }) {

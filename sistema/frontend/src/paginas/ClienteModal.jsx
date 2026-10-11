@@ -9,10 +9,13 @@ import { useState } from "react";
 import { api } from "../api";
 import { BotaoAcao, Campo, Modal, Selecao, linhas, useApi } from "../componentes";
 
+/* A empresa atende no Pará: o estado não é pergunta, é constante. */
+const UF = "PA";
+
 const NOVO = {
   nome: "", telefone: "", observacoes: "",
   logradouro: "", numero: "", complemento: "", bairro: "",
-  cidade: "Rondonópolis", uf: "MT", ponto_referencia: "", link_localizacao: "",
+  cidade: "", uf: UF, ponto_referencia: "", link_localizacao: "",
 };
 
 export default function ClienteModal({ aoFechar, aoConcluir, subtitulo }) {
@@ -55,8 +58,8 @@ export default function ClienteModal({ aoFechar, aoConcluir, subtitulo }) {
         numero: f.numero,
         complemento: f.complemento,
         bairro: f.bairro.trim(),
-        cidade: f.cidade,
-        uf: f.uf,
+        cidade: f.cidade.trim(),
+        uf: UF,
         ponto_referencia: f.ponto_referencia,
         link_localizacao: f.link_localizacao.trim(),
         principal: true,
@@ -122,8 +125,10 @@ export default function ClienteModal({ aoFechar, aoConcluir, subtitulo }) {
             <input {...campo("complemento")} placeholder="Casa dos fundos" />
           </Campo>
           <div className="two">
-            <Campo rotulo="Cidade"><input {...campo("cidade")} /></Campo>
-            <Campo rotulo="UF"><input {...campo("uf")} maxLength={2} /></Campo>
+            <Campo rotulo="Cidade"><input {...campo("cidade")} placeholder="Marabá" /></Campo>
+            <Campo rotulo="Estado">
+              <div className="travado">{UF}<small>fixo</small></div>
+            </Campo>
           </div>
           <Campo rotulo="Ponto de referência">
             <input {...campo("ponto_referencia")} placeholder="Em frente à padaria" />

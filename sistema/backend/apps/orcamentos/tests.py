@@ -89,3 +89,48 @@ class OrcamentoMaterialTest(BaseCatalogo):
                                      acabamento=self.sanca, vendedor=self.user, criado_por=self.user)
         self.assertIsNone(o.acabamento_id)
         self.assertEqual(o.preco_m2_vista, D("33.80"))
+
+
+class ItemOutroTest(TestCase):
+    """O item "Outro": descrição livre e valor fechado, nos dois tipos."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.usuario = Usuario.objects.create_user("ana", papel="vendedor")
+        cls.forro = Forro.objects.create(
+            nome="Branco Liso", preco_material_vista=D("33.80"), preco_material_cartao=D("36.50"),
+            preco_instalado_vista=D("64.00"), preco_instalado_cartao=D("69.00"),
+        )
+        cls.sanca = Acabamento.objects.create(nome="Sanca (8 cm)", acrescimo_m2=D("8.00"))
+
+    def orcamento(self, tipo, acabamento=None):
+        return Orcamento.objects.create(
+            tipo=tipo, area_m2=D("23"), forro=self.forro, acabamento=acabamento,
+            preco_m2_vista=D("0"), preco_m2_cartao=D("0"),
+            vendedor=self.usuario, criado_por=self.usuario,
+        )
+
+    def test_entra_no_total_do_instalado(self):
+        o = self.orcamento(TipoOrcamento.INSTALADO, self.sanca)
+        OrcamentoItem.objects.create(orcamento=o, descricao="Retirada do forro antigo",
+                                     unidade="verba", quantidade=D("1"), preco_unitario=D("250.00"))
+        o.save()
+        # 23 m² × (64 + 8) = 1656, mais a verba de 250
+        self.assertEqual(o.total_vista, D("1906.00"))
+        self.assertEqual(o.total_cartao, D("2021.00"))                 # 23 × 77 + 250
+
+    def test_entra_no_total_do_material(self):
+        o = self.orcamento(TipoOrcamento.MATERIAL)
+        OrcamentoItem.objects.create(orcamento=o, descricao="Frete", unidade="verba",
+                                     quantidade=D("1"), preco_unitario=D("100.00"))
+        o.save()
+        self.assertEqual(o.total_vista, D("777.40") + D("100.00"))
+
+    def test_nao_tem_acrescimo_de_cartao(self):
+        """A verba é valor fechado: só o forro muda entre à vista e cartão."""
+        o = self.orcamento(TipoOrcamento.MATERIAL)
+        OrcamentoItem.objects.create(orcamento=o, descricao="Frete", unidade="verba",
+                                     quantidade=D("1"), preco_unitario=D("100.00"))
+        o.save()
+        self.assertEqual(o.total_cartao - o.total_vista,
+                         (D("36.50") - D("33.80")) * D("23"))

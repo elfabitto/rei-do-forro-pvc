@@ -11,6 +11,8 @@ export function useApi(caminho, params, deps = []) {
   const [versao, setVersao] = useState(0);
 
   useEffect(() => {
+    // caminho nulo = ainda não há o que buscar (ex.: endereços antes do cliente)
+    if (!caminho) { setCarregando(false); return undefined; }
     let vivo = true;
     setCarregando(true);
     api.get(caminho, params)
@@ -131,12 +133,18 @@ export function DocumentoOrcamento({ doc }) {
         ))}
       </div>
 
-      <div className="sect">{doc.secao}</div>
-      <div className="rows">
-        {doc.linhas.map(([k, v], i) => (
-          <div className="row sm item" key={i}><span className="k">{k}</span><span className="v">{v}</span></div>
-        ))}
-      </div>
+      {doc.secoes.map((secao) => (
+        <div key={secao.titulo}>
+          <div className="sect">{secao.titulo}</div>
+          <div className="rows">
+            {secao.linhas.map(([k, v], i) => (
+              <div className="row sm item" key={i}>
+                <span className="k">{k}</span><span className="v">{v}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
       {doc.obs && <p className="obs">{doc.obs}</p>}
 
       <div className="totais">
@@ -146,6 +154,34 @@ export function DocumentoOrcamento({ doc }) {
           <span className="v">R$ {brl(doc.totalCartao)}</span></div>
       </div>
     </article>
+  );
+}
+
+/* ---------------------------------------------------------------- confirmação */
+/**
+ * Pergunta antes de uma ação que não se desfaz sozinha — dar o orçamento como
+ * perdido, cancelar o serviço. O texto diz o que vai acontecer, não "tem certeza?".
+ */
+export function Confirmacao({
+  titulo, subtitulo, aviso, rotulo = "Confirmar", classe = "btn vermelho",
+  aoFechar, aoConfirmar, children,
+}) {
+  return (
+    <Modal
+      titulo={titulo}
+      subtitulo={subtitulo}
+      aoFechar={aoFechar}
+      largura={440}
+      rodape={
+        <div className="btnrow" style={{ padding: 0 }}>
+          <BotaoAcao classe={classe} aoClicar={aoConfirmar}>{rotulo}</BotaoAcao>
+          <button className="btn" onClick={aoFechar}>Voltar</button>
+        </div>
+      }
+    >
+      {aviso && <p className="confirmaTexto">{aviso}</p>}
+      {children}
+    </Modal>
   );
 }
 

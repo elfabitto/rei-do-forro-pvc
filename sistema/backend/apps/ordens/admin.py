@@ -33,16 +33,21 @@ class HistoricoInline(admin.TabularInline):
 
 @admin.register(OrdemServico)
 class OrdemServicoAdmin(admin.ModelAdmin):
-    list_display = ["numero", "cliente", "status", "vendedor", "modalidade", "valor_total", "saldo", "atrasado", "criado_em"]
-    list_filter = ["status", "vendedor", "criado_em"]
+    list_display = ["numero", "tipo", "cliente", "status", "vendedor", "modalidade",
+                    "valor_total", "saldo", "comissao", "comissao_paga", "atrasado", "criado_em"]
+    list_filter = ["status", "tipo", "vendedor", "comissao_paga", "criado_em"]
     search_fields = ["numero", "cliente__nome"]
     readonly_fields = ["numero", "criado_por", "criado_em", "finalizada_por", "finalizada_em",
-                       "cancelada_por", "cancelada_em"]
+                       "cancelada_por", "cancelada_em", "comissao_paga_por", "comissao_paga_em"]
     inlines = [AgendamentoInline, PagamentoInline, HistoricoInline]
 
     @admin.display(description="saldo")
     def saldo(self, obj):
         return f"R$ {obj.saldo}"
+
+    @admin.display(description="comissão")
+    def comissao(self, obj):
+        return f"R$ {obj.comissao_valor}"
 
     @admin.display(description="atrasado", boolean=True)
     def atrasado(self, obj):

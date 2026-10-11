@@ -1,13 +1,16 @@
 /**
- * Imagem da Ordem de Serviço, para mandar no grupo do WhatsApp.
+ * Imagem da Ordem de Serviço, para mandar no grupo de gestão do WhatsApp.
  *
- * Mesmo desenho do documento de orçamento (docs/ e orcamentoDoc.js), trocando
- * o conteúdo: cliente, endereço, agendamento e situação do pagamento.
+ * Mesmo desenho do documento de orçamento (docs/ e orcamentoDoc.js), com o
+ * conteúdo da O.S.: tipo do serviço, cliente, pedido, agendamento, valor do m²
+ * e a forma de pagamento que o cliente escolheu.
  */
 import { LOGO } from "./logo";
+import { VERBA, quantidadeTexto } from "./orcamentoDoc";
 
 const brl = (n) =>
   Number(n ?? 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const m2 = (n) => Number(n ?? 0).toLocaleString("pt-BR", { maximumFractionDigits: 2 });
 const dataBR = (s) => (s ? new Date(s + "T00:00:00").toLocaleDateString("pt-BR") : "—");
 
 const logoImg = new Image();
@@ -18,9 +21,24 @@ const logoPronta = new Promise((ok) => {
 });
 const FF = '"Segoe UI", Arial, Helvetica, sans-serif';
 
+/** O que foi lançado de ripão, somando os itens do orçamento de Material. */
+export function resumoRipao(itens = []) {
+  const ripoes = itens.filter((i) => /rip[ãa]o/i.test(i.descricao ?? ""));
+  if (!ripoes.length) return "";
+  return ripoes
+    .map((i) => `${quantidadeTexto(i.quantidade, i.unidade)} — `
+      + String(i.descricao).replace(/^Ripão 4 m\s*/i, ""))
+    .join(" · ");
+}
+
+/** Itens "Outro" do orçamento: descrição e valor fechado. */
+export const itensExtras = (itens = []) => itens.filter((i) => i.unidade === VERBA);
+
 /** Reúne o que vai na imagem e no texto, a partir da O.S. da API. */
 export function montarOS(os, { verFinanceiro = true } = {}) {
   const end = os.endereco_detalhe;
+  const orc = os.orcamento_detalhe;
+
   const enderecoTxt = end
     ? [end.logradouro, end.numero].filter(Boolean).join(", ")
       + (end.complemento ? ` — ${end.complemento}` : "")
@@ -29,6 +47,7 @@ export function montarOS(os, { verFinanceiro = true } = {}) {
   const d = {
     numero: os.numero,
     status: os.status_display,
+    tipo: os.tipo_display || (os.tipo === "material" ? "Fornecimento de Material" : "Instalação Completa"),
     atrasado: os.atrasado,
     cliente: os.cliente_detalhe?.nome ?? "",
     telefone: os.cliente_detalhe?.telefone ?? "",
@@ -39,35 +58,59 @@ export function montarOS(os, { verFinanceiro = true } = {}) {
     instalacao: os.instalacao ? `${dataBR(os.instalacao.data)} · ${os.instalacao.turno_display}` : "",
     observacoes: os.observacoes ?? "",
     verFinanceiro,
+    modalidade: os.modalidade_display || "",
     valor: os.valor_liquido ?? os.valor_total,
     pago: os.total_pago,
     saldo: os.saldo,
-    modalidade: os.modalidade_display || "",
+    vendedor: os.vendedor_nome ?? "",
   };
 
-  d.resumo = [
+  /* ---- informações do cliente ---- */
+  d.cliente_linhas = [
     ["Cliente", d.cliente],
     ["Telefone", d.telefone],
     ["Endereço", d.endereco],
     ["Bairro", d.bairro],
   ];
 
+  /* ---- informações do pedido ---- */
+  d.pedido = [];
+  if (orc) {
+    d.pedido.push(["Área", `${m2(orc.area_m2)} m²`]);
+    d.pedido.push(["Forro", orc.forro_nome ?? "—"]);
+    if (orc.acabamento_nome) d.pedido.push(["Acabamento", orc.acabamento_nome]);
+    const ripao = resumoRipao(orc.itens);
+    if (ripao) d.pedido.push(["Ripão", ripao]);
+    for (const extra of itensExtras(orc.itens)) {
+      d.pedido.push([extra.descricao, `R$ ${brl(extra.total)}`]);
+    }
+
+    d.m2Vista = Number(orc.preco_m2_vista);
+    d.m2Cartao = Number(orc.preco_m2_cartao);
+  }
+
+  /* ---- agendamento ---- */
   d.agenda = [["Entrega", d.entrega]];
   if (d.instalacao) d.agenda.push(["Instalação", d.instalacao]);
 
-  d.texto = `*ORDEM DE SERVIÇO ${d.numero}*
-_${d.status}${d.atrasado ? " · ATRASADA" : ""}_
-----------
-*Cliente:* ${d.cliente}
-*Telefone:* ${d.telefone}
-*Endereço:* ${d.endereco}
-*Bairro:* ${d.bairro}${d.link ? `\n*Localização:* ${d.link}` : ""}
+  /* ---- texto do WhatsApp ---- */
+  const bloco = (titulo, pares) =>
+    pares.length ? `\n*${titulo}*\n` + pares.map(([k, v]) => `${k}: ${v || "—"}`).join("\n") : "";
 
-*AGENDAMENTO*
-📦 *Entrega:* ${d.entrega}${d.instalacao ? `\n🔧 *Instalação:* ${d.instalacao}` : ""}${
-    verFinanceiro
-      ? `\n----------\n*VALOR*${d.modalidade ? ` (${d.modalidade})` : ""}\nTotal: R$ ${brl(d.valor)}\nPago: R$ ${brl(d.pago)}\nSaldo: R$ ${brl(d.saldo)}`
+  d.texto = `*ORDEM DE SERVIÇO ${d.numero}*
+_${d.tipo.toUpperCase()}${d.atrasado ? " · ATRASADA" : ""}_
+Situação: ${d.status}
+----------${bloco("INFORMAÇÕES DO CLIENTE", d.cliente_linhas)}${
+    d.link ? `\nLocalização: ${d.link}` : ""
+  }${bloco("INFORMAÇÕES DO PEDIDO", d.pedido)}${bloco("AGENDAMENTO", d.agenda)}${
+    d.m2Vista
+      ? `\n*VALOR DO M²*\nÀ vista: R$ ${brl(d.m2Vista)}/m²\nNo cartão: R$ ${brl(d.m2Cartao)}/m²`
       : ""
+  }
+*INFORMAÇÕES DE PAGAMENTO*
+Tipo: ${d.modalidade || "a definir"}
+Total: R$ ${brl(d.valor)}${
+    verFinanceiro && Number(d.saldo) > 0 ? `\nPago: R$ ${brl(d.pago)}\nSaldo: R$ ${brl(d.saldo)}` : ""
   }${d.observacoes ? `\n----------\n_${d.observacoes}_` : ""}`;
 
   return d;
@@ -77,7 +120,7 @@ export function desenharOS(d) {
   const W = 1000, PAD = 56;
   const C = { ink: "#15161a", ink2: "#464a52", muted: "#7c828d", line: "#e4e7eb",
               orange: "#ee6a1e", orangeDk: "#cf5513", orangeBg: "#fdf1e8",
-              azul: "#2a78d6", vermelho: "#d03b3b", verde: "#0ca30c" };
+              vermelho: "#d03b3b", verde: "#0ca30c" };
 
   const blocos = [];
   const add = (h, draw) => blocos.push({ h, draw });
@@ -89,35 +132,50 @@ export function desenharOS(d) {
     return f;
   };
 
-  const linha = (k, v) => add(52, (x, y) => {
+  const linha = (k, v) => add(50, (x, y) => {
     x.textAlign = "left";
-    x.font = `700 19px ${FF}`; x.fillStyle = C.muted; ls(x, "1px");
-    x.fillText(k.toUpperCase(), PAD, y);
-    const wk = x.measureText(k.toUpperCase()).width;
+    x.font = `700 18px ${FF}`; x.fillStyle = C.muted; ls(x, "1px");
+    x.fillText(String(k).toUpperCase(), PAD, y);
+    const wk = x.measureText(String(k).toUpperCase()).width;
     ls(x, "0px");
 
     x.textAlign = "right"; x.fillStyle = C.ink;
-    encolher(x, String(v), W - PAD * 2 - wk - 24, 25);
+    encolher(x, String(v), W - PAD * 2 - wk - 24, 24);
     x.fillText(String(v), W - PAD, y);
 
     x.strokeStyle = C.line; x.lineWidth = 1;
     x.beginPath(); x.moveTo(PAD, y + 16.5); x.lineTo(W - PAD, y + 16.5); x.stroke();
   });
 
-  const secao = (txt) => add(46, (x, y) => {
+  const secao = (txt) => add(48, (x, y) => {
     x.textAlign = "left"; x.font = `800 18px ${FF}`; x.fillStyle = C.ink; ls(x, "1.4px");
     x.fillText(txt.toUpperCase(), PAD, y); ls(x, "0px");
   });
 
-  d.resumo.forEach(([k, v]) => linha(k, v || "—"));
-  add(12, () => {});
+  secao("Informações do cliente");
+  d.cliente_linhas.forEach(([k, v]) => linha(k, v || "—"));
+
+  if (d.pedido.length) {
+    add(10, () => {});
+    secao("Informações do pedido");
+    d.pedido.forEach(([k, v]) => linha(k, v));
+  }
+
+  add(10, () => {});
   secao("Agendamento");
   d.agenda.forEach(([k, v]) => linha(k, v));
 
+  if (d.m2Vista) {
+    add(10, () => {});
+    secao("Valor do metro quadrado");
+    linha("À vista", `R$ ${brl(d.m2Vista)}/m²`);
+    linha("No cartão", `R$ ${brl(d.m2Cartao)}/m²`);
+  }
+
   if (d.observacoes) {
-    add(12, () => {});
+    add(10, () => {});
     secao("Observações");
-    add(44, (x, y) => {
+    add(42, (x, y) => {
       x.textAlign = "left"; x.font = `400 19px ${FF}`; x.fillStyle = C.ink2;
       const max = W - PAD * 2;
       let txt = d.observacoes;
@@ -127,8 +185,8 @@ export function desenharOS(d) {
     });
   }
 
-  const HEAD = 118, BAR = 56, TOT = d.verFinanceiro ? 150 : 0, FOOT = 54;
-  const H = HEAD + BAR + blocos.reduce((s, b) => s + b.h, 0) + 28 + TOT + FOOT;
+  const HEAD = 118, BAR = 56, TIPO = 46, TOT = 150, FOOT = 54;
+  const H = HEAD + BAR + TIPO + blocos.reduce((s, b) => s + b.h, 0) + 26 + TOT + FOOT;
 
   const cv = document.createElement("canvas");
   cv.width = W; cv.height = H;
@@ -159,30 +217,32 @@ export function desenharOS(d) {
   x.fillText(d.atrasado ? `${d.status.toUpperCase()} · ATRASADA` : d.status.toUpperCase(), W - PAD, HEAD + 37);
   ls(x, "0px");
 
-  let y = HEAD + BAR + 44;
+  /* tipo do serviço, logo abaixo do número */
+  x.fillStyle = C.orangeBg; x.fillRect(0, HEAD + BAR, W, TIPO);
+  x.textAlign = "center"; x.font = `800 19px ${FF}`; x.fillStyle = C.orangeDk; ls(x, "2px");
+  x.fillText(d.tipo.toUpperCase(), W / 2, HEAD + BAR + 30);
+  ls(x, "0px");
+
+  let y = HEAD + BAR + TIPO + 40;
   for (const b of blocos) { b.draw(x, y); y += b.h; }
 
-  /* valores */
-  if (d.verFinanceiro) {
-    const ty = H - FOOT - TOT;
-    x.fillStyle = C.orangeBg; x.fillRect(0, ty, W, TOT);
-    x.fillStyle = C.orange; x.fillRect(0, ty, W, 4);
+  /* informações de pagamento */
+  const ty = H - FOOT - TOT;
+  x.fillStyle = C.orangeBg; x.fillRect(0, ty, W, TOT);
+  x.fillStyle = C.orange; x.fillRect(0, ty, W, 4);
 
-    x.textAlign = "left"; x.font = `800 19px ${FF}`; x.fillStyle = C.ink2; ls(x, "1.2px");
-    x.fillText(`VALOR TOTAL${d.modalidade ? ` — ${d.modalidade.toUpperCase()}` : ""}`, PAD, ty + 52);
-    x.fillStyle = C.muted;
-    x.fillText("PAGO", PAD, ty + 95);
-    x.fillText("SALDO", PAD, ty + 128);
-    ls(x, "0px");
+  x.textAlign = "left"; x.font = `800 18px ${FF}`; x.fillStyle = C.ink; ls(x, "1.4px");
+  x.fillText("INFORMAÇÕES DE PAGAMENTO", PAD, ty + 38);
+  x.font = `700 18px ${FF}`; x.fillStyle = C.muted;
+  x.fillText("FORMA ESCOLHIDA", PAD, ty + 78);
+  x.fillText("TOTAL", PAD, ty + 118);
+  ls(x, "0px");
 
-    x.textAlign = "right";
-    x.font = `800 42px ${FF}`; x.fillStyle = C.orangeDk;
-    x.fillText(`R$ ${brl(d.valor)}`, W - PAD, ty + 58);
-    x.font = `700 24px ${FF}`; x.fillStyle = C.ink2;
-    x.fillText(`R$ ${brl(d.pago)}`, W - PAD, ty + 98);
-    x.fillStyle = Number(d.saldo) > 0 ? C.vermelho : C.verde;
-    x.fillText(`R$ ${brl(d.saldo)}`, W - PAD, ty + 131);
-  }
+  x.textAlign = "right";
+  x.font = `700 24px ${FF}`; x.fillStyle = C.ink;
+  x.fillText(d.modalidade || "a definir", W - PAD, ty + 82);
+  x.font = `800 42px ${FF}`; x.fillStyle = C.orangeDk;
+  x.fillText(`R$ ${brl(d.valor)}`, W - PAD, ty + 126);
 
   /* rodapé */
   x.fillStyle = C.ink; x.fillRect(0, H - FOOT, W, FOOT);
@@ -254,4 +314,4 @@ export async function compartilharOS(d) {
   return copiou ? "imagem copiada — cole no WhatsApp" : "imagem baixada";
 }
 
-export { brl };
+export { brl, m2 };

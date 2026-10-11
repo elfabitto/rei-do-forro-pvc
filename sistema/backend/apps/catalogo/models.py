@@ -36,7 +36,7 @@ class Material(models.Model):
 
     `unidade` e `preco` são SEMPRE a unidade em que a quantidade é lançada e o preço dela.
     `unidade_cotacao`/`preco_cotacao` só documentam a cotação de origem quando ela é outra —
-    o ripão é cotado por dúzia e lançado por unidade, com preço proporcional.
+    hoje nenhum material usa isso: o ripão é cotado e lançado por dúzia (meia dúzia é 0,5).
     """
 
     nome = models.CharField(max_length=80)
