@@ -27,8 +27,9 @@ class OrcamentoResumoSerializer(serializers.ModelSerializer):
     class Meta:
         model = Orcamento
         fields = ["id", "numero", "tipo", "tipo_display", "area_m2", "largura", "comprimento",
+                  "tamanho_folha", "quantidade_folhas",
                   "forro_nome", "acabamento_nome", "preco_m2_vista", "preco_m2_cartao",
-                  "total_vista", "total_cartao", "observacoes", "itens"]
+                  "taxa_logistica", "total_vista", "total_cartao", "observacoes", "itens"]
 
 
 class OrcamentoSerializer(serializers.ModelSerializer):
@@ -46,12 +47,13 @@ class OrcamentoSerializer(serializers.ModelSerializer):
     class Meta:
         model = Orcamento
         fields = ["id", "numero", "cliente", "cliente_detalhe", "tipo", "tipo_display",
-                  "largura", "comprimento", "area_m2", "forro", "forro_nome",
+                  "largura", "comprimento", "tamanho_folha", "quantidade_folhas",
+                  "area_m2", "forro", "forro_nome",
                   "acabamento", "acabamento_nome", "preco_m2_vista", "preco_m2_cartao",
-                  "total_vista", "total_cartao", "status", "status_display", "validade_dias",
+                  "taxa_logistica", "total_vista", "total_cartao", "status", "status_display", "validade_dias",
                   "observacoes", "vendedor", "vendedor_nome", "criado_por", "criado_em",
                   "itens", "tem_os", "os_id", "pode_editar"]
-        read_only_fields = ["numero", "preco_m2_vista", "preco_m2_cartao", "total_vista",
+        read_only_fields = ["numero", "preco_m2_vista", "preco_m2_cartao", "taxa_logistica", "total_vista",
                             "total_cartao", "criado_por", "criado_em"]
         extra_kwargs = {
             # omitido = o próprio usuário logado (ver perform_create da view)

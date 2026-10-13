@@ -16,8 +16,12 @@ import {
 } from "../componentes";
 import Icone from "../icones";
 import {
-  VERBA, baixarImagem, brl, copiarImagem, copiarTexto, montarDocumento, unidadePlural,
+  SERVICO, VERBA, baixarImagem, brl, copiarImagem, copiarTexto, ehServico, montarDocumento,
+  unidadePlural,
 } from "../orcamentoDoc";
+
+// a folha de PVC tem largura fixa: área = tamanho da folha × (0,20 × quantidade)
+const LARGURA_FOLHA = 0.2;
 
 const paraNumero = (v) => {
   const n = parseFloat(String(v).replace(/\./g, "").replace(",", "."));
@@ -39,12 +43,18 @@ export default function OrcamentoNovo() {
   const [area, setArea] = useState("");
   const [largura, setLargura] = useState("");
   const [comprimento, setComprimento] = useState("");
+  const [tamanhoFolha, setTamanhoFolha] = useState("");
+  const [qtdFolhas, setQtdFolhas] = useState("");
 
   // 2 a 4
   const [forroId, setForroId] = useState("");
   const [tipo, setTipo] = useState("");
   const [acabamentoId, setAcabamentoId] = useState("");
   const [quantidades, setQuantidades] = useState({});
+  // serviço, só no orçamento de Material: o sistema sugere área × R$ 25,00/m²,
+  // mas o total é negociado. Campo vazio = usa o sugerido (e acompanha a área).
+  const [servico, setServico] = useState(false);
+  const [totalServico, setTotalServico] = useState("");
   // itens "Outro": descrição livre e valor fechado, nos dois tipos de orçamento
   const [extras, setExtras] = useState([]);
   const [observacoes, setObservacoes] = useState("");
@@ -65,7 +75,11 @@ export default function OrcamentoNovo() {
     setForroId(String(o.forro));
     setAcabamentoId(o.acabamento ? String(o.acabamento) : "");
     setObservacoes(o.observacoes ?? "");
-    if (o.largura && o.comprimento) {
+    if (o.tamanho_folha && o.quantidade_folhas) {
+      setModo("folhas");
+      setTamanhoFolha(String(o.tamanho_folha).replace(".", ","));
+      setQtdFolhas(String(o.quantidade_folhas));
+    } else if (o.largura && o.comprimento) {
       setModo("medidas");
       setLargura(String(o.largura));
       setComprimento(String(o.comprimento));
@@ -75,8 +89,14 @@ export default function OrcamentoNovo() {
     }
     const q = {};
     const outros = [];
+    let comServico = false;
     for (const item of o.itens ?? []) {
-      if (item.unidade === VERBA) {
+      if (ehServico(item)) {
+        comServico = true;
+        // igual ao sugerido volta como automático; negociado volta fixo
+        const sugerido = Math.round(Number(o.area_m2) * SERVICO.precoM2 * 100) / 100;
+        setTotalServico(Number(item.total) === sugerido ? "" : brl(item.total));
+      } else if (item.unidade === VERBA) {
         outros.push({ descricao: item.descricao, valor: String(Number(item.total)).replace(".", ",") });
       } else if (item.material) {
         // vírgula, não ponto: é o separador que o campo lê de volta
@@ -84,16 +104,19 @@ export default function OrcamentoNovo() {
       }
     }
     setQuantidades(q);
+    setServico(comServico);
     setExtras(outros);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [original.dados, listaMateriais.length]);
 
-  const areaFinal = useMemo(
-    () => (modo === "area"
-      ? paraNumero(area)
-      : Math.round(paraNumero(largura) * paraNumero(comprimento) * 100) / 100),
-    [modo, area, largura, comprimento]
-  );
+  // quantidade de folhas é contagem: só inteiro
+  const folhas = Math.floor(paraNumero(qtdFolhas));
+
+  const areaFinal = useMemo(() => {
+    if (modo === "area") return paraNumero(area);
+    if (modo === "folhas") return Math.round(paraNumero(tamanhoFolha) * LARGURA_FOLHA * folhas * 100) / 100;
+    return Math.round(paraNumero(largura) * paraNumero(comprimento) * 100) / 100;
+  }, [modo, area, largura, comprimento, tamanhoFolha, folhas]);
 
   const forro = listaForros.find((f) => String(f.id) === String(forroId));
   const acabamento = listaAcabamentos.find((a) => String(a.id) === String(acabamentoId));
@@ -105,6 +128,11 @@ export default function OrcamentoNovo() {
       .filter((m) => m.quantidade > 0),
     [listaMateriais, quantidades]
   );
+
+  const servicoSugerido = Math.round(areaFinal * SERVICO.precoM2 * 100) / 100;
+  const valorServico = tipo === "material" && servico
+    ? (totalServico.trim() ? paraNumero(totalServico) : servicoSugerido)
+    : 0;
 
   // o acabamento padrão é o de acréscimo zero (perfil)
   const acabamentoPadrao = listaAcabamentos.find((a) => Number(a.acrescimo_m2) === 0);
@@ -125,7 +153,7 @@ export default function OrcamentoNovo() {
 
   const completo = areaFinal > 0 && forro && tipo && (tipo === "material" || acabamento);
   const doc = completo
-    ? montarDocumento({ tipo, area: areaFinal, forro, acabamento, itens, extras: extrasValidos })
+    ? montarDocumento({ tipo, area: areaFinal, forro, acabamento, itens, extras: extrasValidos, servico: valorServico })
     : null;
 
   async function gravar() {
@@ -134,6 +162,8 @@ export default function OrcamentoNovo() {
       area_m2: areaFinal.toFixed(2),
       largura: modo === "medidas" ? paraNumero(largura).toFixed(2) : null,
       comprimento: modo === "medidas" ? paraNumero(comprimento).toFixed(2) : null,
+      tamanho_folha: modo === "folhas" ? paraNumero(tamanhoFolha).toFixed(2) : null,
+      quantidade_folhas: modo === "folhas" ? folhas : null,
       forro: forro.id,
       acabamento: tipo === "instalado" ? acabamento.id : null,
       observacoes,
@@ -146,6 +176,16 @@ export default function OrcamentoNovo() {
               quantidade: String(i.quantidade),
               preco_unitario: String(i.preco),
             }))
+          : []),
+        // serviço: valor fechado, quantidade 1 e a unidade `serviço` o identificam
+        ...(valorServico > 0
+          ? [{
+              material: null,
+              descricao: SERVICO.descricao,
+              unidade: SERVICO.unidade,
+              quantidade: "1",
+              preco_unitario: valorServico.toFixed(2),
+            }]
           : []),
         // "Outro": quantidade 1 e a unidade `verba` marcam o valor fechado
         ...extrasValidos.map((e) => ({
@@ -228,6 +268,8 @@ export default function OrcamentoNovo() {
                           onClick={() => { setSalvo(null); setModo("area"); }}>Área em m²</button>
                   <button type="button" className={modo === "medidas" ? "on" : ""}
                           onClick={() => { setSalvo(null); setModo("medidas"); }}>Largura × Comprimento</button>
+                  <button type="button" className={modo === "folhas" ? "on" : ""}
+                          onClick={() => { setSalvo(null); setModo("folhas"); }}>Cálculo por folha</button>
                 </div>
 
                 {modo === "area" ? (
@@ -235,6 +277,23 @@ export default function OrcamentoNovo() {
                     <input value={area} onChange={(e) => alterou(setArea)(e.target.value)}
                            inputMode="decimal" placeholder="Ex.: 23" />
                   </Campo>
+                ) : modo === "folhas" ? (
+                  <>
+                    <div className="two">
+                      <Campo rotulo="Tamanho da folha (m)">
+                        <input value={tamanhoFolha} onChange={(e) => alterou(setTamanhoFolha)(e.target.value)}
+                               inputMode="decimal" placeholder="Ex.: 5" />
+                      </Campo>
+                      <Campo rotulo="Quantidade de folhas">
+                        <input value={qtdFolhas} onChange={(e) => alterou(setQtdFolhas)(e.target.value)}
+                               inputMode="numeric" placeholder="Ex.: 20" />
+                      </Campo>
+                    </div>
+                    <div className="calc">
+                      <span>Área calculada · folha de 0,20 m</span>
+                      <b>{areaFinal ? `${num(areaFinal)} m²` : "—"}</b>
+                    </div>
+                  </>
                 ) : (
                   <>
                     <div className="two">
@@ -341,6 +400,29 @@ export default function OrcamentoNovo() {
                       </div>
                     );
                   })}
+
+                  <div className="matgrp">Serviço</div>
+                  <div className="opts">
+                    <label className={`opt${servico ? " on" : ""}`}>
+                      <input type="checkbox" checked={servico}
+                             onChange={(e) => alterou(setServico)(e.target.checked)} />
+                      <span className="t">Serviço
+                        <small>Sugerido: R$ {brl(SERVICO.precoM2)}/m² sobre a área</small>
+                      </span>
+                      <span className="v">{servico && valorServico > 0 ? `R$ ${brl(valorServico)}` : ""}</span>
+                    </label>
+                    {servico && (
+                      <Campo rotulo="Valor total do serviço (R$)"
+                             dica={servicoSugerido
+                               ? `Sugerido: ${num(areaFinal)} m² × R$ ${brl(SERVICO.precoM2)} = R$ ${brl(servicoSugerido)}. Altere se for negociado; em branco usa o sugerido.`
+                               : "Informe a medida para o sistema sugerir o valor."}>
+                        <input value={totalServico} inputMode="decimal"
+                               placeholder={servicoSugerido ? brl(servicoSugerido) : "0,00"}
+                               onChange={(e) => alterou(setTotalServico)(e.target.value)} />
+                      </Campo>
+                    )}
+                  </div>
+
                   <p className="nota">
                     Informe a quantidade na unidade indicada ao lado de cada campo. O ripão é
                     lançado por <b>dúzia</b> — para meia dúzia, use 0,5.

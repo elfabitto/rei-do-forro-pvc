@@ -6,7 +6,9 @@ import {
   BotaoAcao, Confirmacao, DocumentoOrcamento, Estado, Etiqueta, Gaveta, linhas, useApi,
 } from "../componentes";
 import Icone from "../icones";
-import { VERBA, baixarImagem, copiarImagem, copiarTexto, montarDocumento } from "../orcamentoDoc";
+import {
+  VERBA, baixarImagem, copiarImagem, copiarTexto, ehServico, montarDocumento,
+} from "../orcamentoDoc";
 
 const FILTROS = [
   ["", "Todos"],
@@ -31,7 +33,7 @@ function VerOrcamento({ orcamento, aoFechar }) {
     area: Number(orcamento.area_m2),
     forro,
     acabamento,
-    itens: gravados.filter((i) => i.unidade !== VERBA).map((i) => ({
+    itens: gravados.filter((i) => i.unidade !== VERBA && !ehServico(i)).map((i) => ({
       rotulo: i.descricao,
       unidade: i.unidade,
       quantidade: Number(i.quantidade),
@@ -41,6 +43,7 @@ function VerOrcamento({ orcamento, aoFechar }) {
       descricao: i.descricao,
       valor: Number(i.total),
     })),
+    servico: Number(gravados.find(ehServico)?.total ?? 0),
   });
 
   return (

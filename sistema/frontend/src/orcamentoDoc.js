@@ -16,6 +16,24 @@ const cent = (n) => Math.round(Number(n) * 100) / 100;
 export const VERBA = "verba";
 export const ehExtra = (i) => i.unidade === VERBA;
 
+/** Nota de rodapé dos dois tipos de orçamento, na imagem e no texto. */
+const OBS_CARTAO = "Valor no cartão considerando parcelamento até 5x.";
+
+/** Instalado abaixo de 20 m² paga logística/frete — espelha o backend (Orcamento.recalcular). */
+export const AREA_MINIMA_SEM_TAXA = 20;
+export const TAXA_LOGISTICA = 80;
+export const taxaLogistica = (tipo, area) =>
+  tipo === "instalado" && area > 0 && area < AREA_MINIMA_SEM_TAXA ? TAXA_LOGISTICA : 0;
+
+/**
+ * Serviço opcional do orçamento de Material. O sistema sugere área × R$ 25,00,
+ * mas o valor final é negociado, então grava como valor fechado: item sem
+ * material, quantidade 1 e unidade `serviço` — é assim que se reconhece.
+ */
+export const SERVICO = { descricao: "Serviço", unidade: "serviço", precoM2: 25 };
+export const ehServico = (i) => !i.material && i.unidade === SERVICO.unidade;
+export const linhaServico = (area) => `Serviço ${m2(area)} m²`;
+
 /* "1 dúzia" / "3,5 dúzias"; und e kg não flexionam */
 export const unidadePlural = (q, u) => (u === "dúzia" && Number(q) > 1 ? "dúzias" : u);
 export const quantidadeTexto = (q, u) => `${qtd(q)} ${unidadePlural(q, u)}`;
@@ -31,9 +49,10 @@ export const descricaoItem = (i) =>
  * forma que `desenhar()` e o React consomem.
  *
  * `extras` são os itens "Outro": descrição livre e valor fechado, que existem
- * nos dois tipos de orçamento para o que não cabe na tabela.
+ * nos dois tipos de orçamento para o que não cabe na tabela. `servico` é o valor
+ * fechado do serviço, só no orçamento de Material (0 = sem serviço).
  */
-export function montarDocumento({ tipo, area, forro, acabamento, itens = [], extras = [] }) {
+export function montarDocumento({ tipo, area, forro, acabamento, itens = [], extras = [], servico = 0 }) {
   const instalado = tipo === "instalado";
   const somaExtras = extras.reduce((s, e) => s + cent(e.valor), 0);
   const linhasExtras = extras.map((e) => [e.descricao, `R$ ${brl(cent(e.valor))}`]);
@@ -64,6 +83,15 @@ export function montarDocumento({ tipo, area, forro, acabamento, itens = [], ext
     : "";
 
   if (instalado) {
+    const taxa = taxaLogistica(tipo, area);
+    const linhasOutros = [
+      ...(taxa ? [["Logística", `R$ ${brl(taxa)}`]] : []),
+      ...linhasExtras,
+    ];
+    const textoOutros = linhasOutros.length
+      ? "\n\n*OUTROS*\n" + linhasOutros.map(([k, v]) => `• ${k} = ${v}`).join("\n")
+      : "";
+
     doc.secoes = [{
       titulo: "Valor do metro quadrado",
       linhas: [
@@ -71,18 +99,18 @@ export function montarDocumento({ tipo, area, forro, acabamento, itens = [], ext
         ["No cartão", `R$ ${brl(m2Cartao)}/m²`],
       ],
     }];
-    if (linhasExtras.length) {
+    if (linhasOutros.length) {
       doc.secoes.push({
         titulo: "Outros",
         linhas: [
           [`Instalação ${m2(area)} m² × R$ ${brl(m2Vista)}/m²`, `R$ ${brl(cent(area * m2Vista))}`],
-          ...linhasExtras,
+          ...linhasOutros,
         ],
       });
     }
-    doc.obs = "";
-    doc.totalVista = cent(area * m2Vista + somaExtras);
-    doc.totalCartao = cent(area * m2Cartao + somaExtras);
+    doc.obs = OBS_CARTAO;
+    doc.totalVista = cent(area * m2Vista + taxa + somaExtras);
+    doc.totalCartao = cent(area * m2Cartao + taxa + somaExtras);
 
     doc.texto = `*ORÇAMENTO — REI DO FORRO*
 ----------
@@ -93,32 +121,38 @@ export function montarDocumento({ tipo, area, forro, acabamento, itens = [], ext
 *INSTALAÇÃO COMPLETA*
 _valor do metro quadrado_
 *À vista*: R$ ${brl(m2Vista)}/m²
-*No cartão*: R$ ${brl(m2Cartao)}/m²${textoExtras}
+*No cartão*: R$ ${brl(m2Cartao)}/m²${textoOutros}
 ----------
 *VALOR TOTAL*
 💵 *À vista*: R$ ${brl(doc.totalVista)}
-💳 *No cartão*: R$ ${brl(doc.totalCartao)}`;
+💳 *No cartão*: R$ ${brl(doc.totalCartao)}
+
+_${doc.obs}_`;
   } else {
     const forroVista = cent(area * precoVista);
     const forroCartao = cent(area * precoCartao);
     const materiais = itens.reduce((s, i) => s + cent(i.quantidade * i.preco), 0);
+    const valorServico = cent(servico);
+    const linhaSrv = valorServico ? [[linhaServico(area), `R$ ${brl(valorServico)}`]] : [];
 
     doc.secoes = [{
       titulo: "Itens do orçamento",
       linhas: [
         [`Forro ${m2(area)} m² × R$ ${brl(precoVista)}/m²`, `R$ ${brl(forroVista)}`],
         ...itens.map((i) => [descricaoItem(i), `R$ ${brl(cent(i.quantidade * i.preco))}`]),
+        ...linhaSrv,
       ],
     }];
     if (linhasExtras.length) doc.secoes.push({ titulo: "Outros", linhas: linhasExtras });
 
-    doc.obs = `No cartão o forro sai a R$ ${brl(precoCartao)}/m² e os demais itens não têm acréscimo.`;
-    doc.totalVista = cent(forroVista + materiais + somaExtras);
-    doc.totalCartao = cent(forroCartao + materiais + somaExtras);
+    doc.obs = OBS_CARTAO;
+    doc.totalVista = cent(forroVista + materiais + valorServico + somaExtras);
+    doc.totalCartao = cent(forroCartao + materiais + valorServico + somaExtras);
 
     const lista = [
       `• Forro ${m2(area)}m² × R$ ${brl(precoVista)}/m² = R$ ${brl(forroVista)}`,
       ...itens.map((i) => `• ${descricaoItem(i)} = R$ ${brl(cent(i.quantidade * i.preco))}`),
+      ...linhaSrv.map(([k, v]) => `• ${k} = ${v}`),
     ].join("\n");
 
     doc.texto = `*ORÇAMENTO DE MATERIAL — REI DO FORRO*

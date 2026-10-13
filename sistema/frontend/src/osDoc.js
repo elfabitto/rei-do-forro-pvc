@@ -6,7 +6,7 @@
  * e a forma de pagamento que o cliente escolheu.
  */
 import { LOGO } from "./logo";
-import { VERBA, quantidadeTexto } from "./orcamentoDoc";
+import { VERBA, ehServico, quantidadeTexto } from "./orcamentoDoc";
 
 const brl = (n) =>
   Number(n ?? 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -81,6 +81,11 @@ export function montarOS(os, { verFinanceiro = true } = {}) {
     if (orc.acabamento_nome) d.pedido.push(["Acabamento", orc.acabamento_nome]);
     const ripao = resumoRipao(orc.itens);
     if (ripao) d.pedido.push(["Ripão", ripao]);
+    const servico = orc.itens?.find(ehServico);
+    if (servico) d.pedido.push(["Serviço", `${m2(orc.area_m2)} m² — R$ ${brl(servico.total)}`]);
+    if (Number(orc.taxa_logistica) > 0) {
+      d.pedido.push(["Logística", `R$ ${brl(orc.taxa_logistica)}`]);
+    }
     for (const extra of itensExtras(orc.itens)) {
       d.pedido.push([extra.descricao, `R$ ${brl(extra.total)}`]);
     }

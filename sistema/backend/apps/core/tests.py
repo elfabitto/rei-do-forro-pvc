@@ -92,6 +92,27 @@ class OrcamentoApiTest(ApiBase):
         self.assertEqual(r.status_code, 201, r.data)
         self.assertEqual(r.data["total_vista"], "1027.40")   # 777,40 + 250,00
 
+    def test_instalado_abaixo_de_20m2_soma_taxa_de_logistica(self):
+        self.client.force_authenticate(self.vendedor)
+        base = {"cliente": self.cliente.id, "tipo": "instalado", "forro": self.forro.id}
+        r = self.client.post("/api/orcamentos/", {**base, "area_m2": "19.99"}, format="json")
+        self.assertEqual(r.status_code, 201, r.data)
+        self.assertEqual(r.data["taxa_logistica"], "80.00")
+        self.assertEqual(r.data["total_vista"], "1359.36")   # 19,99 × 64,00 + 80,00
+        self.assertEqual(r.data["total_cartao"], "1459.31")  # 19,99 × 69,00 + 80,00
+
+        r = self.client.post("/api/orcamentos/", {**base, "area_m2": "20"}, format="json")
+        self.assertEqual(r.data["taxa_logistica"], "0.00")
+        self.assertEqual(r.data["total_vista"], "1280.00")
+
+    def test_material_abaixo_de_20m2_nao_tem_taxa(self):
+        self.client.force_authenticate(self.vendedor)
+        r = self.client.post("/api/orcamentos/", {
+            "cliente": self.cliente.id, "tipo": "material", "area_m2": "10", "forro": self.forro.id,
+        }, format="json")
+        self.assertEqual(r.data["taxa_logistica"], "0.00")
+        self.assertEqual(r.data["total_vista"], "338.00")
+
 
 class OrdemServicoApiTest(ApiBase):
     def nova(self, vendedor=None, criado_por=None):

@@ -15,7 +15,7 @@ import { api, brl, num } from "../api";
 import { useAuth } from "../auth";
 import CalendarioVagas from "../calendario";
 import { BotaoAcao, Campo, Estado, Selecao, linhas, useApi } from "../componentes";
-import { VERBA, quantidadeTexto } from "../orcamentoDoc";
+import { VERBA, ehServico, linhaServico, quantidadeTexto } from "../orcamentoDoc";
 import Icone from "../icones";
 import ClienteModal from "./ClienteModal";
 
@@ -254,13 +254,23 @@ export default function OrdemNova() {
                         <span className="k">
                           {i.unidade === VERBA
                             ? i.descricao
-                            : `${i.descricao} — ${quantidadeTexto(i.quantidade, i.unidade)}`}
+                            : ehServico(i)
+                              ? linhaServico(orc.area_m2)
+                              : `${i.descricao} — ${quantidadeTexto(i.quantidade, i.unidade)}`}
                         </span>
                         <span className="v">{brl(i.total)}</span>
                       </div>
                     ))}
                   </div>
                 </>
+              )}
+              {Number(orc.taxa_logistica) > 0 && (
+                <div className="rows">
+                  <div className="row sm item">
+                    <span className="k">Logística</span>
+                    <span className="v">{brl(orc.taxa_logistica)}</span>
+                  </div>
+                </div>
               )}
               <div className="totais">
                 <div className={`tot${modalidade === "cartao" ? "" : " b"}`}>

@@ -7,6 +7,10 @@ from django.utils import timezone
 
 CENTAVO = Decimal("0.01")
 
+# Instalação abaixo de 20 m² paga a logística/frete à parte.
+AREA_MINIMA_SEM_TAXA = Decimal("20")
+TAXA_LOGISTICA = Decimal("80.00")
+
 
 class TipoOrcamento(models.TextChoices):
     MATERIAL = "material", "Material (só o forro)"
@@ -27,9 +31,11 @@ class Orcamento(models.Model):
     )
     tipo = models.CharField(max_length=12, choices=TipoOrcamento.choices)
 
-    # medida: área direta ou largura × comprimento
+    # medida: área direta, largura × comprimento ou por folha (folha de 20 cm de largura)
     largura = models.DecimalField(max_digits=7, decimal_places=2, null=True, blank=True)
     comprimento = models.DecimalField(max_digits=7, decimal_places=2, null=True, blank=True)
+    tamanho_folha = models.DecimalField("tamanho da folha (m)", max_digits=7, decimal_places=2, null=True, blank=True)
+    quantidade_folhas = models.PositiveIntegerField("quantidade de folhas", null=True, blank=True)
     area_m2 = models.DecimalField("área (m²)", max_digits=9, decimal_places=2, validators=[MinValueValidator(Decimal("0.01"))])
 
     forro = models.ForeignKey("catalogo.Forro", on_delete=models.PROTECT, related_name="orcamentos")
@@ -46,6 +52,7 @@ class Orcamento(models.Model):
     # não pode alterar um orçamento já enviado ao cliente.
     preco_m2_vista = models.DecimalField(max_digits=9, decimal_places=2)
     preco_m2_cartao = models.DecimalField(max_digits=9, decimal_places=2)
+    taxa_logistica = models.DecimalField("taxa de logística", max_digits=9, decimal_places=2, default=0)
     total_vista = models.DecimalField(max_digits=11, decimal_places=2, default=0)
     total_cartao = models.DecimalField(max_digits=11, decimal_places=2, default=0)
 
@@ -101,11 +108,17 @@ class Orcamento(models.Model):
         """
         Refaz os totais a partir do m² e dos itens. O acabamento só entra no
         Instalado; no Material as peças são cobradas por unidade na lista de itens.
+        Instalado abaixo de 20 m² soma a taxa de logística.
         """
         if self.tipo == TipoOrcamento.MATERIAL:
             self.acabamento = None
 
         self.preco_m2_vista, self.preco_m2_cartao = self.precos_vigentes()
+        self.taxa_logistica = (
+            TAXA_LOGISTICA
+            if self.tipo == TipoOrcamento.INSTALADO and self.area_m2 < AREA_MINIMA_SEM_TAXA
+            else Decimal("0")
+        )
 
         forro_vista = (self.area_m2 * self.preco_m2_vista).quantize(CENTAVO)
         forro_cartao = (self.area_m2 * self.preco_m2_cartao).quantize(CENTAVO)
@@ -116,8 +129,8 @@ class Orcamento(models.Model):
         if self.pk:
             itens = sum((i.total for i in self.itens.all()), Decimal("0")).quantize(CENTAVO)
 
-        self.total_vista = forro_vista + itens
-        self.total_cartao = forro_cartao + itens
+        self.total_vista = forro_vista + itens + self.taxa_logistica
+        self.total_cartao = forro_cartao + itens + self.taxa_logistica
         return self
 
     def save(self, *args, **kwargs):
