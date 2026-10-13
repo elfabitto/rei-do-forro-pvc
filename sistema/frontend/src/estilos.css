@@ -123,21 +123,94 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 .p-instalacao{background:var(--s-instalacao-bg);color:var(--orange-dk)}
 
 /* ---------- agenda ---------- */
+.aghead{flex-wrap:wrap}
+.agmes{display:flex;align-items:center;gap:8px}
+.agmes h2{min-width:150px;text-align:center;text-transform:none!important;letter-spacing:.2px!important;font-size:14px!important}
+.btn.ic{padding:7px 12px}
+.agcont{margin-left:auto;display:flex;gap:12px;font-size:12px;font-weight:700}
+.agcont i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px}
+.tag-ent{color:#1b5496}.tag-ent i{background:var(--s-entrega)}
+.tag-ins{color:var(--orange-dk)}.tag-ins i{background:var(--s-instalacao)}
+
 .cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:1px;background:var(--line-2);
      border:1px solid var(--line);border-radius:8px;overflow:hidden}
 .cal .hd{background:var(--surface-2);padding:9px 6px;text-align:center;font-size:11px;
          font-weight:800;letter-spacing:.9px;text-transform:uppercase;color:var(--muted)}
-.cal .dy{background:var(--surface);min-height:104px;padding:7px}
+.cal .dy{background:var(--surface);min-height:110px;padding:7px;position:relative;cursor:pointer;
+         display:flex;flex-direction:column;min-width:0}
+.cal .dy:hover{background:#fcfcfd}
+.cal .dy.vazio{background:#fafbfc;cursor:default}
 .cal .dy.off{background:#fafbfc}
+.cal .dy.sel{box-shadow:inset 0 0 0 2px var(--ink)}
 .cal .dy .n{font-size:12px;font-weight:700;color:var(--ink-2);margin-bottom:5px}
+.cal .dy.off .n{color:var(--muted)}
 .cal .dy.hoje .n{color:#fff;background:var(--ink);border-radius:999px;width:21px;height:21px;
                  display:grid;place-items:center;font-size:11px}
-.ev{display:block;width:100%;text-align:left;border:0;border-radius:4px;padding:4px 6px;
-    margin-bottom:3px;font-size:11px;font-weight:600;cursor:pointer;line-height:1.3}
+.cal .evs{display:flex;flex-direction:column;gap:3px;min-width:0}
+.ev{display:flex;align-items:flex-start;gap:5px;width:100%;text-align:left;border:0;border-radius:4px;
+    padding:4px 6px;font-size:11px;font-weight:600;cursor:pointer;line-height:1.25;min-width:0}
+.ev svg{flex:0 0 auto;margin-top:1px}
+.ev .tx{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ev .tx small{display:block;font-weight:500;font-size:10px;opacity:.85}
 .ev.entrega{background:var(--s-entrega-bg);color:#1b5496;box-shadow:inset 3px 0 0 var(--s-entrega)}
 .ev.instalacao{background:var(--s-instalacao-bg);color:var(--orange-dk);box-shadow:inset 3px 0 0 var(--s-instalacao)}
-.vaga{font-size:10.5px;color:var(--good);font-weight:700;margin-top:3px}
-.vaga.cheio{color:var(--muted)}
+.ev.instalacao.cont{background-image:repeating-linear-gradient(135deg,transparent 0 6px,rgba(238,106,30,.07) 6px 12px)}
+
+/* vagas livres no canto do dia: azul = entregas, laranja = equipes */
+.vagas{position:absolute;top:6px;right:6px;display:flex;gap:3px}
+.vagas span,.leg-vagas b{font-size:10px;font-weight:800;min-width:17px;height:17px;padding:0 4px;
+  border-radius:999px;display:inline-grid;place-items:center;line-height:1}
+.ve{background:var(--s-entrega-bg);color:#1b5496}
+.vi{background:var(--s-instalacao-bg);color:var(--orange-dk)}
+.vagas .zero{background:#f1f2f4;color:var(--muted)}
+.leg-vagas{color:var(--muted)!important;font-weight:500!important}
+.leg-vagas b{width:auto;padding:0 7px;margin:0 2px}
+.marcas{display:none}
+.cal + .legend{margin:12px 0 0}
+
+/* lista do dia selecionado */
+.agdia{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;padding:14px 18px 18px}
+.agcard{display:flex;flex-direction:column;gap:5px;text-align:left;cursor:pointer;width:100%;
+        background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--s-entrega);
+        border-radius:8px;padding:11px 13px;font:inherit;color:inherit}
+.agcard.instalacao{border-left-color:var(--s-instalacao)}
+.agcard.atrasado{border-left-color:var(--st-vermelho);background:#fdf9f9}
+.agcard:hover{border-color:#c9ced6}
+.agcard .topo{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.agcard .quando{font-size:12px;font-weight:700;color:var(--ink-2);text-transform:capitalize}
+.agcard .parte{font-size:11px;font-weight:700;color:var(--orange-dk)}
+.agcard .cli{font-size:14.5px}
+.agcard .rodape{display:flex;gap:12px;flex-wrap:wrap;font-size:11.5px;color:var(--muted);margin-top:2px}
+.diasel > header{flex-wrap:wrap}
+
+@media (max-width:700px){
+  .aghead{gap:8px}
+  .agmes{flex:1;justify-content:space-between}
+  .agmes h2{min-width:0;font-size:12.5px!important}
+  .agcont{margin-left:0;width:100%;justify-content:flex-start}
+  .agenda .card > .body{padding:10px}
+
+  .cal{border-radius:6px}
+  .cal .hd{padding:7px 0;font-size:9.5px;letter-spacing:.3px}
+  .cal .dy{min-height:58px;padding:5px 3px 4px;align-items:center}
+  .cal .dy .n{margin-bottom:4px}
+  .cal .evs{display:none}
+  .marcas{display:flex;flex-wrap:wrap;justify-content:center;gap:3px;max-width:100%}
+  .marcas i{width:8px;height:8px;border-radius:50%}
+  .marcas i.entrega{background:var(--s-entrega)}
+  .marcas i.instalacao{background:var(--s-instalacao)}
+  .marcas i.atrasado{background:var(--st-vermelho)}
+  .marcas b{font-size:9px;color:var(--muted);line-height:8px}
+  .vagas{position:static;margin-top:auto;padding-top:4px}
+  .vagas span{font-size:9px;min-width:14px;height:14px;padding:0 3px}
+  .cal .dy.sel{box-shadow:inset 0 0 0 2px var(--ink);background:#fff}
+
+  .agdia{grid-template-columns:1fr;padding:10px}
+  .diasel > header .hint{width:100%}
+}
+@media (max-width:380px){
+  .vagas{display:none}
+}
 
 /* ---------- controles ---------- */
 .btn{border:1px solid var(--line);background:#fff;color:var(--ink);padding:9px 15px;
@@ -167,3 +240,11 @@ label.f > span{display:block;font-size:11.5px;font-weight:700;letter-spacing:.9p
 .login .marca b i{font-style:normal;color:var(--orange)}
 .login .marca span{display:block;font-size:11px;color:var(--muted);letter-spacing:1.4px;
                    text-transform:uppercase;margin-top:3px}
+
+/* salvo e travado: continua verde, não parece desabilitado por erro */
+.btn.ok:disabled{opacity:1;background:var(--good);border-color:var(--good);color:#fff;cursor:default}
+
+/* volta para a lista, no topo das telas de criação */
+.voltar{display:inline-flex;align-items:center;gap:6px;border:0;background:none;padding:4px 0;
+        margin:0 0 8px;font:inherit;font-size:13px;font-weight:700;color:var(--ink-2);cursor:pointer}
+.voltar:hover{color:var(--orange-dk)}

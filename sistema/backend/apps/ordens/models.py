@@ -211,8 +211,8 @@ class OrdemServico(models.Model):
     # --------------------------------------------------------------- atraso
     @property
     def data_limite(self):
-        """O último compromisso agendado: é o que define se a O.S. atrasou."""
-        datas = [a.data for a in self.agendamentos.all()]
+        """O fim do último compromisso agendado: é o que define se a O.S. atrasou."""
+        datas = [a.data_fim or a.data for a in self.agendamentos.all()]
         return max(datas) if datas else None
 
     @property
@@ -276,8 +276,9 @@ class OrdemServico(models.Model):
 
 class Agendamento(models.Model):
     """
-    Entrega e instalação ocupam vagas distintas no mesmo turno. O limite por turno
-    vem da ConfiguracaoAgenda e é checado no clean().
+    Entrega ocupa um dia; instalação ocupa de 1 a 6 dias úteis conforme a área,
+    contados em turnos. As regras de vaga estão em `agenda.py` e são conferidas
+    no clean().
     """
 
     ordem = models.ForeignKey(OrdemServico, on_delete=models.CASCADE, related_name="agendamentos")
@@ -285,6 +286,14 @@ class Agendamento(models.Model):
     data = models.DateField()
     turno = models.CharField(max_length=6, choices=Turno.choices)
     hora = models.TimeField(null=True, blank=True, help_text="Opcional, quando há hora marcada.")
+
+    # Período calculado ao gravar: quantos turnos o serviço toma, onde termina e
+    # cada turno ocupado ("2026-10-13:manha"). Guardado para que um bloqueio
+    # criado depois não mude, sem aviso, o que já foi combinado com o cliente.
+    duracao_turnos = models.PositiveSmallIntegerField(default=1)
+    data_fim = models.DateField(null=True, blank=True)
+    turno_fim = models.CharField(max_length=6, choices=Turno.choices, blank=True)
+    ocupacao = models.JSONField(default=list, blank=True)
 
     responsavel = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, related_name="agendamentos", null=True, blank=True
@@ -303,26 +312,46 @@ class Agendamento(models.Model):
     def __str__(self):
         return f"{self.get_tipo_display()} {self.data:%d/%m} ({self.get_turno_display()})"
 
+    @property
+    def dias(self):
+        """Duração em dias (1, 1,5 …) — o que a equipe lê."""
+        return self.duracao_turnos / 2 if self.tipo == TipoAgendamento.INSTALACAO else 1
+
+    def calcular_periodo(self, grade=None):
+        """Preenche duração, fim e turnos ocupados a partir da área do orçamento."""
+        from .agenda import Grade, chave, turnos_instalacao
+
+        if self.tipo != TipoAgendamento.INSTALACAO:
+            self.duracao_turnos = 1
+            self.data_fim, self.turno_fim = self.data, self.turno
+            self.ocupacao = [chave(self.data, self.turno)]
+            return grade
+
+        self.duracao_turnos = turnos_instalacao(self.ordem.area_m2 if self.ordem_id else None)
+        grade = grade or Grade(self.data, self.data, excluir=self.pk)
+        periodo = grade.percorrer(self.data, self.turno, self.duracao_turnos)
+        self.ocupacao = [chave(d, t) for d, t in periodo]
+        if periodo:
+            self.data_fim, self.turno_fim = periodo[-1]
+        else:
+            self.data_fim, self.turno_fim = self.data, self.turno
+        return grade
+
     def clean(self):
-        cfg = ConfiguracaoAgenda.obter()
+        from .agenda import Grade
 
-        if self.data.weekday() in cfg.dias_sem_atendimento_lista:
-            raise ValidationError({"data": "Não há atendimento neste dia da semana."})
-
-        if Bloqueio.objects.filter(data=self.data).filter(models.Q(turno="") | models.Q(turno=self.turno)).exists():
-            raise ValidationError({"data": "Data bloqueada na agenda."})
-
-        limite = cfg.capacidade()
-        ocupadas = (
-            Agendamento.objects.filter(data=self.data, turno=self.turno)
-            .exclude(pk=self.pk)
-            .exclude(ordem__status=StatusOS.CANCELADA)
-            .count()
-        )
-        if ocupadas >= limite:
-            raise ValidationError(
-                {"turno": f"Turno cheio: {ocupadas} de {limite} vagas já ocupadas."}
-            )
+        grade = Grade(self.data, self.data, excluir=self.pk)
+        self.calcular_periodo(grade)
+        if self.tipo == TipoAgendamento.INSTALACAO:
+            motivo = grade.motivo_instalacao(self.data, self.turno, self.duracao_turnos)
+            if motivo:
+                raise ValidationError({"turno": motivo})
+        else:
+            motivo = grade.motivo_entrega(self.data)
+            if not motivo and not grade.trabalha(self.data, self.turno):
+                motivo = "Turno bloqueado na agenda."
+            if motivo:
+                raise ValidationError({"data": motivo})
 
     def save(self, *args, **kwargs):
         self.full_clean()
@@ -389,14 +418,17 @@ class Bloqueio(models.Model):
 
 class ConfiguracaoAgenda(models.Model):
     """
-    Registro único com a capacidade da agenda.
+    Registro único com a capacidade da agenda (regras em `agenda.py`).
 
-    A vaga é do turno, não do tipo: entrega e instalação disputam as mesmas
-    vagas, porque é a mesma equipe que sai. 2 por turno = 4 por dia.
+    Instalação: equipes trabalhando ao mesmo tempo, por turno. Entrega: por dia,
+    e cada instalação consome uma no dia em que começa (leva o material).
     """
 
-    capacidade_turno = models.PositiveSmallIntegerField(
-        default=2, help_text="Compromissos por turno, somando entregas e instalações."
+    capacidade_instalacao = models.PositiveSmallIntegerField(
+        default=2, help_text="Instalações ao mesmo tempo (equipes), em cada turno."
+    )
+    capacidade_entrega_dia = models.PositiveSmallIntegerField(
+        default=4, help_text="Entregas por dia. Cada instalação ocupa uma no dia em que começa."
     )
     dias_sem_atendimento = models.CharField(
         max_length=20, default="6", help_text="Dias da semana sem atendimento, separados por vírgula (0=seg … 6=dom)."
@@ -418,6 +450,3 @@ class ConfiguracaoAgenda(models.Model):
     def dias_sem_atendimento_lista(self):
         return [int(d) for d in self.dias_sem_atendimento.split(",") if d.strip().isdigit()]
 
-    def capacidade(self, tipo=None):
-        """O limite é do turno; o tipo não muda a conta."""
-        return self.capacidade_turno

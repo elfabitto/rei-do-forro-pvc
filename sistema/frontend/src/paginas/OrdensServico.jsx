@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { api, brl, data, dataHora } from "../api";
+import { api, brl, dataHora } from "../api";
+import { periodoTexto } from "../agendaTexto";
 import { useAuth } from "../auth";
 import { BotaoAcao, Confirmacao, Estado, Etiqueta, linhas, useApi } from "../componentes";
 import Icone from "../icones";
@@ -54,7 +55,9 @@ function CardOS({ o, verFinanceiro, pode, aoAbrir, aoFinalizar, aoMudarStatus, a
             <Icone nome="entrega" tamanho={15} className="ic-ent" />
             <span className="rot">Entrega</span>
             <span className="val">
-              {o.entrega ? `${data(o.entrega.data)} · ${o.entrega.turno_display}` : "—"}
+              {o.entrega
+                ? periodoTexto(o.entrega)
+                : <span className="pend">{o.tipo === "instalado" ? "junto da instalação" : "—"}</span>}
             </span>
           </div>
           <div className="li">
@@ -62,7 +65,7 @@ function CardOS({ o, verFinanceiro, pode, aoAbrir, aoFinalizar, aoMudarStatus, a
             <span className="rot">Instalação</span>
             <span className="val">
               {o.instalacao
-                ? `${data(o.instalacao.data)} · ${o.instalacao.turno_display}`
+                ? periodoTexto(o.instalacao)
                 : <span className="pend">{o.tipo === "material" ? "não se aplica" : "sem instalação"}</span>}
             </span>
           </div>

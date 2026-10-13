@@ -146,8 +146,6 @@ class Command(BaseCommand):
             tipo=TipoServico.INSTALADO, modalidade=Modalidade.VISTA,
             observacoes="Sanca na sala e no corredor.",
         )
-        Agendamento.objects.create(ordem=os1, tipo=TipoAgendamento.ENTREGA,
-                                   data=dia_util(hoje, -6), turno=Turno.MANHA)
         Agendamento.objects.create(ordem=os1, tipo=TipoAgendamento.INSTALACAO,
                                    data=dia_util(hoje, -5), turno=Turno.TARDE)
         Pagamento.objects.create(ordem=os1, forma="pix", valor=os1.valor_total,
@@ -180,8 +178,6 @@ class Command(BaseCommand):
             valor_vista=o3.total_vista, valor_cartao=o3.total_cartao,
             tipo=TipoServico.INSTALADO, modalidade=Modalidade.CARTAO,
         )
-        Agendamento.objects.create(ordem=os3, tipo=TipoAgendamento.ENTREGA,
-                                   data=dia_util(hoje, 3), turno=Turno.TARDE)
         Agendamento.objects.create(ordem=os3, tipo=TipoAgendamento.INSTALACAO,
                                    data=dia_util(hoje, 4), turno=Turno.MANHA)
         o3.status = StatusOrcamento.CONVERTIDO
@@ -199,16 +195,16 @@ class Command(BaseCommand):
             tipo=TipoServico.INSTALADO, modalidade=Modalidade.VISTA,
             observacoes="Cliente não estava em casa na data combinada.",
         )
-        Agendamento.objects.create(ordem=os4, tipo=TipoAgendamento.ENTREGA,
+        Agendamento.objects.create(ordem=os4, tipo=TipoAgendamento.INSTALACAO,
                                    data=dia_util(hoje, -4), turno=Turno.MANHA)
-        os4.mudar_status(StatusOS.EM_EXECUCAO, segunda, "Saiu para entrega")
+        os4.mudar_status(StatusOS.EM_EXECUCAO, segunda, "Saiu para instalação")
         o5.status = StatusOrcamento.CONVERTIDO
         o5.save()
 
         self.stdout.write(self.style.SUCCESS("4 ordens de serviço (uma delas atrasada)"))
         self.stdout.write(self.style.SUCCESS(
-            f"Agenda: {cfg.capacidade_turno} compromissos por turno "
-            f"({cfg.capacidade_turno * 2} por dia, somando entrega e instalação)"
+            f"Agenda: {cfg.capacidade_instalacao} instalações por turno e "
+            f"{cfg.capacidade_entrega_dia} entregas por dia (instalação conta como entrega no 1º dia)"
         ))
         self.stdout.write("")
         self.stdout.write(self.style.SUCCESS("Pronto. Entre com os usuários criados por criar_equipe."))

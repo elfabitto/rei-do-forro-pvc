@@ -6,12 +6,12 @@
  * e a forma de pagamento que o cliente escolheu.
  */
 import { LOGO } from "./logo";
+import { periodoTexto } from "./agendaTexto";
 import { VERBA, ehServico, quantidadeTexto } from "./orcamentoDoc";
 
 const brl = (n) =>
   Number(n ?? 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const m2 = (n) => Number(n ?? 0).toLocaleString("pt-BR", { maximumFractionDigits: 2 });
-const dataBR = (s) => (s ? new Date(s + "T00:00:00").toLocaleDateString("pt-BR") : "—");
 
 const logoImg = new Image();
 const logoPronta = new Promise((ok) => {
@@ -54,8 +54,8 @@ export function montarOS(os, { verFinanceiro = true } = {}) {
     endereco: enderecoTxt,
     bairro: end?.bairro ?? "",
     link: end?.link_localizacao ?? "",
-    entrega: os.entrega ? `${dataBR(os.entrega.data)} · ${os.entrega.turno_display}` : "—",
-    instalacao: os.instalacao ? `${dataBR(os.instalacao.data)} · ${os.instalacao.turno_display}` : "",
+    entrega: os.entrega ? periodoTexto(os.entrega) : "",
+    instalacao: os.instalacao ? periodoTexto(os.instalacao) : "",
     observacoes: os.observacoes ?? "",
     verFinanceiro,
     modalidade: os.modalidade_display || "",
@@ -95,8 +95,10 @@ export function montarOS(os, { verFinanceiro = true } = {}) {
   }
 
   /* ---- agendamento ---- */
-  d.agenda = [["Entrega", d.entrega]];
+  d.agenda = [];
+  if (d.entrega) d.agenda.push(["Entrega", d.entrega]);
   if (d.instalacao) d.agenda.push(["Instalação", d.instalacao]);
+  if (!d.agenda.length) d.agenda.push(["Agendamento", "—"]);
 
   /* ---- texto do WhatsApp ---- */
   const bloco = (titulo, pares) =>

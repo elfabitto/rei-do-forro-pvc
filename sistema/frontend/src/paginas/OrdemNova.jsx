@@ -6,8 +6,9 @@
  * encheu nesse meio-tempo, a O.S. inteira é desfeita em vez de nascer sem
  * agendamento.
  *
- * Instalação só existe quando o orçamento é de instalação: fornecimento de
- * material tem entrega e ponto.
+ * Material agenda a entrega (1 dia). Instalado agenda só a instalação: ela leva
+ * o material, ocupa a vaga de entrega do primeiro dia e dura de 1 a 6 dias
+ * úteis conforme a área.
  */
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -71,11 +72,16 @@ export default function OrdemNova() {
     if (orc && !vendedorId) setVendedorId(String(orc.vendedor));
   }, [orc, vendedorId]);
 
-  const entregaOk = entrega.data && entrega.turno;
-  const instalacaoOk = !comInstalacao || (instalacao.data && instalacao.turno);
-  const podeGravar = orc && clienteId && enderecoId && entregaOk && instalacaoOk && modalidade;
+  const agendaOk = comInstalacao
+    ? instalacao.data && instalacao.turno
+    : entrega.data && entrega.turno;
+  const podeGravar = orc && clienteId && enderecoId && agendaOk && modalidade;
+
+  // a O.S. gerada fica registrada aqui: o botão trava e não gera de novo
+  const [gerada, setGerada] = useState(null);
 
   async function gerar() {
+    if (gerada) return "já gerado";
     setErro("");
     try {
       const os = await api.post("/ordens-servico/", {
@@ -84,9 +90,10 @@ export default function OrdemNova() {
         vendedor: pode("trocarVendedor") ? Number(vendedorId) : undefined,
         modalidade,
         observacoes,
-        agendar_entrega: entrega,
+        agendar_entrega: comInstalacao ? null : entrega,
         agendar_instalacao: comInstalacao ? instalacao : null,
       });
+      setGerada(os);
       navegar(`/ordens?abrir=${os.id}`);
       return "serviço gerado";
     } catch (e) {
@@ -135,6 +142,9 @@ export default function OrdemNova() {
 
   return (
     <div className="pagina">
+      <button className="voltar" onClick={() => navegar("/orcamentos")}>
+        <span aria-hidden="true">←</span> Orçamentos
+      </button>
       <h1>Gerar Ordem de Serviço</h1>
       <p className="sub">A partir do orçamento {orc?.numero ?? "…"}</p>
 
@@ -206,15 +216,22 @@ export default function OrdemNova() {
 
                 {/* ----------------------------------------- agendamento */}
                 <div className="lbl" style={{ marginTop: 20 }}>Agendamento</div>
-                <CalendarioVagas titulo="Entrega" tipo="entrega"
-                                 valor={entrega} aoMudar={setEntrega} />
                 {comInstalacao ? (
-                  <CalendarioVagas titulo="Instalação" tipo="instalacao"
-                                   valor={instalacao} aoMudar={setInstalacao} />
+                  <>
+                    <CalendarioVagas titulo="Instalação" tipo="instalacao" area={orc.area_m2}
+                                     valor={instalacao} aoMudar={setInstalacao} />
+                    <p className="nota">
+                      A instalação já leva o material: não há entrega separada a agendar.
+                    </p>
+                  </>
                 ) : (
-                  <p className="nota">
-                    Fornecimento de material: não há instalação a agendar, só a entrega.
-                  </p>
+                  <>
+                    <CalendarioVagas titulo="Entrega" tipo="entrega"
+                                     valor={entrega} aoMudar={setEntrega} />
+                    <p className="nota">
+                      Fornecimento de material: só a entrega, em um dia.
+                    </p>
+                  </>
                 )}
 
                 <Campo rotulo="Observações da O.S.">
@@ -223,10 +240,14 @@ export default function OrdemNova() {
                 </Campo>
               </div>
               <div className="acts">
-                <BotaoAcao classe="btn p" aoClicar={gerar} desabilitado={!podeGravar}>
-                  <Icone nome="ordem" tamanho={15} /> Gerar Ordem de Serviço
-                </BotaoAcao>
-                <button className="btn" onClick={() => navegar("/orcamentos")}>Cancelar</button>
+                {gerada ? (
+                  <button className="btn ok" disabled>✓ Gerada — {gerada.numero}</button>
+                ) : (
+                  <BotaoAcao classe="btn p" aoClicar={gerar} desabilitado={!podeGravar}>
+                    <Icone nome="ordem" tamanho={15} /> Gerar Ordem de Serviço
+                  </BotaoAcao>
+                )}
+                <button className="btn" onClick={() => navegar("/orcamentos")}>Voltar para orçamentos</button>
               </div>
             </section>
 

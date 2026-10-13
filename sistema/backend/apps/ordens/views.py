@@ -17,12 +17,13 @@ from apps.orcamentos.models import Orcamento, StatusOrcamento
 from .models import (
     COMISSAO_POR_M2,
     Agendamento,
-    ConfiguracaoAgenda,
     OrdemServico,
     Pagamento,
     StatusOS,
+    TipoAgendamento,
     Turno,
 )
+from .agenda import Grade, chave, turnos_instalacao
 from .serializers import (
     AgendamentoSerializer,
     FinalizarSerializer,
@@ -173,8 +174,10 @@ class AgendamentoViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         qs = super().get_queryset().exclude(ordem__status=StatusOS.CANCELADA)
         de, ate = self.request.query_params.get("de"), self.request.query_params.get("ate")
+        # pelo período: a instalação que começou antes de `de` e ainda está em
+        # andamento também aparece
         if de:
-            qs = qs.filter(data__gte=de)
+            qs = qs.filter(Q(data_fim__gte=de) | Q(data_fim__isnull=True, data__gte=de))
         if ate:
             qs = qs.filter(data__lte=ate)
         return qs
@@ -195,51 +198,84 @@ class PagamentoViewSet(viewsets.ModelViewSet):
 @permission_classes([IsAuthenticated])
 def agenda_disponibilidade(request):
     """
-    Mapa de ocupação para o calendário: por dia e turno, quantas vagas de entrega
-    e de instalação ainda existem. É o que o React desenha como "2 vagas" / "lotado".
+    Mapa de vagas para o calendário, dia a dia (regras em agenda.py):
+
+    - `entregas`: vagas de entrega do dia (instalação que começa no dia conta).
+    - `turnos[].instalacoes`: equipes livres em cada turno.
+
+    Com `tipo=instalacao` e `area` (ou `turnos`), diz também em que turnos uma
+    instalação daquele tamanho pode começar e onde ela termina. `excluir` tira da
+    conta o próprio agendamento que está sendo remarcado.
     """
     hoje = timezone.localdate()
-    de = date.fromisoformat(request.query_params.get("de", str(hoje)))
-    ate = date.fromisoformat(request.query_params.get("ate", str(hoje + timedelta(days=45))))
+    p = request.query_params
+    de = date.fromisoformat(p.get("de", str(hoje)))
+    ate = date.fromisoformat(p.get("ate", str(hoje + timedelta(days=45))))
+    tipo = p.get("tipo", "")
+    excluir = p.get("excluir") or None
 
-    cfg = ConfiguracaoAgenda.obter()
-    sem_atendimento = cfg.dias_sem_atendimento_lista
+    duracao = None
+    if tipo == TipoAgendamento.INSTALACAO:
+        if p.get("turnos"):
+            duracao = max(1, int(p["turnos"]))
+        else:
+            duracao = turnos_instalacao(Decimal(p["area"]) if p.get("area") else None)
 
-    # A vaga é do turno: entrega e instalação disputam o mesmo limite.
-    ocupacao = (
-        Agendamento.objects.filter(data__range=(de, ate))
-        .exclude(ordem__status=StatusOS.CANCELADA)
-        .values("data", "turno")
-        .annotate(n=Count("id"))
-    )
-    mapa = {(o["data"], o["turno"]): o["n"] for o in ocupacao}
-    limite = cfg.capacidade()
-
+    grade = Grade(de, ate, excluir=excluir)
     dias = []
     d = de
     while d <= ate:
-        if d.weekday() in sem_atendimento:
-            dias.append({"data": str(d), "atende": False, "turnos": [], "livre_total": 0})
-        else:
-            turnos = []
-            for turno, rotulo in Turno.choices:
-                usado = mapa.get((d, turno), 0)
-                turnos.append({
-                    "turno": turno,
-                    "turno_display": rotulo,
-                    "usado": usado,
-                    "total": limite,
-                    "livre": max(0, limite - usado),
-                })
-            dias.append({
-                "data": str(d),
-                "atende": True,
-                "turnos": turnos,
-                "livre_total": sum(t["livre"] for t in turnos),
-            })
+        atende = grade.atende(d)
+        dia = {
+            "data": str(d),
+            "atende": atende,
+            "entregas": {
+                "usado": grade.entregas.get(d, 0),
+                "total": grade.cap_entrega,
+                "livre": grade.entregas_livres(d) if atende else 0,
+            },
+            "turnos": [],
+        }
+        for turno, rotulo in Turno.choices:
+            trabalha = grade.trabalha(d, turno)
+            t = {
+                "turno": turno,
+                "turno_display": rotulo,
+                "trabalha": trabalha,
+                "instalacoes": {
+                    "usado": grade.instalacoes.get((d, turno), 0),
+                    "total": grade.cap_instalacao,
+                    "livre": grade.instalacoes_livres(d, turno) if trabalha else 0,
+                },
+            }
+            if tipo == TipoAgendamento.INSTALACAO:
+                motivo = grade.motivo_instalacao(d, turno, duracao)
+                t["disponivel"] = motivo is None
+                t["motivo"] = motivo or ""
+                periodo = grade.percorrer(d, turno, duracao) if trabalha else []
+                if periodo:
+                    fim_d, fim_t = periodo[-1]
+                    t["termina"] = {"data": str(fim_d), "turno": fim_t, "turno_display": Turno(fim_t).label}
+                    # cada turno que a instalação tomaria — a tela pinta o prazo no calendário
+                    t["periodo"] = [chave(pd, pt) for pd, pt in periodo]
+            elif tipo == TipoAgendamento.ENTREGA:
+                motivo = grade.motivo_entrega(d) or ("" if trabalha else "Turno bloqueado na agenda.")
+                t["disponivel"] = not motivo
+                t["motivo"] = motivo
+            dia["turnos"].append(t)
+        if tipo:
+            dia["disponivel"] = any(t["disponivel"] for t in dia["turnos"])
+        dias.append(dia)
         d += timedelta(days=1)
 
-    return Response({"de": str(de), "ate": str(ate), "capacidade_turno": limite, "dias": dias})
+    return Response({
+        "de": str(de), "ate": str(ate), "tipo": tipo,
+        "capacidade_instalacao": grade.cap_instalacao,
+        "capacidade_entrega_dia": grade.cap_entrega,
+        "duracao_turnos": duracao,
+        "duracao_dias": duracao / 2 if duracao else None,
+        "dias": dias,
+    })
 
 
 # ----------------------------------------------------------------- comissões

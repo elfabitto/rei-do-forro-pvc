@@ -62,6 +62,10 @@ export default function OrcamentoNovo() {
 
   // orçamento já gravado nesta sessão — libera o envio ao cliente
   const [salvo, setSalvo] = useState(null);
+  // o registro criado nesta tela: depois do primeiro salvar, tudo vira edição
+  // dele — nunca um segundo orçamento igual
+  const [gravadoId, setGravadoId] = useState(null);
+  const alvoId = editando ? id : gravadoId;
 
   const listaForros = linhas(forros.dados);
   const listaMateriais = linhas(materiais.dados);
@@ -197,7 +201,11 @@ export default function OrcamentoNovo() {
         })),
       ],
     };
-    return editando ? api.patch(`/orcamentos/${id}/`, corpo) : api.post("/orcamentos/", corpo);
+    const registro = alvoId
+      ? await api.patch(`/orcamentos/${alvoId}/`, corpo)
+      : await api.post("/orcamentos/", corpo);
+    setGravadoId(registro.id);
+    return registro;
   }
 
   async function salvar() {
@@ -205,7 +213,7 @@ export default function OrcamentoNovo() {
     try {
       const registro = await gravar();
       setSalvo(registro);
-      return editando ? "alterações salvas" : `salvo como ${registro.numero}`;
+      return alvoId ? "alterações salvas" : `salvo como ${registro.numero}`;
     } catch (e) {
       setErro(e.message);
       throw e;
@@ -246,6 +254,9 @@ export default function OrcamentoNovo() {
 
   return (
     <div className="pagina">
+      <button className="voltar" onClick={() => navegar("/orcamentos")}>
+        <span aria-hidden="true">←</span> Orçamentos
+      </button>
       <h1>{editando ? `Editar ${original.dados?.numero ?? "orçamento"}` : "Novo orçamento"}</h1>
       <p className="sub">
         {editando
@@ -491,16 +502,23 @@ export default function OrcamentoNovo() {
                     <Icone nome="salvar" tamanho={14} /> Gravar no sistema
                   </span>
                   <div className="acts">
-                    <BotaoAcao classe="btn p" aoClicar={salvar}>
-                      <Icone nome="salvar" tamanho={15} />
-                      {editando ? " Salvar alterações" : " Salvar orçamento"}
-                    </BotaoAcao>
-                    <BotaoAcao aoClicar={salvarEFechar}>
-                      <Icone nome="fechado" tamanho={15} /> Salvar e fechar negócio
-                    </BotaoAcao>
-                    {editando && (
-                      <button className="btn" onClick={() => navegar("/orcamentos")}>Voltar</button>
+                    {salvo ? (
+                      // travado enquanto nada mudar: o mesmo documento não se salva duas vezes
+                      <button className="btn ok" disabled>
+                        ✓ Salvo — {salvo.numero}
+                      </button>
+                    ) : (
+                      <BotaoAcao classe="btn p" aoClicar={salvar}>
+                        <Icone nome="salvar" tamanho={15} />
+                        {alvoId ? " Salvar alterações" : " Salvar orçamento"}
+                      </BotaoAcao>
                     )}
+                    <BotaoAcao aoClicar={salvarEFechar}>
+                      <Icone nome="fechado" tamanho={15} /> {salvo ? "Fechar negócio" : "Salvar e fechar negócio"}
+                    </BotaoAcao>
+                    <button className="btn" onClick={() => navegar("/orcamentos")}>
+                      Voltar para orçamentos
+                    </button>
                   </div>
                   <p className="grupoNota">
                     <b>Salvar</b> guarda a proposta sem cliente e libera o envio abaixo.

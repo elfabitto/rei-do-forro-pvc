@@ -228,7 +228,7 @@ input.preco.erro{border-color:var(--critical);background:#fdf2f2}
 /* ---------------------------------------------------------------- calendário de vagas */
 /* Marcar no mês mostra o que o menu suspenso escondia: onde ainda cabe. */
 .calnav{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:13px}
-.calnav b{min-width:116px;text-align:center;text-transform:capitalize}
+.calnav b{min-width:116px;text-align:center}
 .calnav .mini{border:1px solid var(--line);background:var(--surface);border-radius:5px;
               width:26px;height:26px;cursor:pointer;line-height:1;color:var(--ink-2)}
 .calnav .mini:hover{border-color:var(--ink);background:var(--surface-2)}
@@ -257,6 +257,27 @@ input.preco.erro{border-color:var(--critical);background:#fdf2f2}
 .cvt.on{border-color:var(--orange);background:var(--orange-bg);box-shadow:inset 0 0 0 1px var(--orange)}
 .cvt:disabled{opacity:.5;cursor:not-allowed}
 
+/* cor do tipo no calendário de vagas: azul entrega, laranja instalação */
+.calvagas.entrega .cvd .v{color:#1b5496}
+.calvagas.instalacao .cvd .v{color:var(--orange-dk)}
+.calvagas.entrega .cvd:hover:not(.off){border-color:var(--s-entrega);background:var(--s-entrega-bg)}
+.calvagas.entrega .cvd.on{background:var(--s-entrega);border-color:var(--s-entrega)}
+.calvagas.instalacao .cvd.on{background:var(--s-instalacao);border-color:var(--s-instalacao)}
+.calvagas .cvd.on .v{color:#fff}
+.agtit{flex-wrap:wrap}
+.agtit .dur{font-size:12px;font-weight:700;color:var(--orange-dk)}
+.calleg{font-size:11.5px;color:var(--muted);margin:8px 0 0}
+.calresumo{font-size:12.5px;margin:10px 0 0;padding:9px 11px;border-radius:6px;
+           background:var(--s-instalacao-bg);color:var(--ink-2)}
+@media (max-width:520px){
+  .agbox{padding:10px 8px}
+  .calnav{margin-left:0;width:100%;justify-content:space-between}
+  .calvagas{gap:3px}
+  .cvd{min-height:44px}
+  .cvd .n{font-size:13px}
+  .calturnos{flex-direction:column}
+}
+
 /* ---------------------------------------------------------------- confirmação */
 .confirmaTexto{margin:0 0 4px;font-size:14px;line-height:1.55;color:var(--ink-2)}
 
@@ -275,3 +296,25 @@ input.preco.erro{border-color:var(--critical);background:#fdf2f2}
 .extra .x{flex:0 0 auto;width:30px;height:30px;border:1px solid var(--line);border-radius:6px;
           background:var(--surface);color:var(--muted);font-size:17px;line-height:1;cursor:pointer}
 .extra .x:hover{border-color:var(--st-vermelho);color:var(--st-vermelho-tx);background:#fff}
+
+/* prévia do prazo da instalação no calendário de vagas */
+.calvagas .cvd.faixa{background:var(--s-instalacao-bg);border-color:#f6b88f;opacity:1;color:var(--ink)}
+.calvagas .cvd.faixa .v{color:var(--orange-dk)}
+.calvagas .cvd.fim{background:var(--s-instalacao-bg);border:2px solid var(--s-instalacao);opacity:1;color:var(--ink)}
+.calvagas .cvd.fim .v{color:var(--orange-dk);text-transform:uppercase;letter-spacing:.4px;font-weight:800}
+.prazo{display:flex;align-items:stretch;gap:8px;margin-top:12px;padding:10px;border-radius:8px;
+       background:var(--s-instalacao-bg);border:1px solid #f6b88f}
+.prazo.prov{border-style:dashed}
+.prazo .ponta{flex:1;display:flex;flex-direction:column;gap:1px;background:var(--surface);
+              border-radius:6px;padding:8px 10px;min-width:0}
+.prazo .ponta small{font-size:10.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--muted)}
+.prazo .ponta b{font-size:16px;text-transform:capitalize}
+.prazo .ponta span{font-size:12px;color:var(--ink-2)}
+.prazo .ponta.fim{box-shadow:inset 0 0 0 2px var(--s-instalacao)}
+.prazo .ponta.fim small{color:var(--orange-dk)}
+.prazo .seta{display:flex;align-items:center;justify-content:center;position:relative;min-width:54px}
+.prazo .seta::before{content:"";position:absolute;left:0;right:6px;top:50%;border-top:2px solid var(--s-instalacao)}
+.prazo .seta::after{content:"";position:absolute;right:0;top:calc(50% - 5px);border:5px solid transparent;
+                    border-left:7px solid var(--s-instalacao);border-right:0}
+.prazo .seta span{position:relative;background:var(--s-instalacao-bg);padding:0 4px;font-size:11.5px;
+                  font-weight:800;color:var(--orange-dk);white-space:nowrap}

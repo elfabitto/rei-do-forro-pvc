@@ -17,6 +17,7 @@ import {
 } from "../osDoc";
 import FinalizarModal from "./FinalizarModal";
 import ReagendarModal from "./ReagendarModal";
+import { periodoTexto } from "../agendaTexto";
 
 const PASSOS = [
   ["gerada", "Agendado"],
@@ -200,8 +201,7 @@ export default function OrdemDetalhe({ id, aoFechar, aoMudar }) {
                     {os.agendamentos.map((a) => (
                       <div className="agenda-item" key={a.id}>
                         <Pilula tipo={a.tipo} rotulo={a.tipo_display} />
-                        <b>{data(a.data)}</b>
-                        <span>{a.turno_display}</span>
+                        <b>{periodoTexto(a)}</b>
                         {!encerrada && (
                           <button className="lnk" style={{ marginLeft: "auto" }}
                                   onClick={() => setRemarcando(a)}>remarcar</button>

@@ -187,9 +187,8 @@ class OrdemServicoApiTest(ApiBase):
 
 
 class AgendaApiTest(ApiBase):
-    def test_disponibilidade_traz_vagas_por_turno(self):
+    def test_disponibilidade_traz_vagas_de_entrega_e_instalacao(self):
         cfg = ConfiguracaoAgenda.obter()
-        cfg.capacidade_turno = 2
         cfg.dias_sem_atendimento = "6"
         cfg.save()
 
@@ -201,16 +200,29 @@ class AgendaApiTest(ApiBase):
         self.assertEqual(len(r.data["dias"]), 14)
 
         util = next(d for d in r.data["dias"] if d["atende"])
-        self.assertEqual(len(util["turnos"]), 2)              # manhã e tarde
-        self.assertEqual(util["turnos"][0]["livre"], 2)       # 2 vagas por turno
-        self.assertEqual(util["livre_total"], 4)              # 4 por dia
+        self.assertEqual(len(util["turnos"]), 2)                            # manhã e tarde
+        self.assertEqual(util["turnos"][0]["instalacoes"]["livre"], 2)      # 2 equipes por turno
+        self.assertEqual(util["entregas"]["livre"], 4)                      # 4 entregas por dia
 
         domingos = [d for d in r.data["dias"] if not d["atende"]]
         self.assertTrue(domingos, "deveria haver ao menos um domingo em 14 dias")
 
+    def test_disponibilidade_de_instalacao_diz_onde_termina(self):
+        self.client.force_authenticate(self.vendedor)
+        hoje = timezone.localdate()
+        seg = hoje + timedelta(days=(7 - hoje.weekday()) % 7 or 7)
+        r = self.client.get("/api/agenda/disponibilidade/", {
+            "de": str(seg), "ate": str(seg), "tipo": "instalacao", "area": "30",
+        })
+        self.assertEqual(r.data["duracao_dias"], 1.5)
+        manha = r.data["dias"][0]["turnos"][0]
+        self.assertTrue(manha["disponivel"])
+        self.assertEqual(manha["termina"]["data"], str(seg + timedelta(days=1)))
+        self.assertEqual(manha["termina"]["turno"], "manha")
+
 
 class GerarOSDoOrcamentoTest(ApiBase):
-    """Converter orçamento em O.S. agendando entrega e instalação num passo só."""
+    """Converter orçamento em O.S. agendando no mesmo passo (Instalado: só a instalação)."""
 
     def orcamento(self):
         self.client.force_authenticate(self.vendedor)
@@ -227,20 +239,28 @@ class GerarOSDoOrcamentoTest(ApiBase):
         orc = self.orcamento()
         r = self.client.post("/api/ordens-servico/", {
             "orcamento": orc["id"], "endereco": self.endereco.id,
-            "agendar_entrega": {"data": self.dia_util(2), "turno": "manha"},
             "agendar_instalacao": {"data": self.dia_util(3), "turno": "tarde"},
         }, format="json")
         self.assertEqual(r.status_code, 201, r.data)
         self.assertEqual(r.data["valor_total"], "1656.00")        # herdado do orçamento
         self.assertEqual(r.data["cliente"], self.cliente.id)
         self.assertEqual(r.data["cliente_detalhe"]["nome"], "Maria Souza")
-        self.assertEqual(len(r.data["agendamentos"]), 2)
+        self.assertEqual(len(r.data["agendamentos"]), 1)
+        self.assertEqual(r.data["agendamentos"][0]["dias"], 1.0)  # 23 m² = 1 dia
         # o orçamento passa a constar como convertido
         self.assertEqual(self.client.get(f"/api/orcamentos/{orc['id']}/").data["status"], "convertido")
 
+    def test_instalado_nao_agenda_entrega_separada(self):
+        r = self.client.post("/api/ordens-servico/", {
+            "orcamento": self.orcamento()["id"], "endereco": self.endereco.id,
+            "agendar_entrega": {"data": self.dia_util(2), "turno": "manha"},
+        }, format="json")
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("agendar_entrega", r.data)
+
     def test_turno_cheio_desfaz_a_os_inteira(self):
         cfg = ConfiguracaoAgenda.obter()
-        cfg.capacidade_turno = 1
+        cfg.capacidade_instalacao = 1
         cfg.save()
         dia = self.dia_util(2)
 
@@ -265,7 +285,7 @@ class GerarOSDoOrcamentoTest(ApiBase):
         orc = self.orcamento()
         r = self.client.post("/api/ordens-servico/", {
             "orcamento": orc["id"], "endereco": self.endereco.id, "modalidade": "cartao",
-            "agendar_entrega": {"data": self.dia_util(2), "turno": "manha"},
+            "agendar_instalacao": {"data": self.dia_util(2), "turno": "manha"},
         }, format="json")
         self.assertEqual(r.status_code, 201, r.data)
         self.assertEqual(r.data["modalidade"], "cartao")
@@ -276,7 +296,7 @@ class GerarOSDoOrcamentoTest(ApiBase):
         orc = self.orcamento()
         r = self.client.post("/api/ordens-servico/", {
             "orcamento": orc["id"], "endereco": self.endereco.id, "modalidade": "vista",
-            "agendar_entrega": {"data": self.dia_util(2), "turno": "manha"},
+            "agendar_instalacao": {"data": self.dia_util(2), "turno": "manha"},
         }, format="json")
         self.assertEqual(r.data["tipo"], "instalado")
         self.assertTrue(r.data["numero"].startswith("OS-SERV-"), r.data["numero"])

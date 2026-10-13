@@ -61,7 +61,8 @@ class OrdemServicoAdmin(admin.ModelAdmin):
 
 @admin.register(Agendamento)
 class AgendamentoAdmin(admin.ModelAdmin):
-    list_display = ["ordem", "tipo", "data", "turno", "responsavel", "concluido"]
+    list_display = ["ordem", "tipo", "data", "turno", "data_fim", "turno_fim", "responsavel", "concluido"]
+    readonly_fields = ["duracao_turnos", "data_fim", "turno_fim", "ocupacao"]
     list_filter = ["tipo", "turno", "concluido", "data"]
     date_hierarchy = "data"
 
@@ -74,7 +75,7 @@ class BloqueioAdmin(admin.ModelAdmin):
 
 @admin.register(ConfiguracaoAgenda)
 class ConfiguracaoAgendaAdmin(admin.ModelAdmin):
-    list_display = ["__str__", "capacidade_turno", "dias_sem_atendimento"]
+    list_display = ["__str__", "capacidade_instalacao", "capacidade_entrega_dia", "dias_sem_atendimento"]
 
     def has_add_permission(self, request):
         return not ConfiguracaoAgenda.objects.exists()

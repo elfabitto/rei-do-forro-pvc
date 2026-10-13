@@ -27,6 +27,8 @@ from .models import (
 class AgendamentoSerializer(serializers.ModelSerializer):
     tipo_display = serializers.CharField(source="get_tipo_display", read_only=True)
     turno_display = serializers.CharField(source="get_turno_display", read_only=True)
+    turno_fim_display = serializers.CharField(source="get_turno_fim_display", read_only=True)
+    dias = serializers.FloatField(read_only=True)
 
     # contexto do compromisso, para a lista da agenda não precisar de outra chamada
     os_numero = serializers.CharField(source="ordem.numero", read_only=True)
@@ -41,12 +43,14 @@ class AgendamentoSerializer(serializers.ModelSerializer):
     class Meta:
         model = Agendamento
         fields = ["id", "ordem", "tipo", "tipo_display", "data", "turno", "turno_display",
+                  "duracao_turnos", "dias", "data_fim", "turno_fim", "turno_fim_display", "ocupacao",
                   "hora", "responsavel", "concluido", "concluido_em", "observacoes",
                   "os_numero", "os_status", "os_status_display", "atrasado",
                   "cliente_nome", "cliente_telefone", "bairro", "endereco_resumo"]
+        read_only_fields = ["duracao_turnos", "data_fim", "turno_fim", "ocupacao"]
 
     def validate(self, attrs):
-        # roda o clean() do modelo (capacidade do turno, bloqueios, dia sem atendimento)
+        # roda o clean() do modelo (vagas, duração da instalação, bloqueios, dia sem atendimento)
         instancia = Agendamento(**{**_campos_atuais(self.instance), **attrs})
         instancia.pk = self.instance.pk if self.instance else None
         try:
@@ -198,6 +202,11 @@ class OrdemServicoSerializer(OrdemServicoListaSerializer):
         elif orcamento:
             attrs.setdefault("valor_total", orcamento.total_vista)
 
+        if not self.instance and attrs.get("tipo") == TipoServico.INSTALADO and attrs.get("agendar_entrega"):
+            raise serializers.ValidationError({
+                "agendar_entrega": "A instalação já leva o material: agende só a instalação."
+            })
+
         if not self.instance:
             faltando = {
                 campo: "Informe o valor ou vincule um orçamento."
@@ -211,8 +220,9 @@ class OrdemServicoSerializer(OrdemServicoListaSerializer):
     @transaction.atomic
     def create(self, validated):
         """
-        Transação única: se o turno estiver cheio, a O.S. inteira é desfeita em vez
-        de ficar criada sem agendamento.
+        Transação única: se não houver vaga, a O.S. inteira é desfeita em vez
+        de ficar criada sem agendamento. Material agenda a entrega; Instalado
+        agenda só a instalação, que já consome a vaga de entrega do primeiro dia.
         """
         entrega = validated.pop("agendar_entrega", None)
         instalacao = validated.pop("agendar_instalacao", None)

@@ -40,6 +40,7 @@ export default function ReagendarModal({ os, agendamento, aoFechar, aoConcluir }
     >
       {erro && <div className="erro">{erro}</div>}
       <CalendarioVagas titulo={agendamento.tipo_display} tipo={agendamento.tipo}
+                       area={os.area_m2} excluir={agendamento.id}
                        valor={quando} aoMudar={setQuando} />
     </Modal>
   );

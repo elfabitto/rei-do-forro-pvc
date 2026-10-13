@@ -6,10 +6,14 @@ from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.utils import timezone
 
+from apps.catalogo.models import Forro
 from apps.clientes.models import Cliente, Endereco
+from apps.orcamentos.models import Orcamento
 
+from .agenda import dias_instalacao
 from .models import (
     Agendamento,
+    Bloqueio,
     ConfiguracaoAgenda,
     OrdemServico,
     Pagamento,
@@ -122,66 +126,124 @@ class FinanceiroTest(BaseOS):
 
 
 class AgendaTest(BaseOS):
+    """
+    Instalação: 2 equipes por turno, duração pela área em dias úteis.
+    Entrega: 4 por dia, e a instalação consome uma no dia em que começa.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.forro = Forro.objects.create(
+            nome="BRANCO", preco_material_vista=D("30"), preco_material_cartao=D("32"),
+            preco_instalado_vista=D("60"), preco_instalado_cartao=D("65"),
+        )
+
     def setUp(self):
         self.cfg = ConfiguracaoAgenda.obter()
-        self.cfg.capacidade_turno = 2          # 2 por turno = 4 por dia
+        self.cfg.capacidade_instalacao = 2
+        self.cfg.capacidade_entrega_dia = 4
         self.cfg.dias_sem_atendimento = "6"    # domingo
         self.cfg.save()
-        self.dia = proxima_segunda()
+        self.seg = proxima_segunda()
+        self.ter = self.seg + timedelta(days=1)
 
-    def test_turno_cheio_recusa_novo_agendamento(self):
+    def os_com_area(self, area):
+        orc = Orcamento.objects.create(tipo="instalado", area_m2=D(area), forro=self.forro,
+                                       vendedor=self.vendedor, criado_por=self.vendedor)
+        os_ = self.nova_os()
+        os_.orcamento = orc
+        os_.save()
+        return os_
+
+    def instalar(self, area, dia, turno=Turno.MANHA):
+        return Agendamento.objects.create(ordem=self.os_com_area(area), tipo=TipoAgendamento.INSTALACAO,
+                                          data=dia, turno=turno)
+
+    def entregar(self, dia, turno=Turno.MANHA):
+        return Agendamento.objects.create(ordem=self.nova_os(), tipo=TipoAgendamento.ENTREGA,
+                                          data=dia, turno=turno)
+
+    def test_tabela_de_dias_pela_area(self):
+        casos = [(None, "1"), ("10", "1"), ("25", "1"), ("26", "1.5"), ("30", "1.5"),
+                 ("31", "2"), ("40", "2"), ("45", "2.5"), ("46", "3"), ("60", "3"),
+                 ("65", "3.5"), ("80", "4"), ("85", "4.5"), ("100", "5"), ("101", "6"), ("300", "6")]
+        for area, dias in casos:
+            self.assertEqual(dias_instalacao(D(area) if area else None), D(dias), area)
+
+    def test_duas_instalacoes_por_turno(self):
+        self.instalar("20", self.seg)
+        self.instalar("20", self.seg)
+        with self.assertRaisesMessage(ValidationError, "Equipes ocupadas"):
+            self.instalar("20", self.seg)
+
+    def test_instalacao_ocupa_os_dias_da_area(self):
+        a = self.instalar("35", self.seg)               # 2 dias = 4 turnos
+        self.assertEqual(a.duracao_turnos, 4)
+        self.assertEqual((a.data_fim, a.turno_fim), (self.ter, Turno.TARDE))
+        self.assertEqual(len(a.ocupacao), 4)
+
+    def test_meio_dia_libera_a_tarde_para_outra_equipe(self):
+        """1,5 dia começando segunda de manhã termina terça de manhã."""
         for _ in range(2):
-            Agendamento.objects.create(ordem=self.nova_os(), tipo=TipoAgendamento.ENTREGA,
-                                       data=self.dia, turno=Turno.MANHA)
-        with self.assertRaisesMessage(ValidationError, "Turno cheio"):
-            Agendamento.objects.create(ordem=self.nova_os(), tipo=TipoAgendamento.ENTREGA,
-                                       data=self.dia, turno=Turno.MANHA)
+            a = self.instalar("30", self.seg)
+        self.assertEqual((a.data_fim, a.turno_fim), (self.ter, Turno.MANHA))
+        with self.assertRaisesMessage(ValidationError, "Equipes ocupadas"):
+            self.instalar("20", self.ter, Turno.MANHA)
+        self.assertIsNotNone(self.instalar("20", self.ter, Turno.TARDE).pk)
 
-    def test_entrega_e_instalacao_disputam_a_mesma_vaga(self):
-        """É a mesma equipe que sai: lotar o turno com entregas bloqueia instalação."""
-        for _ in range(2):
-            Agendamento.objects.create(ordem=self.nova_os(), tipo=TipoAgendamento.ENTREGA,
-                                       data=self.dia, turno=Turno.MANHA)
-        with self.assertRaisesMessage(ValidationError, "Turno cheio"):
-            Agendamento.objects.create(ordem=self.nova_os(), tipo=TipoAgendamento.INSTALACAO,
-                                       data=self.dia, turno=Turno.MANHA)
+    def test_instalacao_pula_domingo(self):
+        sab = self.seg - timedelta(days=2)
+        a = self.instalar("20", sab, Turno.TARDE)        # sáb tarde + seg manhã
+        self.assertEqual((a.data_fim, a.turno_fim), (self.seg, Turno.MANHA))
 
-    def test_quatro_vagas_por_dia(self):
-        """2 de manhã + 2 à tarde."""
-        for turno in (Turno.MANHA, Turno.TARDE):
-            for _ in range(2):
-                Agendamento.objects.create(ordem=self.nova_os(), tipo=TipoAgendamento.ENTREGA,
-                                           data=self.dia, turno=turno)
-        self.assertEqual(Agendamento.objects.filter(data=self.dia).count(), 4)
-        with self.assertRaisesMessage(ValidationError, "Turno cheio"):
-            Agendamento.objects.create(ordem=self.nova_os(), tipo=TipoAgendamento.INSTALACAO,
-                                       data=self.dia, turno=Turno.TARDE)
+    def test_instalacao_pula_dia_bloqueado(self):
+        Bloqueio.objects.create(data=self.ter, motivo="Feriado", criado_por=self.diretor)
+        a = self.instalar("35", self.seg)                # seg inteira, ter bloqueada, qua inteira
+        self.assertEqual((a.data_fim, a.turno_fim), (self.seg + timedelta(days=2), Turno.TARDE))
+
+    def test_quatro_entregas_por_dia(self):
+        for turno in (Turno.MANHA, Turno.MANHA, Turno.TARDE, Turno.TARDE):
+            self.entregar(self.seg, turno)
+        with self.assertRaisesMessage(ValidationError, "Dia cheio"):
+            self.entregar(self.seg, Turno.TARDE)
+
+    def test_instalacao_consome_entrega_so_no_primeiro_dia(self):
+        self.instalar("35", self.seg)                    # seg e ter
+        self.instalar("35", self.seg)
+        for _ in range(2):                               # 4 - 2 instalações
+            self.entregar(self.seg)
+        with self.assertRaisesMessage(ValidationError, "Dia cheio"):
+            self.entregar(self.seg)
+        for _ in range(4):                               # terça: instalação em andamento não conta
+            self.entregar(self.ter)
+
+    def test_dia_sem_entrega_livre_recusa_instalacao(self):
+        for _ in range(4):
+            self.entregar(self.seg)
+        with self.assertRaisesMessage(ValidationError, "Sem vaga de entrega"):
+            self.instalar("20", self.seg)
 
     def test_domingo_nao_e_agendavel(self):
-        domingo = self.dia + timedelta(days=6)
+        domingo = self.seg + timedelta(days=6)
         self.assertEqual(domingo.weekday(), 6)
         with self.assertRaisesMessage(ValidationError, "Não há atendimento"):
-            Agendamento.objects.create(ordem=self.nova_os(), tipo=TipoAgendamento.ENTREGA,
-                                       data=domingo, turno=Turno.MANHA)
+            self.entregar(domingo)
 
     def test_os_cancelada_libera_a_vaga(self):
-        self.cfg.capacidade_turno = 1
+        self.cfg.capacidade_instalacao = 1
         self.cfg.save()
-        a = self.nova_os()
-        Agendamento.objects.create(ordem=a, tipo=TipoAgendamento.INSTALACAO,
-                                   data=self.dia, turno=Turno.TARDE)
-        a.mudar_status(StatusOS.CANCELADA, self.diretor, "Desistiu")
-        livre = Agendamento.objects.create(ordem=self.nova_os(), tipo=TipoAgendamento.INSTALACAO,
-                                           data=self.dia, turno=Turno.TARDE)
-        self.assertIsNotNone(livre.pk)
+        a = self.instalar("20", self.seg, Turno.TARDE)
+        a.ordem.mudar_status(StatusOS.CANCELADA, self.diretor, "Desistiu")
+        self.assertIsNotNone(self.instalar("20", self.seg, Turno.TARDE).pk)
 
     def test_uma_entrega_e_uma_instalacao_por_os(self):
         os_ = self.nova_os()
         Agendamento.objects.create(ordem=os_, tipo=TipoAgendamento.ENTREGA,
-                                   data=self.dia, turno=Turno.MANHA)
+                                   data=self.seg, turno=Turno.MANHA)
         with self.assertRaises(Exception):
             Agendamento.objects.create(ordem=os_, tipo=TipoAgendamento.ENTREGA,
-                                       data=self.dia, turno=Turno.TARDE)
+                                       data=self.seg, turno=Turno.TARDE)
 
 
 class AtrasoTest(BaseOS):
@@ -189,7 +251,6 @@ class AtrasoTest(BaseOS):
 
     def setUp(self):
         cfg = ConfiguracaoAgenda.obter()
-        cfg.capacidade_turno = 2
         cfg.dias_sem_atendimento = ""   # sem restrição, para poder agendar no passado
         cfg.save()
 
