@@ -16,13 +16,15 @@ import Painel from "./paginas/Painel";
 import Parametros from "./paginas/Parametros";
 import Chamados from "./paginas/Chamados";
 import Financeiro from "./paginas/Financeiro";
+import Home from "./paginas/Home";
 import Usuarios from "./paginas/Usuarios";
 import Sino from "./Sino";
 
 /* `so` restringe o item a uma permissão calculada pelo backend. */
 const MENU = [
   { grupo: "Operação" },
-  { to: "/", rotulo: "Painel", icone: "painel", fim: true, so: "verPainel" },
+  { to: "/inicio", rotulo: "Início", icone: "casa" },
+  { to: "/painel", rotulo: "Painel", icone: "painel", so: "verPainel" },
   { to: "/orcamentos", rotulo: "Orçamentos", icone: "orcamento" },
   { to: "/ordens", rotulo: "Ordens de Serviço", icone: "ordem" },
   { to: "/agenda", rotulo: "Agenda", icone: "agenda" },
@@ -130,8 +132,10 @@ export default function App() {
         </header>
 
         <Routes>
-          {/* o painel é da diretoria; os demais entram direto nos orçamentos */}
-          <Route path="/" element={pode("verPainel") ? <Painel /> : <Navigate to="/orcamentos" replace />} />
+          {/* entrada: Início (botões grandes) — só a diretoria no computador abre no Painel */}
+          <Route path="/" element={<Navigate to={pode("verPainel") && !ehEstreito() ? "/painel" : "/inicio"} replace />} />
+          <Route path="/inicio" element={<Home />} />
+          <Route path="/painel" element={pode("verPainel") ? <Painel /> : <Navigate to="/inicio" replace />} />
           <Route path="/orcamentos" element={<Orcamentos />} />
           <Route path="/orcamentos/novo" element={<OrcamentoNovo />} />
           <Route path="/orcamentos/:id/editar" element={<OrcamentoNovo />} />
@@ -145,7 +149,7 @@ export default function App() {
           <Route path="/chamados" element={<Chamados />} />
           <Route path="/clientes" element={<Clientes />} />
           <Route path="/catalogo" element={<Catalogo />} />
-          <Route path="*" element={<Navigate to={pode("verPainel") ? "/" : "/orcamentos"} replace />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
     </div>

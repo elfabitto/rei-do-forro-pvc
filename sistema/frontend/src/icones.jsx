@@ -36,6 +36,7 @@ const FORMAS = {
              <circle cx="19" cy="10" r="2.2" /><path d="M22.5 18.5c0-2.2-1.4-3.7-3.5-3.9" /></>,
   sino: <><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z" /><path d="M10 20.5a2 2 0 0 0 4 0" /></>,
   lixo: <><path d="M4 7h16M9 7V4.5h6V7M6.5 7l1 13h9l1-13" /></>,
+  casa: <><path d="M3.5 11 12 4l8.5 7" /><path d="M5.5 9.5V20h13V9.5" /><path d="M10 20v-5.5h4V20" /></>,
   menu: <><path d="M4 6h16M4 12h16M4 18h16" /></>,
   fechar: <><path d="M6 6l12 12M18 6L6 18" /></>,
   mais: <><path d="M12 5v14M5 12h14" /></>,

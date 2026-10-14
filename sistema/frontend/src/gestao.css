@@ -174,3 +174,68 @@ label.f.comErro input:focus{box-shadow:0 0 0 3px rgba(208,59,59,.15)}
 .comboLista li.sel{font-weight:700;color:var(--orange-dk)}
 .comboLista li.sel::after{content:" ✓"}
 .comboLista li.nada{color:var(--muted);cursor:default;font-size:13px}
+
+/* ======================================== fotos do catálogo no orçamento */
+.mini{display:block;flex:0 0 auto;border-radius:6px;border:1px solid var(--line);object-fit:cover;background:#fff}
+.mini.acab{object-fit:contain;background:#f4f6f8;padding:2px}
+.mini.grande{border-radius:8px;box-shadow:0 2px 6px rgba(20,22,26,.12)}
+.opt .mini.acab{margin-left:2px}
+
+.selForro{position:relative}
+.selForroBtn{display:flex;align-items:center;gap:11px;width:100%;min-height:50px;padding:7px 12px;border:1px solid var(--line);
+             border-radius:8px;background:var(--surface);font:inherit;color:var(--ink);cursor:pointer;text-align:left}
+.selForroBtn:hover,.selForroBtn.aberto{border-color:var(--ink)}
+.selForroBtn:focus-visible{outline:2px solid var(--orange);outline-offset:1px}
+.selForroBtn .nm{font-weight:700;font-size:14.5px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.selForroBtn .pr{margin-left:auto;font-size:13px;font-weight:700;color:var(--orange-dk);white-space:nowrap}
+.selForroBtn .ph{color:var(--muted)}
+.selForroBtn .seta{color:var(--muted);font-size:12px;margin-left:4px}
+.selForroBtn .ph + .seta{margin-left:auto}
+.selForroLista{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:40;list-style:none;margin:0;padding:5px;
+               background:var(--surface);border:1px solid var(--line);border-radius:10px;max-height:380px;overflow:auto;
+               box-shadow:0 18px 40px -12px rgba(20,22,26,.35)}
+.selForroLista li{display:flex;align-items:center;gap:12px;padding:6px 8px;border-radius:7px;cursor:pointer}
+.selForroLista li.ativo{background:var(--surface-2)}
+.selForroLista li.sel{background:var(--orange-bg)}
+.selForroLista li .nm{font-size:14px;font-weight:600;min-width:0}
+.selForroLista li .pr{margin-left:auto;font-size:13px;font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums}
+.selForroLista li .pr small{font-weight:500;color:var(--muted)}
+.selForroLista li.sel .nm::after{content:" ✓";color:var(--orange-dk)}
+
+/* ============================================================ Início */
+.home{max-width:760px;margin:0 auto}
+.homeTopo{margin:4px 0 20px}
+.homeTopo .data{font-size:12.5px;font-weight:700;color:var(--orange-dk);letter-spacing:.2px}
+.homeTopo h1{font-size:26px;margin:2px 0 2px;letter-spacing:-.4px}
+.homeTopo p{margin:0;color:var(--muted);font-size:14.5px}
+.homeGrade{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.homeBtn{--cor:var(--orange);position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;
+         gap:6px;text-align:center;text-decoration:none;color:var(--ink);background:var(--surface);border:1px solid var(--line);
+         border-radius:18px;padding:22px 10px 18px;min-height:160px;box-shadow:var(--shadow);
+         transition:transform .12s ease,box-shadow .12s ease,border-color .12s ease;-webkit-tap-highlight-color:transparent}
+.homeBtn:hover{border-color:color-mix(in srgb,var(--cor) 45%,var(--line));transform:translateY(-2px);
+               box-shadow:0 2px 4px rgba(20,22,26,.06),0 14px 28px -14px color-mix(in srgb,var(--cor) 60%,transparent)}
+.homeBtn:active{transform:scale(.97)}
+.homeBtn:focus-visible{outline:3px solid var(--cor);outline-offset:2px}
+.homeBtn .ico{width:62px;height:62px;border-radius:18px;display:grid;place-items:center;color:var(--cor);
+              background:color-mix(in srgb,var(--cor) 13%,#fff);margin-bottom:4px}
+.homeBtn b{font-size:15px;line-height:1.2}
+.homeBtn small{font-size:12px;color:var(--muted);line-height:1.25;min-height:15px}
+.homeBtn.destaque{background:var(--cor);border-color:var(--cor);color:#fff}
+.homeBtn.destaque .ico{background:rgba(255,255,255,.2);color:#fff}
+.homeBtn.destaque small{color:rgba(255,255,255,.85)}
+.homeLink{display:flex;align-items:center;gap:10px;margin-top:16px;padding:14px 16px;background:var(--surface);
+          border:1px solid var(--line);border-radius:14px;text-decoration:none;color:var(--ink-2);font-weight:600;font-size:14px}
+.homeLink:hover{border-color:var(--ink)}
+.homeLink .seta{margin-left:auto;font-size:20px;color:var(--muted);line-height:1}
+@media (max-width:620px){
+  .home{padding:16px}
+  .homeTopo h1{font-size:22px}
+  .homeGrade{gap:10px}
+  .homeBtn{min-height:132px;padding:16px 6px 13px;border-radius:16px}
+  .homeBtn .ico{width:52px;height:52px;border-radius:15px}
+  .homeBtn .ico svg{width:26px;height:26px}
+  .homeBtn b{font-size:13.5px}
+  .homeBtn small{font-size:11px}
+}
+@media (max-width:360px){.homeGrade{grid-template-columns:repeat(2,minmax(0,1fr))}}

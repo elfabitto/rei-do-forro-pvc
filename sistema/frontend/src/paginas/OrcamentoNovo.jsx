@@ -12,10 +12,12 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api, num } from "../api";
 import {
-  BotaoAcao, Campo, DocumentoOrcamento, Estado, Selecao, linhas, useApi,
+  BotaoAcao, Campo, DocumentoOrcamento, Estado, linhas, useApi,
 } from "../componentes";
 import Icone from "../icones";
+import { imagemDe } from "../imagensCatalogo";
 import { decimal, digitos } from "../mascaras";
+import SeletorForro, { Miniatura } from "./SeletorForro";
 import {
   SERVICO, VERBA, baixarImagem, brl, copiarImagem, copiarTexto, ehServico, montarDocumento,
   unidadePlural,
@@ -328,14 +330,10 @@ export default function OrcamentoNovo() {
 
               <div className="step">
                 {passo(2, "Tipo de forro")}
-                <Selecao valor={forroId} aoMudar={alterou(setForroId)} vazio="Selecione o tipo de forro"
-                         opcoes={listaForros.map((f) => ({
-                           valor: f.id,
-                           rotulo: `${f.nome} — R$ ${brl(f.preco_material_vista)}/m²`,
-                         }))} />
+                <SeletorForro forros={listaForros} valor={forroId} aoMudar={alterou(setForroId)} />
                 {forro && (
                   <div className="ref">
-                    <div className="sw" style={{ background: forro.cor_amostra || "#e9ecef" }} />
+                    <Miniatura nome={forro.nome} cor={forro.cor_amostra} tamanho={64} className="grande" />
                     <div className="tx">Preço do m² — só o forro
                       <b>R$ {brl(forro.preco_material_vista)} à vista · R$ {brl(forro.preco_material_cartao)} cartão</b>
                     </div>
@@ -367,6 +365,7 @@ export default function OrcamentoNovo() {
                       <label key={a.id} className={`opt${String(acabamentoId) === String(a.id) ? " on" : ""}`}>
                         <input type="radio" name="acab" checked={String(acabamentoId) === String(a.id)}
                                onChange={() => alterou(setAcabamentoId)(String(a.id))} />
+                        <Miniatura nome={a.nome} tamanho={58} className="acab" />
                         <span className="t">{a.nome}</span>
                         <span className={`v${Number(a.acrescimo_m2) ? "" : " z"}`}>
                           {Number(a.acrescimo_m2) ? `+ R$ ${brl(a.acrescimo_m2)}/m²` : "Incluso"}
@@ -389,6 +388,7 @@ export default function OrcamentoNovo() {
                         {primeiroAvulso && <div className="matgrp">Avulsos</div>}
                         {grupoNovo && <div className="matgrp">{m.grupo}</div>}
                         <div className={`mat${q > 0 ? " on" : ""}`}>
+                          {imagemDe(m.nome) && <Miniatura nome={m.nome} tamanho={48} className="acab" />}
                           <div className="i">
                             <b>{m.nome}</b>
                             <small>
