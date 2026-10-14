@@ -127,8 +127,7 @@ class OrdemServicoApiTest(ApiBase):
         alheia = self.nova(vendedor=self.diretor)
         self.client.force_authenticate(self.vendedor)
 
-        painel = self.client.get("/api/painel/").data
-        self.assertNotIn("financeiro", painel)
+        self.assertEqual(self.client.get("/api/painel/").status_code, 403)
 
         lista = self.client.get("/api/ordens-servico/").data
         self.assertEqual(lista["count"], 1)
@@ -149,8 +148,20 @@ class OrdemServicoApiTest(ApiBase):
         self.nova()
         self.client.force_authenticate(self.diretor)
         painel = self.client.get("/api/painel/").data
-        self.assertIn("financeiro", painel)
-        self.assertIn("comissoes", painel)
+        self.assertEqual(painel["atual"]["vendas"], 1)
+        self.assertEqual(painel["atual"]["valor"], D("1000.00"))
+        self.assertEqual(painel["por_vendedor"][0]["nome"], "Marcos")
+        self.assertEqual(len(painel["semana"]["dias"]), 7)
+
+        # filtro por dia: ontem não teve venda
+        ontem = (timezone.localdate() - timedelta(days=1)).isoformat()
+        r = self.client.get("/api/painel/", {"de": ontem}).data
+        self.assertEqual((r["periodo"]["de"], r["periodo"]["dias"]), (timezone.localdate() - timedelta(days=1), 1))
+        self.assertEqual(r["atual"]["vendas"], 0)
+        self.assertEqual(r["anterior"]["vendas"], 0)
+
+        cal = self.client.get("/api/painel/calendario/", {"mes": "2026-02"}).data
+        self.assertEqual(cal["mes"], "2026-02")
 
     def test_vendedor_nao_finaliza_pela_api(self):
         os_ = self.nova()
@@ -392,10 +403,111 @@ class ComissoesApiTest(ApiBase):
         self.assertEqual(resumo["aberto"], D("0"))
         self.assertEqual(resumo["pago"], D("110.00"))
 
+    def test_diretor_paga_tudo_de_um_vendedor_de_uma_vez(self):
+        self.finalizada()
+        self.finalizada()
+        r = self.client.post("/api/comissoes/pagar/", {"vendedor": self.vendedor.id}, format="json")
+        self.assertEqual(r.status_code, 200, r.data)
+        self.assertEqual(r.data["pagas"], 2)
+        self.assertEqual(r.data["total"], D("220.00"))
+        resumo = self.client.get("/api/comissoes/").data["resumo"]
+        self.assertEqual((resumo["aberto"], resumo["pago"]), (D("0"), D("220.00")))
+
+        self.client.force_authenticate(self.vendedor)
+        r = self.client.post("/api/comissoes/pagar/", {"vendedor": self.vendedor.id}, format="json")
+        self.assertEqual(r.status_code, 403)
+
     def test_vendedor_nao_da_baixa(self):
         os_ = self.finalizada()
         self.client.force_authenticate(self.vendedor)
         r = self.client.post(f"/api/ordens-servico/{os_['id']}/pagar_comissao/", {}, format="json")
+        self.assertEqual(r.status_code, 403)
+
+    def test_ciclo_da_comissao(self):
+        """Orçamento não conta; O.S. aberta = agendada; finalizada = a receber; baixa = paga."""
+        self.client.force_authenticate(self.vendedor)
+        orc = self.client.post("/api/orcamentos/", {
+            "cliente": self.cliente.id, "tipo": "instalado", "area_m2": "30",
+            "forro": self.forro.id, "acabamento": self.sanca.id,
+        }, format="json").data
+        self.assertEqual(self.client.get("/api/comissoes/").data["resumo"]["servicos"], 0)
+
+        os_ = self.client.post("/api/ordens-servico/", {
+            "orcamento": orc["id"], "endereco": self.endereco.id, "modalidade": "vista",
+        }, format="json").data
+        r = self.client.get("/api/comissoes/").data
+        self.assertEqual(r["resumo"]["agendada"], D("60.00"))     # 30 m² × 2
+        self.assertEqual(r["itens"][0]["situacao"], "agendada")
+
+        self.client.force_authenticate(self.diretor)
+        self.client.post(f"/api/ordens-servico/{os_['id']}/finalizar/", {
+            "pagamentos": [{"forma": "pix", "valor": os_["valor_total"]}],
+        }, format="json")
+        self.client.force_authenticate(self.vendedor)
+        r = self.client.get("/api/comissoes/").data
+        self.assertEqual((r["resumo"]["agendada"], r["resumo"]["aberto"]), (D("0"), D("60.00")))
+
+        self.client.force_authenticate(self.diretor)
+        self.client.post(f"/api/ordens-servico/{os_['id']}/pagar_comissao/", {}, format="json")
+        r = self.client.get("/api/comissoes/", {"situacao": "paga"}).data
+        self.assertEqual(r["itens"][0]["situacao_display"], "Paga")
+
+    def test_os_cancelada_nao_gera_comissao(self):
+        self.client.force_authenticate(self.vendedor)
+        orc = self.client.post("/api/orcamentos/", {
+            "cliente": self.cliente.id, "tipo": "instalado", "area_m2": "30",
+            "forro": self.forro.id, "acabamento": self.sanca.id,
+        }, format="json").data
+        os_ = self.client.post("/api/ordens-servico/", {
+            "orcamento": orc["id"], "endereco": self.endereco.id,
+        }, format="json").data
+        self.client.force_authenticate(self.diretor)
+        OrdemServico.objects.get(pk=os_["id"]).mudar_status(StatusOS.CANCELADA, self.diretor, "Desistiu")
+        self.assertEqual(self.client.get("/api/comissoes/").data["resumo"]["servicos"], 0)
+
+    def test_comissao_de_material_e_item_a_item(self):
+        """Forro 25 m² (25) + 5 perfis (5) + 2,5 dúzias de ripão (12,50) + serviço 25 m² (50)."""
+        perfil = Material.objects.create(nome="Perfil", rotulo="Perfil 6 m", unidade="und",
+                                         preco=D("25"), comissao=D("1.00"))
+        ripao = Material.objects.create(nome="Cutiuba", rotulo="Ripão 4 m Cutiuba", unidade="dúzia",
+                                        preco=D("150"), comissao=D("5.00"))
+        prego = Material.objects.create(nome="Prego", rotulo="Prego 2 × 12", unidade="kg",
+                                        preco=D("30"))
+        self.client.force_authenticate(self.vendedor)
+        orc = self.client.post("/api/orcamentos/", {
+            "cliente": self.cliente.id, "tipo": "material", "area_m2": "25", "forro": self.forro.id,
+            "itens": [
+                {"material": perfil.id, "descricao": "Perfil 6 m", "unidade": "und",
+                 "quantidade": "5", "preco_unitario": "25"},
+                {"material": ripao.id, "descricao": "Ripão 4 m Cutiuba", "unidade": "dúzia",
+                 "quantidade": "2.5", "preco_unitario": "150"},
+                {"material": prego.id, "descricao": "Prego 2 × 12", "unidade": "kg",
+                 "quantidade": "2", "preco_unitario": "30"},
+                {"descricao": "Serviço", "unidade": "serviço", "quantidade": "1", "preco_unitario": "625"},
+            ],
+        }, format="json").data
+        self.client.post("/api/ordens-servico/", {
+            "orcamento": orc["id"], "endereco": self.endereco.id, "modalidade": "vista",
+        }, format="json")
+        item = self.client.get("/api/comissoes/").data["itens"][0]
+        self.assertEqual(item["valor"], D("92.50"))
+        self.assertEqual(len(item["detalhe"]), 4)          # prego não tem comissão
+
+        # mudar a tabela depois não mexe na comissão de quem já vendeu
+        perfil.comissao = D("9.00")
+        perfil.save()
+        self.assertEqual(self.client.get("/api/comissoes/").data["itens"][0]["valor"], D("92.50"))
+
+    def test_parametro_novo_vale_so_para_os_nova(self):
+        self.finalizada()                                  # 55 m² × R$ 2,00 = 110
+        r = self.client.put("/api/parametros-comissao/", {"instalado_m2": "3.00"}, format="json")
+        self.assertEqual(r.status_code, 200, r.data)
+        self.finalizada()                                  # 55 m² × R$ 3,00 = 165
+        valores = sorted(i["valor"] for i in self.client.get("/api/comissoes/").data["itens"])
+        self.assertEqual(valores, [D("110.00"), D("165.00")])
+
+        self.client.force_authenticate(self.vendedor)
+        r = self.client.put("/api/parametros-comissao/", {"instalado_m2": "9"}, format="json")
         self.assertEqual(r.status_code, 403)
 
     def test_vendedor_ve_so_as_proprias_comissoes(self):

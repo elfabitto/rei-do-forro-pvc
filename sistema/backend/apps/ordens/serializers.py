@@ -20,6 +20,7 @@ from .models import (
     Pagamento,
     StatusOS,
     TipoAgendamento,
+    ParametrosComissao,
     TaxasCartao,
     TipoServico,
     Turno,
@@ -109,6 +110,7 @@ class OrdemServicoListaSerializer(serializers.ModelSerializer):
     modalidade_display = serializers.CharField(source="get_modalidade_display", read_only=True, default="")
     area_m2 = serializers.DecimalField(max_digits=9, decimal_places=2, read_only=True)
     comissao_valor = serializers.DecimalField(max_digits=11, decimal_places=2, read_only=True)
+    comissao_detalhe = serializers.SerializerMethodField()
     pode_editar = serializers.SerializerMethodField()
 
     class Meta:
@@ -118,7 +120,7 @@ class OrdemServicoListaSerializer(serializers.ModelSerializer):
                   "valor_total", "valor_vista", "valor_cartao",
                   "modalidade", "modalidade_display", "desconto", "saldo",
                   "entrega", "instalacao", "criado_em", "atrasado", "dias_atraso",
-                  "area_m2", "comissao_valor", "comissao_paga", "pode_editar"]
+                  "area_m2", "comissao_valor", "comissao_detalhe", "comissao_paga", "pode_editar"]
 
     def get_entrega(self, obj):
         a = obj.agendamento_entrega
@@ -127,6 +129,9 @@ class OrdemServicoListaSerializer(serializers.ModelSerializer):
     def get_instalacao(self, obj):
         a = obj.agendamento_instalacao
         return AgendamentoSerializer(a).data if a else None
+
+    def get_comissao_detalhe(self, obj):
+        return [{"descricao": d, "valor": v} for d, _, v in obj.comissao_detalhe]
 
     def get_pode_editar(self, obj):
         pedido = self.context.get("request")
@@ -322,3 +327,10 @@ class TaxasCartaoSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(f"Taxa de {n}x deve ficar entre 0 e 100%.")
             limpo[str(n)] = str(taxa.quantize(Decimal("0.01")))
         return limpo
+
+
+class ParametrosComissaoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ParametrosComissao
+        fields = ["instalado_m2", "material_forro_m2", "material_servico_m2", "atualizado_em"]
+        read_only_fields = ["atualizado_em"]

@@ -50,6 +50,10 @@ class Material(models.Model):
     unidade_cotacao = models.CharField(max_length=12, blank=True)
     preco_cotacao = models.DecimalField(max_digits=9, decimal_places=2, null=True, blank=True)
 
+    # Comissão do vendedor na O.S. de Material, por unidade de lançamento
+    # (perfil R$ 1,00/und, ripão R$ 5,00/dúzia). Congelada no item do orçamento.
+    comissao = models.DecimalField("comissão por unidade", max_digits=7, decimal_places=2, default=0)
+
     ativo = models.BooleanField(default=True)
 
     class Meta:

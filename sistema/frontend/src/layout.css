@@ -206,3 +206,37 @@ nav a.on .ic{color:var(--orange)}
 .cardItem .refValores{font-size:11.5px;color:var(--muted);margin:-4px 0 11px;
                       font-variant-numeric:tabular-nums}
 .cardItem .rodape .saldoAberto{color:var(--critical);font-weight:700}
+
+/* comissões: cartões de resumo clicáveis (filtram a lista) e uma linha por venda */
+button.comCard{font:inherit;text-align:left;cursor:pointer;color:inherit}
+button.comCard:hover{border-color:#c9ced6}
+.comCard.agendada{border-top-color:var(--s-entrega)}
+.comCard.agendada b{color:#1b5496}
+.comCard.sel{box-shadow:0 0 0 2px var(--ink) inset}
+.comLista{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px}
+.comItem{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--orange);
+         border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:4px}
+.comItem.s-agendada{border-left-color:var(--s-entrega)}
+.comItem.s-paga{border-left-color:var(--good)}
+.comItem .topo{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.comItem .cli{font-size:14.5px}
+.comItem .rodape{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-top:4px}
+.comItem .quando{font-size:12px;color:var(--muted)}
+.comItem .valor{font-size:18px;font-variant-numeric:tabular-nums}
+.comItem.s-a_receber .valor{color:var(--orange-dk)}
+.comItem.s-paga .valor{color:var(--good)}
+.comItem .acoes{margin-top:6px}
+.comItem .acoes .btn{width:100%}
+@media (max-width:620px){ .comLista{grid-template-columns:1fr} }
+.filtroPessoa{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 16px;padding:10px 12px;
+              background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--ink);border-radius:8px}
+.filtroPessoa span{font-size:13.5px;color:var(--ink-2)}
+
+.btn.mini-baixa{padding:6px 11px;font-size:12.5px;white-space:nowrap}
+
+/* de onde vem a comissão — linha a linha */
+.comDetalhe{list-style:none;margin:6px 0 0;padding:8px 10px;background:var(--surface-2);border-radius:6px;
+            display:grid;gap:3px}
+.comDetalhe li,.comLinha{display:flex;justify-content:space-between;gap:10px;font-size:12px;color:var(--ink-2)}
+.comDetalhe b,.comLinha b{font-variant-numeric:tabular-nums;white-space:nowrap}
+.comLinha + .comLinha{margin-top:2px}

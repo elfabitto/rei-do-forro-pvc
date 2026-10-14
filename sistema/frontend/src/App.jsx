@@ -13,19 +13,21 @@ import Orcamentos from "./paginas/Orcamentos";
 import OrdemNova from "./paginas/OrdemNova";
 import OrdensServico from "./paginas/OrdensServico";
 import Painel from "./paginas/Painel";
+import Parametros from "./paginas/Parametros";
 
 /* `so` restringe o item a uma permissão calculada pelo backend. */
 const MENU = [
   { grupo: "Operação" },
-  { to: "/", rotulo: "Painel", icone: "painel", fim: true },
+  { to: "/", rotulo: "Painel", icone: "painel", fim: true, so: "verPainel" },
   { to: "/orcamentos", rotulo: "Orçamentos", icone: "orcamento" },
   { to: "/ordens", rotulo: "Ordens de Serviço", icone: "ordem" },
   { to: "/agenda", rotulo: "Agenda", icone: "agenda" },
-  { grupo: "Diretoria" },
-  { to: "/comissoes", rotulo: "Comissões", icone: "comissao", so: "verFinanceiro" },
+  // cada um vê as próprias; a diretoria vê todas e dá a baixa
+  { to: "/comissoes", rotulo: "Comissões", icone: "comissao" },
   { grupo: "Cadastros" },
   { to: "/clientes", rotulo: "Clientes", icone: "clientes" },
   { to: "/catalogo", rotulo: "Tabela de preços", icone: "precos" },
+  { to: "/parametros", rotulo: "Parâmetros", icone: "ajustes", so: "verFinanceiro" },
 ];
 
 /** Abaixo disto o menu vira gaveta sobreposta e começa recolhido. */
@@ -119,17 +121,19 @@ export default function App() {
         </header>
 
         <Routes>
-          <Route path="/" element={<Painel />} />
+          {/* o painel é da diretoria; os demais entram direto nos orçamentos */}
+          <Route path="/" element={pode("verPainel") ? <Painel /> : <Navigate to="/orcamentos" replace />} />
           <Route path="/orcamentos" element={<Orcamentos />} />
           <Route path="/orcamentos/novo" element={<OrcamentoNovo />} />
           <Route path="/orcamentos/:id/editar" element={<OrcamentoNovo />} />
           <Route path="/ordens" element={<OrdensServico />} />
           <Route path="/ordens/nova" element={<OrdemNova />} />
           <Route path="/agenda" element={<Agenda />} />
+          <Route path="/parametros" element={<Parametros />} />
           <Route path="/comissoes" element={<Comissoes />} />
           <Route path="/clientes" element={<Clientes />} />
           <Route path="/catalogo" element={<Catalogo />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="*" element={<Navigate to={pode("verPainel") ? "/" : "/orcamentos"} replace />} />
         </Routes>
       </main>
     </div>

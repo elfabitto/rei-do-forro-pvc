@@ -248,3 +248,7 @@ label.f > span{display:block;font-size:11.5px;font-weight:700;letter-spacing:.9p
 .voltar{display:inline-flex;align-items:center;gap:6px;border:0;background:none;padding:4px 0;
         margin:0 0 8px;font:inherit;font-size:13px;font-weight:700;color:var(--ink-2);cursor:pointer}
 .voltar:hover{color:var(--orange-dk)}
+
+/* separador de grupo dentro de uma tabela (Parâmetros) */
+tr.grupoLinha td{background:var(--surface-2);font-size:11px;font-weight:800;letter-spacing:.8px;
+                 text-transform:uppercase;color:var(--muted);padding-top:9px;padding-bottom:9px}

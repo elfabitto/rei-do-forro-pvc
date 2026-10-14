@@ -13,9 +13,11 @@ from apps.ordens.views import (
     PagamentoViewSet,
     agenda_disponibilidade,
     taxas_cartao,
+    parametros_comissao,
     comissoes,
-    painel,
+    pagar_comissoes_vendedor,
 )
+from apps.ordens.painel import painel, painel_calendario
 
 router = DefaultRouter()
 router.register("usuarios", UsuarioViewSet)
@@ -34,9 +36,12 @@ urlpatterns = [
     path("api/", include(router.urls)),
     path("api/eu/", eu, name="eu"),
     path("api/painel/", painel, name="painel"),
+    path("api/painel/calendario/", painel_calendario, name="painel-calendario"),
     path("api/comissoes/", comissoes, name="comissoes"),
+    path("api/comissoes/pagar/", pagar_comissoes_vendedor, name="comissoes-pagar"),
     path("api/agenda/disponibilidade/", agenda_disponibilidade, name="agenda-disponibilidade"),
     path("api/taxas-cartao/", taxas_cartao, name="taxas-cartao"),
+    path("api/parametros-comissao/", parametros_comissao, name="parametros-comissao"),
     path("api/token/", TokenObtainPairView.as_view(), name="token"),
     path("api/token/refresh/", TokenRefreshView.as_view(), name="token-refresh"),
 ]

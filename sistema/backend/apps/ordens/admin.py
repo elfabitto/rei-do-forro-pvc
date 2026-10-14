@@ -4,6 +4,7 @@ from .models import (
     Agendamento,
     Bloqueio,
     ConfiguracaoAgenda,
+    ParametrosComissao,
     TaxasCartao,
     HistoricoOS,
     OrdemServico,
@@ -91,6 +92,17 @@ class TaxasCartaoAdmin(admin.ModelAdmin):
 
     def has_add_permission(self, request):
         return not TaxasCartao.objects.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(ParametrosComissao)
+class ParametrosComissaoAdmin(admin.ModelAdmin):
+    list_display = ["__str__", "instalado_m2", "material_forro_m2", "material_servico_m2"]
+
+    def has_add_permission(self, request):
+        return not ParametrosComissao.objects.exists()
 
     def has_delete_permission(self, request, obj=None):
         return False

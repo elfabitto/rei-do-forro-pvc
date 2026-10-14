@@ -8,9 +8,26 @@ from django.utils import timezone
 
 CENTAVO = Decimal("0.01")
 
-# Comissão de quem trouxe o cliente: R$ 2,00 por m² orçado.
-# Ex.: 55 m² × 2 = R$ 110,00.
+# Comissão de quem trouxe o cliente — valores iniciais; a diretoria edita em
+# Parâmetros (ParametrosComissao) e cada O.S. guarda os que valiam ao nascer.
+# Instalação completa: R$ 2,00 por m² orçado (55 m² × 2 = R$ 110,00).
+# Material: item a item — forro R$ 1,00/m², cada material pela comissão do
+# catálogo (perfil R$ 1,00/und, ripão R$ 5,00/dúzia) e o serviço de
+# instalação, quando incluído, R$ 2,00/m².
 COMISSAO_POR_M2 = Decimal("2.00")
+COMISSAO_MATERIAL_FORRO_M2 = Decimal("1.00")
+COMISSAO_MATERIAL_SERVICO_M2 = Decimal("2.00")
+UNIDADE_SERVICO = "serviço"   # item "Serviço" do orçamento de Material
+
+
+def _qtd(n):
+    """34.00 → "34"; 2.50 → "2,5" — quantidade como se lê."""
+    return f"{Decimal(n).normalize():f}".replace(".", ",")
+
+
+def _brl(n):
+    """1.5 → "R$ 1,50"."""
+    return "R$ " + f"{Decimal(n):.2f}".replace(".", ",")
 
 
 class StatusOS(models.TextChoices):
@@ -128,6 +145,11 @@ class OrdemServico(models.Model):
     # finalizado e só sai da lista quando a diretoria marca como paga.
     comissao_paga = models.BooleanField(default=False)
     comissao_paga_em = models.DateTimeField(null=True, blank=True)
+    # valores de comissão por m² que valiam quando a O.S. foi gerada
+    comissao_instalado_m2 = models.DecimalField(max_digits=7, decimal_places=2, default=COMISSAO_POR_M2)
+    comissao_forro_m2 = models.DecimalField(max_digits=7, decimal_places=2, default=COMISSAO_MATERIAL_FORRO_M2)
+    comissao_servico_m2 = models.DecimalField(max_digits=7, decimal_places=2,
+                                              default=COMISSAO_MATERIAL_SERVICO_M2)
     comissao_paga_por = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="comissoes_pagas", null=True, blank=True
     )
@@ -165,6 +187,11 @@ class OrdemServico(models.Model):
     def save(self, *args, **kwargs):
         if not self.numero:
             self.numero = self._proximo_numero(self.tipo)
+        if not self.pk:
+            p = ParametrosComissao.obter()
+            self.comissao_instalado_m2 = p.instalado_m2
+            self.comissao_forro_m2 = p.material_forro_m2
+            self.comissao_servico_m2 = p.material_servico_m2
         return super().save(*args, **kwargs)
 
     # --------------------------------------------------------------- comissão
@@ -174,11 +201,36 @@ class OrdemServico(models.Model):
         return self.orcamento.area_m2 if self.orcamento_id else None
 
     @property
-    def comissao_valor(self):
+    def comissao_detalhe(self):
+        """
+        De onde vem a comissão, linha a linha: [(descrição, base, valor)].
+        Instalação completa é uma linha só (área × R$ 2,00); Material soma item a item.
+        """
         area = self.area_m2
-        if not area or self.status == StatusOS.CANCELADA:
+        if not area:
+            return []
+        if self.tipo != TipoServico.MATERIAL:
+            m2 = self.comissao_instalado_m2
+            return [(f"Instalação {_qtd(area)} m² × {_brl(m2)}", area, (area * m2).quantize(CENTAVO))]
+
+        forro = self.comissao_forro_m2
+        linhas = [(f"Forro {_qtd(area)} m² × {_brl(forro)}", area, (area * forro).quantize(CENTAVO))]
+        for item in self.orcamento.itens.all():
+            if item.material_id and item.comissao_unitaria:
+                valor = (item.quantidade * item.comissao_unitaria).quantize(CENTAVO)
+                linhas.append((f"{item.descricao} {_qtd(item.quantidade)} {item.unidade} "
+                               f"× {_brl(item.comissao_unitaria)}", item.quantidade, valor))
+            elif not item.material_id and item.unidade == UNIDADE_SERVICO:
+                servico = self.comissao_servico_m2
+                linhas.append((f"Instalação {_qtd(area)} m² × {_brl(servico)}", area,
+                               (area * servico).quantize(CENTAVO)))
+        return linhas
+
+    @property
+    def comissao_valor(self):
+        if self.status == StatusOS.CANCELADA:
             return Decimal("0.00")
-        return (area * COMISSAO_POR_M2).quantize(CENTAVO)
+        return sum((v for _, _, v in self.comissao_detalhe), Decimal("0.00")).quantize(CENTAVO)
 
     @property
     def comissao_em_aberto(self):
@@ -519,3 +571,31 @@ class TaxasCartao(models.Model):
         if t <= 0 or t >= 1:
             return Decimal("0.00")
         return (base / (1 - t) - base).quantize(CENTAVO)
+
+
+class ParametrosComissao(models.Model):
+    """
+    Valores de comissão por m², editados pela diretoria em Parâmetros.
+    A comissão de cada material fica no próprio material (Material.comissao).
+    Mudar aqui só vale para O.S. geradas depois. Registro único.
+    """
+
+    instalado_m2 = models.DecimalField("instalação completa (R$/m²)", max_digits=7, decimal_places=2,
+                                       default=COMISSAO_POR_M2)
+    material_forro_m2 = models.DecimalField("material — forro (R$/m²)", max_digits=7, decimal_places=2,
+                                            default=COMISSAO_MATERIAL_FORRO_M2)
+    material_servico_m2 = models.DecimalField("material — serviço de instalação (R$/m²)", max_digits=7,
+                                              decimal_places=2, default=COMISSAO_MATERIAL_SERVICO_M2)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "parâmetros de comissão"
+        verbose_name_plural = "parâmetros de comissão"
+
+    def __str__(self):
+        return "Parâmetros de comissão"
+
+    @classmethod
+    def obter(cls):
+        p, _ = cls.objects.get_or_create(pk=1)
+        return p

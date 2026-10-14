@@ -28,6 +28,7 @@ class EuSerializer(UsuarioSerializer):
         return {
             "verFinanceiro": obj.pode_ver_financeiro,
             "finalizarOS": obj.pode_finalizar_os,
+            "verPainel": obj.e_diretor,
             "cancelarOS": obj.e_diretor,
             "trocarVendedor": obj.pode_trocar_vendedor,
             "verTudo": obj.pode_ver_tudo,

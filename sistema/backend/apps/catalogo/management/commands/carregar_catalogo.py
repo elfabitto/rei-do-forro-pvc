@@ -29,15 +29,16 @@ FORROS = [
 
 # O ripão é cotado e lançado por dúzia, igual ao gerador do Pages:
 # meia dúzia é 0,5 e sai por R$ 75,00 no Cutiuba.
+# comissão = R$ por unidade de lançamento, para quem trouxe o cliente
 MATERIAIS = [
-    # nome,          rótulo,                grupo,        unidade,  preço,       cotação
-    ("Perfil 6 m",   "Perfil 6 m",          "",           "und",   D("25.00"),  None),
-    ("Moldura 6 m",  "Moldura 6 m",         "",           "und",   D("40.00"),  None),
-    ("Sanca 6 m",    "Sanca 6 m",           "",           "und",   D("50.00"),  None),
-    ("Cutiuba",      "Ripão 4 m Cutiuba",   "Ripão 4 m",  "dúzia", D("150.00"), None),
-    ("Cupiuba",      "Ripão 4 m Cupiuba",   "Ripão 4 m",  "dúzia", D("180.00"), None),
-    ("Prego 2 × 12", "Prego 2 × 12",        "Pregos",     "kg",    D("30.00"),  None),
-    ("Prego 1 × 16", "Prego 1 × 16",        "Pregos",     "kg",    D("40.00"),  None),
+    # nome,          rótulo,                grupo,        unidade,  preço,       cotação, comissão
+    ("Perfil 6 m",   "Perfil 6 m",          "",           "und",   D("25.00"),  None,    D("1.00")),
+    ("Moldura 6 m",  "Moldura 6 m",         "",           "und",   D("40.00"),  None,    D("1.00")),
+    ("Sanca 6 m",    "Sanca 6 m",           "",           "und",   D("50.00"),  None,    D("1.00")),
+    ("Cutiuba",      "Ripão 4 m Cutiuba",   "Ripão 4 m",  "dúzia", D("150.00"), None,    D("5.00")),
+    ("Cupiuba",      "Ripão 4 m Cupiuba",   "Ripão 4 m",  "dúzia", D("180.00"), None,    D("5.00")),
+    ("Prego 2 × 12", "Prego 2 × 12",        "Pregos",     "kg",    D("30.00"),  None,    D("0")),
+    ("Prego 1 × 16", "Prego 1 × 16",        "Pregos",     "kg",    D("40.00"),  None,    D("0")),
 ]
 
 ACABAMENTOS = [
@@ -65,7 +66,7 @@ class Command(BaseCommand):
             )
         self.stdout.write(self.style.SUCCESS(f"{len(FORROS)} forros"))
 
-        for i, (nome, rotulo, grupo, unid, preco, cot) in enumerate(MATERIAIS):
+        for i, (nome, rotulo, grupo, unid, preco, cot, comissao) in enumerate(MATERIAIS):
             Material.objects.update_or_create(
                 rotulo=rotulo,
                 defaults={
@@ -76,6 +77,7 @@ class Command(BaseCommand):
                     "preco": preco,
                     "unidade_cotacao": cot[0] if cot else "",
                     "preco_cotacao": cot[1] if cot else None,
+                    "comissao": comissao,
                     "ativo": True,
                 },
             )

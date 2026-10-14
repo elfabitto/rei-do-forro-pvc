@@ -20,6 +20,7 @@ from .models import (
     FORMAS_CARTAO,
     FORMAS_VISTA,
     Modalidade,
+    ParametrosComissao,
     TaxasCartao,
     Agendamento,
     OrdemServico,
@@ -37,6 +38,7 @@ from .serializers import (
     OrdemServicoSerializer,
     PagamentoSerializer,
     ReagendarSerializer,
+    ParametrosComissaoSerializer,
     TaxasCartaoSerializer,
 )
 
@@ -313,22 +315,41 @@ def taxas_cartao(request):
     return Response(TaxasCartaoSerializer(taxas).data)
 
 
+@api_view(["GET", "PUT"])
+@permission_classes([IsAuthenticated])
+def parametros_comissao(request):
+    """Comissão por m²: todos leem; só a diretoria altera (vale para O.S. novas)."""
+    p = ParametrosComissao.obter()
+    if request.method == "PUT":
+        if not request.user.e_diretor:
+            return Response({"detail": "Apenas a diretoria altera os parâmetros."}, status=http.HTTP_403_FORBIDDEN)
+        dados = ParametrosComissaoSerializer(p, data=request.data, partial=True)
+        dados.is_valid(raise_exception=True)
+        dados.save()
+    return Response(ParametrosComissaoSerializer(p).data)
+
+
 # ----------------------------------------------------------------- comissões
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def comissoes(request):
     """
-    Comissões dos serviços finalizados: R$ 2,00 por m² para quem trouxe o
-    cliente. "Em aberto" é o que a diretoria ainda deve repassar — a baixa é
-    feita em /ordens-servico/<id>/pagar_comissao/.
+    Comissões: R$ 2,00 por m² para quem trouxe o cliente. O ciclo segue a O.S.:
 
-    Quem não vê o financeiro enxerga só as próprias comissões.
+    - orçamento sem O.S.: ainda não há comissão;
+    - O.S. agendada ou em execução: comissão **agendada** (vai receber);
+    - O.S. finalizada: **a receber** — entra para a diretoria pagar;
+    - baixa da diretoria (/ordens-servico/<id>/pagar_comissao/): **paga**.
+
+    O.S. cancelada não gera comissão. Quem não vê o financeiro (vendedor)
+    enxerga só as próprias.
     """
     user = request.user
     qs = (
-        OrdemServico.objects.filter(status=StatusOS.FINALIZADA)
+        OrdemServico.objects.exclude(status=StatusOS.CANCELADA)
         .select_related("cliente", "vendedor", "orcamento")
-        .order_by("-finalizada_em")
+        .prefetch_related("agendamentos", "orcamento__itens")
+        .order_by("-criado_em")
     )
     if not user.pode_ver_financeiro:
         qs = qs.filter(vendedor=user)
@@ -336,121 +357,96 @@ def comissoes(request):
     if (vendedor := request.query_params.get("vendedor")):
         qs = qs.filter(vendedor_id=vendedor)
     if (de := request.query_params.get("de")):
-        qs = qs.filter(finalizada_em__date__gte=de)
+        qs = qs.filter(criado_em__date__gte=de)
     if (ate := request.query_params.get("ate")):
-        qs = qs.filter(finalizada_em__date__lte=ate)
+        qs = qs.filter(criado_em__date__lte=ate)
 
+    ROTULOS = {"agendada": "Agendada", "a_receber": "A receber", "paga": "Paga"}
+    zero = Decimal("0")
+    resumo = {k: zero for k in ROTULOS}
+    contagem = {k: 0 for k in ROTULOS}
     itens, por_vendedor = [], {}
-    aberto = pago = Decimal("0")
 
     for os_ in qs:
         valor = os_.comissao_valor
+        if os_.status != StatusOS.FINALIZADA:
+            situacao = "agendada"
+        elif os_.comissao_paga:
+            situacao = "paga"
+        else:
+            situacao = "a_receber"
+
+        # quando o serviço acontece: o primeiro compromisso agendado
+        datas = sorted(a.data for a in os_.agendamentos.all())
         itens.append({
             "id": os_.id,
             "numero": os_.numero,
             "tipo_display": os_.get_tipo_display(),
+            "status_os": os_.status,
+            "status_os_display": os_.get_status_display(),
             "cliente": os_.cliente.nome,
             "area_m2": os_.area_m2,
             "valor": valor,
+            "detalhe": [{"descricao": d, "valor": v} for d, _, v in os_.comissao_detalhe],
             "vendedor": os_.vendedor_id,
             "vendedor_nome": os_.vendedor.get_full_name() or os_.vendedor.username,
+            "agendado_para": datas[0] if datas else None,
             "finalizada_em": os_.finalizada_em,
+            "situacao": situacao,
+            "situacao_display": ROTULOS[situacao],
             "paga": os_.comissao_paga,
             "paga_em": os_.comissao_paga_em,
         })
+        resumo[situacao] += valor
+        contagem[situacao] += 1
+
         linha = por_vendedor.setdefault(
             os_.vendedor_id,
             {"vendedor": os_.vendedor_id,
              "nome": os_.vendedor.get_full_name() or os_.vendedor.username,
-             "ordens": 0, "aberto": Decimal("0"), "pago": Decimal("0")},
+             "ordens": 0, "agendada": zero, "aberto": zero, "pago": zero},
         )
         linha["ordens"] += 1
-        if os_.comissao_paga:
-            linha["pago"] += valor
-            pago += valor
-        else:
-            linha["aberto"] += valor
-            aberto += valor
+        chave = {"agendada": "agendada", "a_receber": "aberto", "paga": "pago"}[situacao]
+        linha[chave] += valor
 
-    situacao = request.query_params.get("situacao")
-    if situacao == "aberto":
-        itens = [i for i in itens if not i["paga"]]
-    elif situacao == "pago":
-        itens = [i for i in itens if i["paga"]]
+    # "aberto" e "pago" continuam aceitos (nomes antigos do filtro)
+    filtro = {"aberto": "a_receber", "pago": "paga"}.get(
+        request.query_params.get("situacao", ""), request.query_params.get("situacao", ""))
+    if filtro in ROTULOS:
+        itens = [i for i in itens if i["situacao"] == filtro]
 
     return Response({
-        "por_m2": COMISSAO_POR_M2,
-        "resumo": {"aberto": aberto, "pago": pago, "total": aberto + pago, "servicos": qs.count()},
-        "por_vendedor": sorted(por_vendedor.values(), key=lambda v: -v["aberto"]),
+        "por_m2": ParametrosComissao.obter().instalado_m2,
+        "resumo": {
+            "agendada": resumo["agendada"],
+            "aberto": resumo["a_receber"],
+            "pago": resumo["paga"],
+            "total": sum(resumo.values(), zero),
+            "contagem": {"agendada": contagem["agendada"], "aberto": contagem["a_receber"],
+                         "pago": contagem["paga"]},
+            "servicos": sum(contagem.values()),
+        },
+        "por_vendedor": sorted(por_vendedor.values(), key=lambda v: -(v["aberto"] + v["agendada"])),
         "itens": itens,
     })
 
 
-# --------------------------------------------------------------------- painel
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
-def painel(request):
-    """Números do dashboard. O bloco financeiro só vai para quem pode vê-lo."""
-    user = request.user
-    hoje = timezone.localdate()
-    inicio_mes = hoje.replace(day=1)
-
-    orcs = Orcamento.objects.all()
-    oss = OrdemServico.objects.all()
-    if not user.pode_ver_tudo:
-        orcs = orcs.filter(vendedor=user)
-        oss = oss.filter(Q(vendedor=user) | Q(criado_por=user))
-
-    no_mes = orcs.filter(criado_em__date__gte=inicio_mes)
-    convertidos = no_mes.filter(status=StatusOrcamento.CONVERTIDO).count()
-    total_mes = no_mes.count()
-
-    # série das últimas 6 semanas para o gráfico de conversão
-    semanas = []
-    for k in range(5, -1, -1):
-        fim = hoje - timedelta(days=7 * k)
-        ini = fim - timedelta(days=6)
-        faixa = orcs.filter(criado_em__date__range=(ini, fim))
-        semanas.append({
-            "inicio": str(ini),
-            "fim": str(fim),
-            "total": faixa.count(),
-            "convertidos": faixa.filter(status=StatusOrcamento.CONVERTIDO).count(),
-        })
-
-    dados = {
-        "orcamentos_mes": total_mes,
-        "convertidos_mes": convertidos,
-        "taxa_conversao": round(convertidos / total_mes * 100) if total_mes else 0,
-        "os_geradas": oss.filter(status=StatusOS.GERADA).count(),
-        "os_em_execucao": oss.filter(status=StatusOS.EM_EXECUCAO).count(),
-        "semanas": semanas,
-    }
-
-    if user.pode_ver_financeiro:
-        ativas = OrdemServico.objects.exclude(status=StatusOS.CANCELADA)
-        total = ativas.aggregate(v=Coalesce(Sum("valor_total"), 0,
-                                            output_field=DecimalField(max_digits=12, decimal_places=2)))["v"]
-        pago = Pagamento.objects.filter(ordem__in=ativas).aggregate(v=ZERO)["v"]
-        dados["financeiro"] = {
-            "a_receber": total - pago,
-            "recebido": pago,
-            "faturado_mes": Pagamento.objects.filter(data__gte=inicio_mes).aggregate(v=ZERO)["v"],
-        }
-        # Comissão é R$ 2,00 por m² finalizado, não um percentual do serviço:
-        # o painel mostra o que ainda está em aberto para a diretoria repassar.
-        porvendedor = {}
-        for os_ in (OrdemServico.objects.filter(status=StatusOS.FINALIZADA)
-                    .select_related("vendedor", "orcamento")):
-            linha = porvendedor.setdefault(
-                os_.vendedor_id,
-                {"usuario": os_.vendedor.get_full_name() or os_.vendedor.username,
-                 "ordens": 0, "valor": Decimal("0"), "aberto": Decimal("0")},
-            )
-            linha["ordens"] += 1
-            linha["valor"] += os_.comissao_valor
-            if not os_.comissao_paga:
-                linha["aberto"] += os_.comissao_valor
-        dados["comissoes"] = sorted(porvendedor.values(), key=lambda r: -r["aberto"])
-
-    return Response(dados)
+@api_view(["POST"])
+@permission_classes([SomenteDiretor])
+def pagar_comissoes_vendedor(request):
+    """
+    Baixa de uma vez em tudo o que está a pagar para um vendedor — o que a
+    diretoria faz quando acerta com a pessoa. Só entram serviços finalizados.
+    """
+    vendedor = request.data.get("vendedor")
+    if not vendedor:
+        raise ValidationError({"vendedor": "Informe de quem são as comissões."})
+    pendentes = OrdemServico.objects.filter(
+        vendedor_id=vendedor, status=StatusOS.FINALIZADA, comissao_paga=False,
+    )
+    total = sum((o.comissao_valor for o in pendentes), Decimal("0"))
+    quantidade = pendentes.update(
+        comissao_paga=True, comissao_paga_em=timezone.now(), comissao_paga_por=request.user,
+    )
+    return Response({"pagas": quantidade, "total": total})

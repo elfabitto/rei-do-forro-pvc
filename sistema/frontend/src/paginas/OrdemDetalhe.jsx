@@ -238,7 +238,13 @@ export default function OrdemDetalhe({ id, aoFechar, aoMudar }) {
                   </dd>
                   <dt>Base de cálculo</dt>
                   <dd className="wk">
-                    {os.area_m2 ? `${num(os.area_m2)} m² × R$ 2,00` : "sem orçamento vinculado"}
+                    {os.comissao_detalhe?.length
+                      ? os.comissao_detalhe.map((l) => (
+                          <div className="comLinha" key={l.descricao}>
+                            <span>{l.descricao}</span><b>{brl(l.valor)}</b>
+                          </div>
+                        ))
+                      : "sem orçamento vinculado"}
                   </dd>
                   <dt>Comissão</dt>
                   <dd><b>{brl(os.comissao_valor)}</b></dd>

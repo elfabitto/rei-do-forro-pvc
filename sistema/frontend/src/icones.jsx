@@ -26,6 +26,8 @@ const FORMAS = {
                <path d="M16 11.2a3 3 0 0 0 0-6" /><path d="M18 20c0-2.6-1-4.4-2.5-5.2" /></>,
   precos: <><path d="M20.6 12.6 12.4 20.8a2 2 0 0 1-2.8 0l-6.4-6.4a2 2 0 0 1-.6-1.4V5a2 2 0 0 1 2-2h8a2 2 0 0 1 1.4.6l6.6 6.6a2 2 0 0 1 0 2.4z" />
              <circle cx="7.5" cy="7.5" r="1.3" /></>,
+  ajustes: <><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0" />
+    <circle cx="16" cy="6" r="2" /><circle cx="10" cy="12" r="2" /><circle cx="18" cy="18" r="2" /></>,
   menu: <><path d="M4 6h16M4 12h16M4 18h16" /></>,
   fechar: <><path d="M6 6l12 12M18 6L6 18" /></>,
   mais: <><path d="M12 5v14M5 12h14" /></>,

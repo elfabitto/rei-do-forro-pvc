@@ -158,6 +158,8 @@ class OrcamentoItem(models.Model):
     quantidade = models.DecimalField(max_digits=9, decimal_places=2)
     preco_unitario = models.DecimalField(max_digits=9, decimal_places=4)
     total = models.DecimalField(max_digits=11, decimal_places=2, default=0)
+    # comissão por unidade, copiada do material quando o item é gravado
+    comissao_unitaria = models.DecimalField(max_digits=7, decimal_places=2, default=0)
 
     class Meta:
         ordering = ["id"]
@@ -172,5 +174,7 @@ class OrcamentoItem(models.Model):
             self.descricao = self.material.rotulo
             self.unidade = self.material.unidade
             self.preco_unitario = self.material.preco
+        if self.material and not self.pk:
+            self.comissao_unitaria = self.material.comissao
         self.total = (self.quantidade * self.preco_unitario).quantize(CENTAVO)
         return super().save(*args, **kwargs)
