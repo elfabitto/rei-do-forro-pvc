@@ -366,8 +366,8 @@ class GerarOSDoOrcamentoTest(ApiBase):
         self.assertTrue(r.data["numero"].startswith("OS-SERV-"), r.data["numero"])
 
 
-class ComissoesApiTest(ApiBase):
-    """A aba Comissões: finalizados, em aberto a pagar, baixa pela diretoria."""
+class OSFinalizadaMixin:
+    """Cria uma O.S. de instalação (55 m²) e finaliza no PIX."""
 
     def finalizada(self):
         self.client.force_authenticate(self.vendedor)
@@ -384,6 +384,10 @@ class ComissoesApiTest(ApiBase):
             "pagamentos": [{"forma": "pix", "valor": os_["valor_total"]}],
         }, format="json")
         return os_
+
+
+class ComissoesApiTest(OSFinalizadaMixin, ApiBase):
+    """A aba Comissões: finalizados, em aberto a pagar, baixa pela diretoria."""
 
     def test_lista_traz_a_comissao_em_aberto(self):
         self.finalizada()

@@ -59,3 +59,10 @@ class PodeVender(BasePermission):
         if not (request.user and request.user.is_authenticated):
             return False
         return request.method in SAFE_METHODS or request.user.pode_vender
+
+
+class PodeVerFinanceiro(BasePermission):
+    message = "O financeiro é restrito à diretoria."
+
+    def has_permission(self, request, view):
+        return bool(request.user and request.user.is_authenticated and request.user.pode_ver_financeiro)

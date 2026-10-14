@@ -340,6 +340,9 @@ class OrdemServico(models.Model):
         HistoricoOS.objects.create(
             ordem=self, de_status=anterior, para_status=novo, usuario=usuario, observacao=observacao
         )
+        if novo == StatusOS.FINALIZADA:
+            from .eventos import os_finalizada   # caixa e aviso ao vendedor
+            os_finalizada(self, usuario)
         return self
 
 

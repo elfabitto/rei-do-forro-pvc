@@ -1,0 +1,139 @@
+/* ======================================== sino de notificações (topo) */
+.sino{position:relative;flex:0 0 auto}
+.sinoBtn{position:relative;width:38px;height:38px;border-radius:50%;border:1px solid var(--line);background:var(--surface);
+         display:grid;place-items:center;color:var(--ink-2);cursor:pointer}
+.sinoBtn:hover{border-color:var(--ink);color:var(--ink)}
+.sinoBtn.tem{color:var(--orange-dk);border-color:#f6c9a8;background:var(--orange-bg)}
+.sinoBtn .cont{position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;padding:0 5px;border-radius:999px;
+               background:var(--critical);color:#fff;font-size:10.5px;font-weight:800;display:grid;place-items:center;
+               border:2px solid var(--surface)}
+.sinoCaixa{position:absolute;right:0;top:46px;width:360px;max-width:calc(100vw - 24px);background:var(--surface);
+           border:1px solid var(--line);border-radius:10px;box-shadow:0 18px 40px -12px rgba(20,22,26,.35);z-index:60;
+           overflow:hidden}
+.sinoCaixa header{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line-2)}
+.sinoCaixa header b{font-size:14px}
+.sinoCaixa .link{margin-left:auto;border:0;background:none;color:var(--orange-dk);font-weight:700;font-size:12.5px;cursor:pointer;padding:0}
+.sinoCaixa ul{list-style:none;margin:0;padding:4px;max-height:420px;overflow:auto}
+.sinoCaixa li button{display:flex;gap:10px;width:100%;text-align:left;border:0;background:none;padding:10px;border-radius:7px;
+                     cursor:pointer;font:inherit;color:var(--ink-2)}
+.sinoCaixa li button:hover{background:var(--surface-2)}
+.sinoCaixa li button.nova{background:#fff8f2}
+.sinoCaixa li button.nova b::after{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;
+                                    background:var(--orange);margin-left:6px;vertical-align:2px}
+.sinoCaixa footer{padding:10px 12px;border-top:1px solid var(--line-2)}
+.sinoCaixa footer .btn{width:100%;font-size:12.5px}
+.sinoVazio{padding:30px 16px;text-align:center;color:var(--muted);font-size:13px}
+.sino .ico{flex:0 0 auto;width:30px;height:30px;border-radius:8px;display:grid;place-items:center}
+.sino .ico.t-os_finalizada{background:#e6f5ec;color:#147a46}
+.sino .ico.t-comissao_paga{background:var(--orange-bg);color:var(--orange-dk)}
+.sino .ico.t-chamado{background:var(--s-entrega-bg);color:#1b5496}
+.sino .txt{display:flex;flex-direction:column;gap:1px;min-width:0;font-size:12.5px;line-height:1.35}
+.sino .txt b{color:var(--ink);font-size:13px}
+.sino .txt small{color:var(--muted);font-size:11px;margin-top:2px}
+.sinoAlerta{position:fixed;right:18px;bottom:18px;z-index:80;display:flex;gap:11px;align-items:flex-start;text-align:left;
+            width:340px;max-width:calc(100vw - 24px);background:var(--surface);border:1px solid var(--line);
+            border-left:4px solid var(--orange);border-radius:10px;padding:12px 14px;cursor:pointer;font:inherit;
+            box-shadow:0 18px 40px -10px rgba(20,22,26,.35);animation:sobe .25s ease-out}
+@keyframes sobe{from{transform:translateY(16px);opacity:0}to{transform:none;opacity:1}}
+@media (max-width:700px){.sinoBtn{width:34px;height:34px}.sinoCaixa{position:fixed;left:12px;right:12px;top:60px;width:auto}
+  .sinoAlerta{left:12px;right:12px;bottom:12px;width:auto}}
+
+/* ================================================================ Financeiro */
+.caixaKpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
+@media (max-width:1180px){.caixaKpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:700px){.caixaKpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.caixaKpis .forte{grid-column:1/-1}}
+.ck{background:var(--surface);border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow);padding:13px 15px;
+    display:flex;flex-direction:column;gap:2px;min-width:0;border-top:3px solid var(--deemph)}
+.ck span{font-size:12px;color:var(--muted);font-weight:700}
+.ck b{font-size:22px;letter-spacing:-.5px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ck small{font-size:11.5px;color:var(--muted)}
+.ck.ent{border-top-color:#1f9d6b}.ck.ent b{color:#147a46}
+.ck.sai{border-top-color:#d03b3b}.ck.sai b{color:#b42828}
+.ck.forte{background:var(--ink);border-color:var(--ink);border-top-color:var(--orange)}
+.ck.forte span,.ck.forte small{color:#b9bec7}.ck.forte b{color:#fff}
+@media (max-width:700px){.ck b{font-size:18px}}
+
+.lancTab tbody tr.manual{cursor:pointer}
+.lancTab tbody tr.manual:hover td{background:var(--surface-2)}
+.lancTab td.valor{font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
+.lancTab td.valor.entrada{color:#147a46}
+.lancTab td.valor.saida{color:#b42828}
+.origem{font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--surface-2);color:var(--ink-2);
+        white-space:nowrap;border:1px solid var(--line)}
+.origem.auto{background:#eef4fb;border-color:#d3e3f6;color:#1b5496}
+.financeiro .card > header .filtros{align-items:center}
+
+.tipoLanc{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+.tipoLanc button{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:11px;font:inherit;
+                 font-weight:700;cursor:pointer;color:var(--ink-2)}
+.tipoLanc button b{font-size:17px;margin-right:4px}
+.tipoLanc .entrada.on{background:#e6f5ec;border-color:#1f9d6b;color:#147a46}
+.tipoLanc .saida.on{background:#fdeaea;border-color:#d03b3b;color:#b42828}
+
+/* ========================================================== Chamados */
+.filtrosChamado{display:flex;gap:6px;flex-wrap:wrap}
+.chip .qtd{display:inline-block;min-width:18px;padding:0 5px;margin-left:5px;border-radius:999px;background:var(--surface-2);
+           color:var(--ink-2);font-size:11px;font-weight:800;text-align:center}
+.chip.on .qtd{background:rgba(255,255,255,.22);color:#fff}
+.chamados{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px}
+@media (max-width:700px){.chamados{grid-template-columns:1fr}}
+.chamado{display:flex;flex-direction:column;gap:6px;text-align:left;background:var(--surface);border:1px solid var(--line);
+         border-top:4px solid var(--s-entrega);border-radius:10px;padding:13px 15px;box-shadow:var(--shadow);cursor:pointer;
+         font:inherit;color:inherit}
+.chamado:hover{border-color:#c9ced6}
+.chamado.st-em_andamento{border-top-color:var(--orange)}
+.chamado.st-concluido{border-top-color:var(--good)}
+.chamado.st-recusado{border-top-color:#9aa0aa}
+.chamado .topo{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.chamado .num{font-size:12px;font-weight:800;color:var(--muted)}
+.chamado .tit{font-size:15px}
+.chamado .desc{margin:0;font-size:13px;color:var(--ink-2);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.chamado .resp{font-size:12.5px;background:var(--surface-2);border-radius:6px;padding:7px 9px;color:var(--ink-2)}
+.chamado .rodape{display:flex;gap:12px;flex-wrap:wrap;font-size:11.5px;color:var(--muted);margin-top:auto;padding-top:4px}
+.catTag,.stTag,.urgente,.papelTag{font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;white-space:nowrap}
+.catTag{background:var(--surface-2);color:var(--ink-2)}
+.catTag.problema{background:#fdeaea;color:#b42828}
+.catTag.melhoria{background:var(--orange-bg);color:var(--orange-dk)}
+.catTag.sugestao{background:#f1ecfb;color:#5b3aa8}
+.catTag.duvida{background:var(--s-entrega-bg);color:#1b5496}
+.urgente{background:var(--critical);color:#fff}
+.stTag{margin-left:auto;background:var(--s-entrega-bg);color:#1b5496}
+.stTag.em_andamento{background:var(--orange-bg);color:var(--orange-dk)}
+.stTag.concluido{background:#e6f5ec;color:#147a46}
+.stTag.recusado{background:#f1f2f4;color:var(--muted)}
+
+.catChamado,.papeis{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.papeis{grid-template-columns:1fr}
+.catChamado button,.papeis button{display:flex;flex-direction:column;gap:2px;text-align:left;border:1px solid var(--line);
+     background:var(--surface);border-radius:8px;padding:9px 11px;font:inherit;cursor:pointer;color:var(--ink)}
+.catChamado button small,.papeis button small{font-size:11.5px;color:var(--muted);font-weight:500;line-height:1.35}
+.catChamado button.on,.papeis button.on{border-color:var(--orange);background:var(--orange-bg);box-shadow:inset 0 0 0 1px var(--orange)}
+.catChamado button:disabled,.papeis button:disabled{opacity:.5;cursor:default}
+.respostaTi{background:var(--surface-2);border-radius:8px;padding:11px 13px;font-size:13.5px;white-space:pre-wrap}
+.respostaTi small{display:block;margin-top:6px;color:var(--muted);font-size:11.5px}
+
+/* ========================================================== Usuários */
+.resumoPapeis{display:flex;gap:10px;flex-wrap:wrap}
+.rp{display:flex;align-items:baseline;gap:7px;background:var(--surface);border:1px solid var(--line);border-radius:8px;
+    padding:9px 14px;box-shadow:var(--shadow);border-left:4px solid var(--deemph)}
+.rp b{font-size:20px}
+.rp span{font-size:12.5px;color:var(--muted);font-weight:700}
+.rp.diretor{border-left-color:var(--ink)}
+.rp.administrativo{border-left-color:var(--s-entrega)}
+.rp.vendedor{border-left-color:var(--orange)}
+.usuTab tbody tr{cursor:pointer}
+.usuTab tbody tr:hover td{background:var(--surface-2)}
+.usuTab tr.inativo td{color:var(--muted)}
+.usuTab tr.inativo .avatarMini{filter:grayscale(1);opacity:.5}
+.usuNome{display:flex;align-items:center;gap:9px}
+.avatarMini{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:800;
+            color:#fff;background:var(--orange);flex:0 0 auto}
+.avatarMini.diretor{background:var(--ink)}
+.avatarMini.administrativo{background:var(--s-entrega)}
+.voce{font-size:10.5px;font-weight:800;color:var(--orange-dk);background:var(--orange-bg);padding:1px 7px;border-radius:999px}
+.papelTag{background:var(--orange-bg);color:var(--orange-dk)}
+.papelTag.diretor{background:var(--ink);color:#fff}
+.papelTag.administrativo{background:var(--s-entrega-bg);color:#1b5496}
+.senhaCampo{display:flex;gap:6px}
+.senhaCampo input{flex:1;min-width:0}
+.senhaCampo .btn{padding:7px 11px}

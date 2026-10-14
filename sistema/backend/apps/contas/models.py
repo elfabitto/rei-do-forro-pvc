@@ -6,7 +6,6 @@ class Papel(models.TextChoices):
     DIRETOR = "diretor", "Diretor"
     ADMINISTRATIVO = "administrativo", "Administrativo"
     VENDEDOR = "vendedor", "Vendedor"
-    INSTALADOR = "instalador", "Instalador"
 
 
 class Usuario(AbstractUser):

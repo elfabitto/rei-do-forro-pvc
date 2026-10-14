@@ -14,7 +14,6 @@ import { diaCurto } from "../agendaTexto";
 import { Estado, useApi } from "../componentes";
 import { BarrasH, CORES, Colunas, Empilhada, Faisca, Funil, Legenda, Linhas, Rosca, fmtCurto } from "../graficos";
 import Icone from "../icones";
-import "../painel.css";
 
 const C = { laranja: CORES[0], azul: CORES[1], verde: CORES[2], roxo: CORES[3], amarelo: CORES[4],
             cinza: "#b4bac3" };

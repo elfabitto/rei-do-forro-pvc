@@ -40,6 +40,8 @@ INSTALLED_APPS = [
     "apps.catalogo",
     "apps.orcamentos",
     "apps.ordens",
+    "apps.financeiro",
+    "apps.comunicacao",
 ]
 
 MIDDLEWARE = [
@@ -135,6 +137,7 @@ SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(hours=8),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=14),
     "ROTATE_REFRESH_TOKENS": True,
+    "UPDATE_LAST_LOGIN": True,   # "último acesso" na tela de Usuários
 }
 
 CORS_ALLOWED_ORIGINS = config(

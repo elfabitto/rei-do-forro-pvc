@@ -29,6 +29,7 @@ from .models import (
     TipoAgendamento,
     Turno,
 )
+from . import eventos
 from .agenda import Grade, chave, turnos_instalacao
 from .serializers import (
     AgendamentoSerializer,
@@ -47,8 +48,8 @@ ZERO = Coalesce(Sum("valor"), 0, output_field=DecimalField(max_digits=12, decima
 
 class OrdemServicoViewSet(viewsets.ModelViewSet):
     """
-    Serviço é informação de equipe: todos veem a lista inteira, porque o
-    instalador precisa saber o que está marcado. Alterar continua sendo de quem
+    Serviço é informação de equipe: todos veem a lista inteira, porque a
+    equipe precisa saber o que está marcado. Alterar continua sendo de quem
     lançou e da diretoria; finalizar e cancelar, só da diretoria.
     """
 
@@ -78,8 +79,8 @@ class OrdemServicoViewSet(viewsets.ModelViewSet):
             Orcamento.objects.filter(pk=os_.orcamento_id).update(status=StatusOrcamento.CONVERTIDO)
 
     # ------------------------------------------------------------------ ações
-    # Quem executa o serviço não é necessariamente quem o lançou: o instalador
-    # precisa poder marcar "em execução". As regras duras (só a diretoria
+    # Quem executa o serviço não é necessariamente quem o lançou: qualquer um
+    # da equipe pode marcar "em execução". As regras duras (só a diretoria
     # finaliza ou cancela) continuam dentro de `mudar_status` no modelo.
     @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated])
     def mudar_status(self, request, pk=None):
@@ -146,21 +147,27 @@ class OrdemServicoViewSet(viewsets.ModelViewSet):
         return Response(OrdemServicoSerializer(os_, context={"request": request}).data)
 
     @action(detail=True, methods=["post"], permission_classes=[SomenteDiretor])
+    @transaction.atomic
     def pagar_comissao(self, request, pk=None):
         """Dá baixa na comissão de quem trouxe o cliente — controle da diretoria."""
         os_ = self.get_object()
         if os_.status != StatusOS.FINALIZADA:
             raise ValidationError({"comissao": "A comissão só é paga depois do serviço finalizado."})
+        if os_.comissao_paga:
+            raise ValidationError({"comissao": "Esta comissão já foi paga."})
         os_.comissao_paga = True
         os_.comissao_paga_em = timezone.now()
         os_.comissao_paga_por = request.user
         os_.save(update_fields=["comissao_paga", "comissao_paga_em", "comissao_paga_por"])
+        eventos.comissoes_pagas([os_], request.user)
         return Response(OrdemServicoSerializer(os_, context={"request": request}).data)
 
     @action(detail=True, methods=["post"], permission_classes=[SomenteDiretor])
+    @transaction.atomic
     def estornar_comissao(self, request, pk=None):
         """Desfaz a baixa, para quando a diretoria marca a comissão errada."""
         os_ = self.get_object()
+        eventos.comissao_estornada(os_)
         os_.comissao_paga = False
         os_.comissao_paga_em = None
         os_.comissao_paga_por = None
@@ -212,7 +219,8 @@ class PagamentoViewSet(viewsets.ModelViewSet):
     filterset_fields = ["ordem", "forma"]
 
     def perform_create(self, serializer):
-        serializer.save(registrado_por=self.request.user)
+        pg = serializer.save(registrado_por=self.request.user)
+        eventos.pagamento_lancado(pg, self.request.user)
 
 
 # --------------------------------------------------------------------- agenda
@@ -445,8 +453,12 @@ def pagar_comissoes_vendedor(request):
     pendentes = OrdemServico.objects.filter(
         vendedor_id=vendedor, status=StatusOS.FINALIZADA, comissao_paga=False,
     )
-    total = sum((o.comissao_valor for o in pendentes), Decimal("0"))
-    quantidade = pendentes.update(
-        comissao_paga=True, comissao_paga_em=timezone.now(), comissao_paga_por=request.user,
-    )
-    return Response({"pagas": quantidade, "total": total})
+    lista = list(pendentes.select_related("vendedor", "orcamento").prefetch_related("orcamento__itens"))
+    total = sum((o.comissao_valor for o in lista), Decimal("0"))
+    agora = timezone.now()
+    with transaction.atomic():
+        for o in lista:
+            o.comissao_paga, o.comissao_paga_em, o.comissao_paga_por = True, agora, request.user
+            o.save(update_fields=["comissao_paga", "comissao_paga_em", "comissao_paga_por"])
+        eventos.comissoes_pagas(lista, request.user)
+    return Response({"pagas": len(lista), "total": total})

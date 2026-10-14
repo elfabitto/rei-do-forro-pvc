@@ -19,8 +19,6 @@ EQUIPE = [
     ("lucilene",  "Lucilene", "",         "vendedor",    3),
     ("grace",     "Grace",    "",         "vendedor",    3),
     ("jade",      "Jade",     "",         "vendedor",    3),
-    ("fernando",  "Fernando", "",         "instalador",  0),
-    ("marcos",    "Marcos",   "",         "instalador",  0),
 ]
 
 

@@ -14,6 +14,10 @@ import OrdemNova from "./paginas/OrdemNova";
 import OrdensServico from "./paginas/OrdensServico";
 import Painel from "./paginas/Painel";
 import Parametros from "./paginas/Parametros";
+import Chamados from "./paginas/Chamados";
+import Financeiro from "./paginas/Financeiro";
+import Usuarios from "./paginas/Usuarios";
+import Sino from "./Sino";
 
 /* `so` restringe o item a uma permissão calculada pelo backend. */
 const MENU = [
@@ -24,10 +28,14 @@ const MENU = [
   { to: "/agenda", rotulo: "Agenda", icone: "agenda" },
   // cada um vê as próprias; a diretoria vê todas e dá a baixa
   { to: "/comissoes", rotulo: "Comissões", icone: "comissao" },
+  { to: "/financeiro", rotulo: "Financeiro", icone: "financeiro", so: "verFinanceiro" },
   { grupo: "Cadastros" },
   { to: "/clientes", rotulo: "Clientes", icone: "clientes" },
   { to: "/catalogo", rotulo: "Tabela de preços", icone: "precos" },
+  { to: "/usuarios", rotulo: "Usuários", icone: "equipe", so: "gerirUsuarios" },
   { to: "/parametros", rotulo: "Parâmetros", icone: "ajustes", so: "verFinanceiro" },
+  { grupo: "Suporte" },
+  { to: "/chamados", rotulo: "Sugestões e melhorias", icone: "chamado" },
 ];
 
 /** Abaixo disto o menu vira gaveta sobreposta e começa recolhido. */
@@ -114,6 +122,7 @@ export default function App() {
               <span className="papel">{usuario.papel}</span>
             </div>
           </div>
+          <Sino />
           <button className="btn sairBtn" onClick={sair}>
             <Icone nome="sair" tamanho={16} />
             <span>Sair</span>
@@ -131,6 +140,9 @@ export default function App() {
           <Route path="/agenda" element={<Agenda />} />
           <Route path="/parametros" element={<Parametros />} />
           <Route path="/comissoes" element={<Comissoes />} />
+          <Route path="/financeiro" element={pode("verFinanceiro") ? <Financeiro /> : <Navigate to="/" replace />} />
+          <Route path="/usuarios" element={pode("gerirUsuarios") ? <Usuarios /> : <Navigate to="/" replace />} />
+          <Route path="/chamados" element={<Chamados />} />
           <Route path="/clientes" element={<Clientes />} />
           <Route path="/catalogo" element={<Catalogo />} />
           <Route path="*" element={<Navigate to={pode("verPainel") ? "/" : "/orcamentos"} replace />} />

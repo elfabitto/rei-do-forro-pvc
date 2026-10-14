@@ -7,6 +7,8 @@ import "./estilos.css";
 import "./componentes.css";
 import "./layout.css";
 import "./status.css";
+import "./painel.css";
+import "./gestao.css";
 
 createRoot(document.getElementById("root")).render(
   <React.StrictMode>

@@ -157,7 +157,7 @@ export function Linhas({ categorias, series, altura = 230, formato = fmtCurto, f
         {sobre >= 0 && <line x1={x(sobre)} x2={x(sobre)} y1={topoY} y2={base} className="cursor" />}
       </svg>
       {sobre >= 0 && (
-        <div className="dica" style={{ left: `${(x(sobre) / W) * 100}%` }}>
+        <div className="grafDica" style={{ left: `${(x(sobre) / W) * 100}%` }}>
           <b>{categorias[sobre]}</b>
           {series.map((s) => (
             <span key={s.rotulo}><i style={{ background: s.cor }} />{s.rotulo}: {formatoDica(s.valores[sobre])}</span>

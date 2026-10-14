@@ -5,7 +5,9 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 from apps.catalogo.views import AcabamentoViewSet, ForroViewSet, MaterialViewSet
 from apps.clientes.views import ClienteViewSet, EnderecoViewSet
+from apps.comunicacao.views import ChamadoViewSet, ler_notificacao, ler_todas, notificacoes
 from apps.contas.views import UsuarioViewSet, eu
+from apps.financeiro.views import LancamentoViewSet
 from apps.orcamentos.views import OrcamentoViewSet
 from apps.ordens.views import (
     AgendamentoViewSet,
@@ -30,11 +32,16 @@ router.register("orcamentos", OrcamentoViewSet)
 router.register("ordens-servico", OrdemServicoViewSet)
 router.register("agendamentos", AgendamentoViewSet)
 router.register("pagamentos", PagamentoViewSet)
+router.register("lancamentos", LancamentoViewSet, basename="lancamento")
+router.register("chamados", ChamadoViewSet, basename="chamado")
 
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/", include(router.urls)),
     path("api/eu/", eu, name="eu"),
+    path("api/notificacoes/", notificacoes, name="notificacoes"),
+    path("api/notificacoes/ler-todas/", ler_todas, name="notificacoes-ler-todas"),
+    path("api/notificacoes/<int:pk>/ler/", ler_notificacao, name="notificacao-ler"),
     path("api/painel/", painel, name="painel"),
     path("api/painel/calendario/", painel_calendario, name="painel-calendario"),
     path("api/comissoes/", comissoes, name="comissoes"),

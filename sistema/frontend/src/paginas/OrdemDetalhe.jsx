@@ -263,7 +263,6 @@ export default function OrdemDetalhe({ id, aoFechar, aoMudar }) {
                   <div className="linha-acao">
                     <Selecao valor={os.vendedor} aoMudar={trocarVendedor}
                              opcoes={linhas(usuarios.dados)
-                               .filter((u) => u.papel !== "instalador")
                                .map((u) => ({ valor: u.id, rotulo: u.nome }))} />
                     <span className="nota">A diretoria pode corrigir quando lança no lugar do funcionário.</span>
                   </div>

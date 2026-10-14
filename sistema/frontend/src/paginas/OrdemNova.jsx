@@ -188,7 +188,6 @@ export default function OrdemNova() {
                          : `Fica com ${usuario.nome}; só a diretoria altera.`}>
                   <Selecao valor={vendedorId} aoMudar={setVendedorId} disabled={!pode("trocarVendedor")}
                            opcoes={linhas(usuarios.dados)
-                             .filter((u) => u.papel !== "instalador")
                              .map((u) => ({ valor: u.id, rotulo: u.nome }))} />
                 </Campo>
 

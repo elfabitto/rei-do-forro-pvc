@@ -37,7 +37,6 @@ class BaseOS(TestCase):
     def setUpTestData(cls):
         cls.diretor = Usuario.objects.create_user("alan", papel="diretor", first_name="Alan")
         cls.vendedor = Usuario.objects.create_user("marcos", papel="vendedor", first_name="Marcos")
-        cls.instalador = Usuario.objects.create_user("jonas", papel="instalador", first_name="Jonas")
 
         cls.cliente = Cliente.objects.create(nome="Maria Souza", telefone="(66) 99988-1122",
                                              criado_por=cls.vendedor)
@@ -85,7 +84,7 @@ class PermissoesTest(BaseOS):
         self.assertFalse(self.vendedor.pode_finalizar_os)
         self.assertFalse(self.vendedor.pode_trocar_vendedor)
         self.assertFalse(self.vendedor.pode_ver_financeiro)
-        self.assertFalse(self.instalador.pode_vender)
+        self.assertNotIn("instalador", [p for p, _ in Usuario._meta.get_field("papel").choices])
 
 
 class TransicaoTest(BaseOS):

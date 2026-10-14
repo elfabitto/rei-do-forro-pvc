@@ -91,10 +91,10 @@
 .centroVal{font-size:20px;font-weight:800;fill:var(--ink)}
 .centroRot{font-size:11px;fill:var(--muted);font-weight:600}
 .grafWrap{position:relative}
-.dica{position:absolute;top:0;transform:translateX(-50%);background:var(--ink);color:#fff;border-radius:7px;
+.grafDica{position:absolute;top:0;transform:translateX(-50%);background:var(--ink);color:#fff;border-radius:7px;
       padding:7px 10px;font-size:12px;display:flex;flex-direction:column;gap:2px;pointer-events:none;white-space:nowrap;
       box-shadow:0 6px 18px -6px rgba(0,0,0,.4)}
-.dica i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px}
+.grafDica i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px}
 
 .rosca{display:flex;align-items:center;gap:18px;flex-wrap:wrap;justify-content:center}
 .roscaLeg{list-style:none;margin:0;padding:0;display:grid;gap:4px;flex:1 1 180px;min-width:0}
