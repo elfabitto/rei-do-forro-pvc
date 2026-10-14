@@ -9,6 +9,7 @@ import { api, brl, data } from "../api";
 import { BotaoAcao, Campo, Estado, Gaveta, useApi } from "../componentes";
 import { CORES, Colunas, Legenda, Linhas, Rosca, fmtCurto } from "../graficos";
 import Icone from "../icones";
+import { decimal } from "../mascaras";
 
 const VERDE = "#1f9d6b", VERMELHO = "#d03b3b";
 const FORMAS = ["PIX", "Dinheiro", "Cartão de débito", "Cartão de crédito", "Transferência", "Boleto"];
@@ -93,7 +94,7 @@ function FormLancamento({ lancamento, categorias, aoFechar, aoSalvar }) {
         </Campo>
         <Campo rotulo="Descrição"><input {...campo("descricao")} autoFocus placeholder={l.tipo === "saida" ? "Ex.: Diesel do caminhão" : "Ex.: Venda de sobra de forro"} /></Campo>
         <div className="two">
-          <Campo rotulo="Valor (R$)"><input {...campo("valor")} inputMode="decimal" placeholder="0,00" /></Campo>
+          <Campo rotulo="Valor (R$)" obrigatorio><input value={l.valor} onChange={(e) => setL((x) => ({ ...x, valor: decimal(e.target.value) }))} inputMode="decimal" placeholder="0,00" /></Campo>
           <Campo rotulo="Data"><input type="date" {...campo("data")} /></Campo>
         </div>
         <Campo rotulo="Forma de pagamento">

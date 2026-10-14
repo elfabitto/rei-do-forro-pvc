@@ -15,6 +15,7 @@ import {
   BotaoAcao, Campo, DocumentoOrcamento, Estado, Selecao, linhas, useApi,
 } from "../componentes";
 import Icone from "../icones";
+import { decimal, digitos } from "../mascaras";
 import {
   SERVICO, VERBA, baixarImagem, brl, copiarImagem, copiarTexto, ehServico, montarDocumento,
   unidadePlural,
@@ -285,18 +286,18 @@ export default function OrcamentoNovo() {
 
                 {modo === "area" ? (
                   <Campo rotulo="Área do compartimento (m²)">
-                    <input value={area} onChange={(e) => alterou(setArea)(e.target.value)}
+                    <input value={area} onChange={(e) => alterou(setArea)(decimal(e.target.value))}
                            inputMode="decimal" placeholder="Ex.: 23" />
                   </Campo>
                 ) : modo === "folhas" ? (
                   <>
                     <div className="two">
                       <Campo rotulo="Tamanho da folha (m)">
-                        <input value={tamanhoFolha} onChange={(e) => alterou(setTamanhoFolha)(e.target.value)}
+                        <input value={tamanhoFolha} onChange={(e) => alterou(setTamanhoFolha)(decimal(e.target.value))}
                                inputMode="decimal" placeholder="Ex.: 5" />
                       </Campo>
                       <Campo rotulo="Quantidade de folhas">
-                        <input value={qtdFolhas} onChange={(e) => alterou(setQtdFolhas)(e.target.value)}
+                        <input value={qtdFolhas} onChange={(e) => alterou(setQtdFolhas)(digitos(e.target.value).slice(0, 4))}
                                inputMode="numeric" placeholder="Ex.: 20" />
                       </Campo>
                     </div>
@@ -309,11 +310,11 @@ export default function OrcamentoNovo() {
                   <>
                     <div className="two">
                       <Campo rotulo="Largura (m)">
-                        <input value={largura} onChange={(e) => alterou(setLargura)(e.target.value)}
+                        <input value={largura} onChange={(e) => alterou(setLargura)(decimal(e.target.value))}
                                inputMode="decimal" placeholder="Ex.: 4,60" />
                       </Campo>
                       <Campo rotulo="Comprimento (m)">
-                        <input value={comprimento} onChange={(e) => alterou(setComprimento)(e.target.value)}
+                        <input value={comprimento} onChange={(e) => alterou(setComprimento)(decimal(e.target.value))}
                                inputMode="decimal" placeholder="Ex.: 5" />
                       </Campo>
                     </div>
@@ -402,7 +403,7 @@ export default function OrcamentoNovo() {
                                    aria-label={`${m.nome} — quantidade em ${m.unidade}`}
                                    onChange={(e) => {
                                      setSalvo(null);
-                                     setQuantidades((s) => ({ ...s, [m.id]: e.target.value }));
+                                     setQuantidades((s) => ({ ...s, [m.id]: decimal(e.target.value) }));
                                    }} />
                             <span className="un">{unidadePlural(q, m.unidade)}</span>
                             <span className="sb">{q > 0 ? `R$ ${brl(q * Number(m.preco))}` : ""}</span>
@@ -429,7 +430,7 @@ export default function OrcamentoNovo() {
                                : "Informe a medida para o sistema sugerir o valor."}>
                         <input value={totalServico} inputMode="decimal"
                                placeholder={servicoSugerido ? brl(servicoSugerido) : "0,00"}
-                               onChange={(e) => alterou(setTotalServico)(e.target.value)} />
+                               onChange={(e) => alterou(setTotalServico)(decimal(e.target.value))} />
                       </Campo>
                     )}
                   </div>
@@ -457,7 +458,7 @@ export default function OrcamentoNovo() {
                         <span className="cifrao">R$</span>
                         <input value={e.valor} placeholder="0,00" inputMode="decimal"
                                aria-label={`Valor do item ${i + 1}`}
-                               onChange={(ev) => mudarExtra(i, "valor", ev.target.value)} />
+                               onChange={(ev) => mudarExtra(i, "valor", decimal(ev.target.value))} />
                       </div>
                       <button type="button" className="x" aria-label="Remover item"
                               onClick={() => removerExtra(i)}>×</button>

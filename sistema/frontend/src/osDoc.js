@@ -53,7 +53,7 @@ export function montarOS(os, { verFinanceiro = true } = {}) {
     telefone: os.cliente_detalhe?.telefone ?? "",
     endereco: enderecoTxt,
     bairro: end?.bairro ?? "",
-    link: end?.link_localizacao ?? "",
+    cidade: end?.cidade ?? "",
     entrega: os.entrega ? periodoTexto(os.entrega) : "",
     instalacao: os.instalacao ? periodoTexto(os.instalacao) : "",
     observacoes: os.observacoes ?? "",
@@ -71,6 +71,7 @@ export function montarOS(os, { verFinanceiro = true } = {}) {
     ["Telefone", d.telefone],
     ["Endereço", d.endereco],
     ["Bairro", d.bairro],
+    ...(d.cidade ? [["Cidade", d.cidade]] : []),
   ];
 
   /* ---- informações do pedido ---- */
@@ -107,9 +108,7 @@ export function montarOS(os, { verFinanceiro = true } = {}) {
   d.texto = `*ORDEM DE SERVIÇO ${d.numero}*
 _${d.tipo.toUpperCase()}${d.atrasado ? " · ATRASADA" : ""}_
 Situação: ${d.status}
-----------${bloco("INFORMAÇÕES DO CLIENTE", d.cliente_linhas)}${
-    d.link ? `\nLocalização: ${d.link}` : ""
-  }${bloco("INFORMAÇÕES DO PEDIDO", d.pedido)}${bloco("AGENDAMENTO", d.agenda)}${
+----------${bloco("INFORMAÇÕES DO CLIENTE", d.cliente_linhas)}${bloco("INFORMAÇÕES DO PEDIDO", d.pedido)}${bloco("AGENDAMENTO", d.agenda)}${
     d.m2Vista
       ? `\n*VALOR DO M²*\nÀ vista: R$ ${brl(d.m2Vista)}/m²\nNo cartão: R$ ${brl(d.m2Cartao)}/m²`
       : ""

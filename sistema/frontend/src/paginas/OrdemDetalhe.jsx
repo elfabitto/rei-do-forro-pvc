@@ -163,13 +163,9 @@ export default function OrdemDetalhe({ id, aoFechar, aoMudar }) {
                     <><dt>Complemento</dt><dd className="wk">{os.endereco_detalhe.complemento}</dd></>
                   )}
                   <dt>Bairro</dt><dd className="wk">{os.endereco_detalhe?.bairro}</dd>
-                  <dt>Localização</dt>
-                  <dd className="wk">
-                    {os.endereco_detalhe?.link_localizacao ? (
-                      <a className="lnk" href={os.endereco_detalhe.link_localizacao}
-                         target="_blank" rel="noopener noreferrer">link enviado pelo WhatsApp</a>
-                    ) : <span style={{ color: "var(--muted)" }}>não enviada</span>}
-                  </dd>
+                  {os.endereco_detalhe?.cidade && (
+                    <><dt>Cidade</dt><dd className="wk">{os.endereco_detalhe.cidade}</dd></>
+                  )}
                 </dl>
               </section>
 

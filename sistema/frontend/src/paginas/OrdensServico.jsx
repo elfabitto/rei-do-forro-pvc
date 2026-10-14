@@ -73,22 +73,16 @@ function CardOS({ o, verFinanceiro, pode, aoAbrir, aoFinalizar, aoMudarStatus, a
 
         <div className="valores pagamento">
           <div className="v1">
-            <span>Total {o.modalidade === "cartao" ? "no cartão" : "à vista"}</span>
+            <span>Valor total</span>
             <b>{brl(o.valor_total)}</b>
           </div>
           <span className="formaPg">{o.modalidade_display || "a definir"}</span>
-        </div>
-        <div className="refValores">
-          À vista {brl(o.valor_vista)} · Cartão {brl(o.valor_cartao)}
         </div>
 
         <div className="rodape">
           <span><Icone nome="calendario" tamanho={13} /> {dataHora(o.criado_em)}</span>
           <span><Icone nome="usuario" tamanho={13} /> trouxe:{" "}
             <span className="forma">{o.vendedor_nome}</span></span>
-          {verFinanceiro && Number(o.saldo) > 0 && (
-            <span className="saldoAberto">saldo {brl(o.saldo)}</span>
-          )}
         </div>
       </div>
 

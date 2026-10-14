@@ -184,13 +184,19 @@ function CardOrcamento({ o, aoVer, aoGerarOS, aoPerder, aoReabrir, aoEditar }) {
 
 export default function Orcamentos() {
   const navegar = useNavigate();
-  const { pode } = useAuth();
+  const { pode, usuario } = useAuth();
   const [status, setStatus] = useState("");
+  // vendedor abre nos próprios orçamentos; a diretoria, em todos
+  const [dono, setDono] = useState(() => (pode("verTudo") ? "todos" : "meus"));
   const [vendo, setVendo] = useState(null);
   const [perdendo, setPerdendo] = useState(null);
 
+  const filtro = {
+    ...(status ? { status } : {}),
+    ...(dono === "meus" ? { vendedor: usuario.id } : {}),
+  };
   const { dados, erro, carregando, recarregar } =
-    useApi("/orcamentos/", status ? { status } : null, [status]);
+    useApi("/orcamentos/", Object.keys(filtro).length ? filtro : null, [status, dono]);
   const lista = linhas(dados);
 
   async function marcarPerdido() {
@@ -221,6 +227,14 @@ export default function Orcamentos() {
       </div>
 
       <div className="barraFiltros">
+        <div className="seg donoSeg">
+          <button type="button" className={dono === "meus" ? "on" : ""} onClick={() => setDono("meus")}>
+            Meus orçamentos
+          </button>
+          <button type="button" className={dono === "todos" ? "on" : ""} onClick={() => setDono("todos")}>
+            Todos
+          </button>
+        </div>
         {FILTROS.map(([k, r]) => (
           <button key={k} className={`chip${status === k ? " on" : ""}`} onClick={() => setStatus(k)}>
             {r}
@@ -230,7 +244,9 @@ export default function Orcamentos() {
       </div>
 
       <Estado carregando={carregando} erro={erro}
-              vazio={lista.length === 0 ? "Nenhum orçamento com esse filtro." : null}>
+              vazio={lista.length === 0
+                ? (dono === "meus" ? "Você não tem orçamentos com esse filtro." : "Nenhum orçamento com esse filtro.")
+                : null}>
         <div className="cardGrid">
           {lista.map((o) => (
             <CardOrcamento key={o.id} o={o}

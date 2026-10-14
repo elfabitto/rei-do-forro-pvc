@@ -2,6 +2,8 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
+from apps.core import formatos
+
 from .models import Papel, Usuario
 
 
@@ -51,6 +53,20 @@ class UsuarioGestaoSerializer(UsuarioSerializer):
         fields = ["id", "username", "nome", "first_name", "last_name", "email", "papel", "papel_display",
                   "telefone", "is_active", "senha", "last_login", "date_joined"]
         read_only_fields = ["id", "last_login", "date_joined"]
+
+    def validate_first_name(self, v):
+        return formatos.nome_proprio(v)
+
+    def validate_last_name(self, v):
+        return formatos.nome_proprio(v)
+
+    def validate_telefone(self, v):
+        if not (v or "").strip():
+            return ""
+        try:
+            return formatos.telefone(v)
+        except ValueError as e:
+            raise serializers.ValidationError(str(e))
 
     def validate_username(self, valor):
         valor = valor.strip().lower()

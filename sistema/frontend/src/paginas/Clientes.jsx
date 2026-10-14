@@ -2,49 +2,45 @@ import { useState } from "react";
 import { api } from "../api";
 import { BotaoAcao, Campo, Estado, Gaveta, linhas, useApi } from "../componentes";
 import Icone from "../icones";
+import {
+  CLIENTE_VAZIO, CamposCliente, CamposEndereco, ENDERECO_VAZIO,
+  corpoCliente, corpoEndereco, errosDaApi, paramsBusca, validarCliente, validarEndereco,
+} from "./formCliente";
 
-/* A empresa atende no Pará: o estado não é pergunta, é constante. */
-const UF = "PA";
-
-const CLIENTE_VAZIO = { nome: "", telefone: "", observacoes: "" };
-const ENDERECO_VAZIO = {
-  logradouro: "", numero: "", complemento: "", bairro: "",
-  cidade: "", uf: UF, cep: "", ponto_referencia: "",
-  link_localizacao: "", principal: true,
-};
+const PRIMEIRO_ERRO = "Confira os campos destacados.";
 
 function FormCliente({ cliente, aoFechar, aoSalvar }) {
   const novo = !cliente;
-  const [c, setC] = useState(cliente ? { ...cliente } : { ...CLIENTE_VAZIO });
+  const [c, setC] = useState(cliente ? { ...CLIENTE_VAZIO, ...cliente } : { ...CLIENTE_VAZIO });
   const [e, setE] = useState({ ...ENDERECO_VAZIO });
+  const [erros, setErros] = useState({});
+  const [errosE, setErrosE] = useState({});
   const [erro, setErro] = useState("");
-
-  const campo = (k) => ({
-    value: c[k] ?? "",
-    onChange: (ev) => setC((s) => ({ ...s, [k]: ev.target.value })),
-  });
-  const campoE = (k) => ({
-    value: e[k] ?? "",
-    onChange: (ev) => setE((s) => ({ ...s, [k]: ev.target.value })),
-  });
 
   async function salvar() {
     setErro("");
+    // no cadastro novo, o endereço vai junto quando houver logradouro
+    const comEndereco = novo && (e.logradouro.trim() || e.bairro.trim());
+    const ec = validarCliente(c);
+    const ee = comEndereco ? validarEndereco(e) : {};
+    setErros(ec);
+    setErrosE(ee);
+    if (Object.keys(ec).length || Object.keys(ee).length) {
+      setErro(PRIMEIRO_ERRO);
+      throw new Error("confira os campos");
+    }
     try {
-      if (!c.nome.trim()) throw new Error("Informe o nome do cliente.");
       const salvo = novo
-        ? await api.post("/clientes/", c)
-        : await api.patch(`/clientes/${c.id}/`, c);
-
-      // no cadastro novo, o endereço vai junto quando houver logradouro
-      if (novo && e.logradouro.trim()) {
-        await api.post("/enderecos/", { ...e, cliente: salvo.id });
-      }
+        ? await api.post("/clientes/", corpoCliente(c))
+        : await api.patch(`/clientes/${c.id}/`, corpoCliente(c));
+      if (comEndereco) await api.post("/enderecos/", { ...corpoEndereco(e), cliente: salvo.id });
       aoSalvar();
       aoFechar();
       return "salvo";
     } catch (err) {
-      setErro(err.message);
+      const campos = errosDaApi(err);
+      if (campos) { setErros(campos); setErrosE(campos); }
+      setErro(campos ? PRIMEIRO_ERRO : err.message);
       throw err;
     }
   }
@@ -60,10 +56,10 @@ function FormCliente({ cliente, aoFechar, aoSalvar }) {
       <section className="sec">
         <h4>Dados do cliente</h4>
         {erro && <div className="erro">{erro}</div>}
-        <Campo rotulo="Nome"><input {...campo("nome")} autoFocus /></Campo>
-        <Campo rotulo="Telefone"><input {...campo("telefone")} placeholder="(66) 99999-0000" /></Campo>
+        <CamposCliente c={c} setC={setC} erros={erros} setErros={setErros} autoFocus />
         <Campo rotulo="Observações">
-          <textarea rows={2} {...campo("observacoes")} />
+          <textarea rows={2} value={c.observacoes ?? ""}
+                    onChange={(ev) => setC((s) => ({ ...s, observacoes: ev.target.value }))} />
         </Campo>
       </section>
 
@@ -73,23 +69,7 @@ function FormCliente({ cliente, aoFechar, aoSalvar }) {
           <p className="nota" style={{ marginTop: 0 }}>
             Opcional agora, mas a O.S. precisa de um endereço para ser gerada.
           </p>
-          <Campo rotulo="Logradouro"><input {...campoE("logradouro")} placeholder="Rua, avenida…" /></Campo>
-          <div className="two">
-            <Campo rotulo="Número"><input {...campoE("numero")} /></Campo>
-            <Campo rotulo="Bairro"><input {...campoE("bairro")} /></Campo>
-          </div>
-          <Campo rotulo="Complemento" dica="Apto, bloco, fundos, sala…">
-            <input {...campoE("complemento")} />
-          </Campo>
-          <div className="two">
-            <Campo rotulo="Cidade"><input {...campoE("cidade")} placeholder="Marabá" /></Campo>
-            <Campo rotulo="Estado"><div className="travado">{UF}<small>fixo</small></div></Campo>
-          </div>
-          <Campo rotulo="Ponto de referência"><input {...campoE("ponto_referencia")} /></Campo>
-          <Campo rotulo="Localização do WhatsApp"
-                 dica="Cole aqui o link de localização que o cliente mandou.">
-            <input {...campoE("link_localizacao")} placeholder="https://maps.app.goo.gl/…" />
-          </Campo>
+          <CamposEndereco e={e} setE={setE} erros={errosE} setErros={setErrosE} />
         </section>
       )}
     </Gaveta>
@@ -98,24 +78,26 @@ function FormCliente({ cliente, aoFechar, aoSalvar }) {
 
 function FormEndereco({ cliente, aoFechar, aoSalvar }) {
   const [e, setE] = useState({ ...ENDERECO_VAZIO });
+  const [erros, setErros] = useState({});
   const [erro, setErro] = useState("");
-  const campo = (k) => ({
-    value: e[k] ?? "",
-    onChange: (ev) => setE((s) => ({ ...s, [k]: ev.target.value })),
-  });
 
   async function salvar() {
     setErro("");
+    const ee = validarEndereco(e);
+    setErros(ee);
+    if (Object.keys(ee).length) {
+      setErro(PRIMEIRO_ERRO);
+      throw new Error("confira os campos");
+    }
     try {
-      if (!e.logradouro.trim() || !e.bairro.trim()) {
-        throw new Error("Logradouro e bairro são obrigatórios.");
-      }
-      await api.post("/enderecos/", { ...e, cliente: cliente.id });
+      await api.post("/enderecos/", { ...corpoEndereco(e), cliente: cliente.id });
       aoSalvar();
       aoFechar();
       return "salvo";
     } catch (err) {
-      setErro(err.message);
+      const campos = errosDaApi(err);
+      if (campos) setErros(campos);
+      setErro(campos ? PRIMEIRO_ERRO : err.message);
       throw err;
     }
   }
@@ -130,20 +112,7 @@ function FormEndereco({ cliente, aoFechar, aoSalvar }) {
             }>
       <section className="sec">
         {erro && <div className="erro">{erro}</div>}
-        <Campo rotulo="Logradouro"><input {...campo("logradouro")} autoFocus /></Campo>
-        <div className="two">
-          <Campo rotulo="Número"><input {...campo("numero")} /></Campo>
-          <Campo rotulo="Bairro"><input {...campo("bairro")} /></Campo>
-        </div>
-        <Campo rotulo="Complemento"><input {...campo("complemento")} /></Campo>
-        <div className="two">
-          <Campo rotulo="Cidade"><input {...campo("cidade")} placeholder="Marabá" /></Campo>
-          <Campo rotulo="Estado"><div className="travado">{UF}<small>fixo</small></div></Campo>
-        </div>
-        <Campo rotulo="Ponto de referência"><input {...campo("ponto_referencia")} /></Campo>
-        <Campo rotulo="Localização do WhatsApp">
-          <input {...campo("link_localizacao")} placeholder="https://maps.app.goo.gl/…" />
-        </Campo>
+        <CamposEndereco e={e} setE={setE} erros={erros} setErros={setErros} />
         <label className="check">
           <input type="checkbox" checked={e.principal}
                  onChange={(ev) => setE((s) => ({ ...s, principal: ev.target.checked }))} />
@@ -157,7 +126,7 @@ function FormEndereco({ cliente, aoFechar, aoSalvar }) {
 export default function Clientes() {
   const [busca, setBusca] = useState("");
   const { dados, erro, carregando, recarregar } =
-    useApi("/clientes/", busca ? { search: busca } : null, [busca]);
+    useApi("/clientes/", paramsBusca(busca), [busca]);
   const [editando, setEditando] = useState(null);   // objeto cliente ou "novo"
   const [novoEndereco, setNovoEndereco] = useState(null);
   const lista = linhas(dados);
@@ -183,7 +152,7 @@ export default function Clientes() {
             <table>
               <thead>
                 <tr><th>Cliente</th><th>Telefone</th><th>Endereço da obra</th>
-                  <th>Bairro</th><th>Localização</th><th className="num">O.S.</th><th /></tr>
+                  <th>Bairro</th><th>Cidade</th><th className="num">O.S.</th><th /></tr>
               </thead>
               <tbody>
                 {lista.map((c) => {
@@ -203,12 +172,7 @@ export default function Clientes() {
                         )}
                       </td>
                       <td>{e?.bairro ?? "—"}</td>
-                      <td>
-                        {e?.link_localizacao
-                          ? <a className="lnk" href={e.link_localizacao}
-                               target="_blank" rel="noopener noreferrer">abrir mapa</a>
-                          : <span style={{ color: "var(--muted)" }}>não enviada</span>}
-                      </td>
+                      <td>{e?.cidade || "—"}</td>
                       <td className="num">{c.total_ordens ?? 0}</td>
                       <td className="acoes">
                         <button className="lnk" onClick={() => setEditando(c)}>editar</button>

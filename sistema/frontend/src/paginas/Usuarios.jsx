@@ -9,6 +9,7 @@ import { api, dataHora } from "../api";
 import { useAuth } from "../auth";
 import { BotaoAcao, Campo, Estado, Gaveta, useApi } from "../componentes";
 import Icone from "../icones";
+import { erroEmail, erroTelefone, nomeProprio, telefone } from "../mascaras";
 
 const PAPEIS = [
   { valor: "diretor", rotulo: "Diretor", plural: "Diretores",
@@ -26,16 +27,34 @@ function FormUsuario({ usuario, eu, aoFechar, aoSalvar }) {
     : { first_name: "", last_name: "", username: "", email: "", telefone: "", papel: "vendedor", is_active: true, senha: "" });
   const [ver, setVer] = useState(false);
   const [erro, setErro] = useState("");
+  const [erros, setErros] = useState({});
   const souEu = !novo && u.id === eu.id;
-  const campo = (k) => ({ value: u[k] ?? "", onChange: (e) => setU((s) => ({ ...s, [k]: e.target.value })) });
+  const campo = (k, { mascara, aoSair } = {}) => ({
+    value: u[k] ?? "",
+    onChange: (e) => {
+      const v = mascara ? mascara(e.target.value) : e.target.value;
+      setU((s) => ({ ...s, [k]: v }));
+      if (erros[k]) setErros((x) => ({ ...x, [k]: undefined }));
+    },
+    onBlur: aoSair ? () => setU((s) => ({ ...s, [k]: aoSair(s[k]) })) : undefined,
+    "aria-invalid": erros[k] ? true : undefined,
+  });
 
   async function salvar() {
     setErro("");
     try {
-      if (!u.first_name.trim()) throw new Error("Informe o nome.");
-      if (!u.username.trim()) throw new Error("Informe o login.");
-      if (novo && u.senha.length < 8) throw new Error("A senha inicial precisa de pelo menos 8 caracteres.");
-      const corpo = { first_name: u.first_name.trim(), last_name: u.last_name.trim(), username: u.username.trim(),
+      const e = {};
+      if (!u.first_name.trim()) e.first_name = "Informe o nome.";
+      if (u.username.trim().length < 3) e.username = "Login com pelo menos 3 letras.";
+      if (novo && u.senha.length < 8) e.senha = "Mínimo 8 caracteres.";
+      if (!novo && u.senha && u.senha.length < 8) e.senha = "Mínimo 8 caracteres.";
+      const tel = erroTelefone(u.telefone, false);
+      if (tel) e.telefone = tel;
+      const mail = erroEmail(u.email);
+      if (mail) e.email = mail;
+      setErros(e);
+      if (Object.keys(e).length) throw new Error("Confira os campos destacados.");
+      const corpo = { first_name: nomeProprio(u.first_name), last_name: nomeProprio(u.last_name), username: u.username.trim(),
                       email: u.email.trim(), telefone: u.telefone.trim(), papel: u.papel, is_active: u.is_active };
       if (u.senha) corpo.senha = u.senha;
       if (novo) await api.post("/usuarios/", corpo);
@@ -44,7 +63,9 @@ function FormUsuario({ usuario, eu, aoFechar, aoSalvar }) {
       aoFechar();
       return "salvo";
     } catch (e) {
-      setErro(e.message.replace(/^senha: /, "Senha: ").replace(/^username: /, "Login: "));
+      const d = e.dados && typeof e.dados === "object" && !e.dados.detail ? e.dados : null;
+      if (d) setErros(Object.fromEntries(Object.entries(d).map(([k, v]) => [k === "senha" ? "senha" : k, [].concat(v).join(" ")])));
+      setErro(d ? "Confira os campos destacados." : e.message);
       throw e;
     }
   }
@@ -61,22 +82,29 @@ function FormUsuario({ usuario, eu, aoFechar, aoSalvar }) {
         <h4>Dados</h4>
         {erro && <div className="erro">{erro}</div>}
         <div className="two">
-          <Campo rotulo="Nome"><input {...campo("first_name")} autoFocus={novo} /></Campo>
-          <Campo rotulo="Sobrenome"><input {...campo("last_name")} /></Campo>
+          <Campo rotulo="Nome" obrigatorio erro={erros.first_name}>
+            <input {...campo("first_name", { aoSair: nomeProprio })} autoFocus={novo} maxLength={150} />
+          </Campo>
+          <Campo rotulo="Sobrenome"><input {...campo("last_name", { aoSair: nomeProprio })} maxLength={150} /></Campo>
         </div>
         <div className="two">
-          <Campo rotulo="Telefone"><input {...campo("telefone")} placeholder="(94) 99999-0000" /></Campo>
-          <Campo rotulo="E-mail"><input type="email" {...campo("email")} /></Campo>
+          <Campo rotulo="Telefone (WhatsApp)" erro={erros.telefone}>
+            <input {...campo("telefone", { mascara: telefone })} inputMode="tel" placeholder="(94) 99999-0000" />
+          </Campo>
+          <Campo rotulo="E-mail" erro={erros.email}>
+            <input type="email" inputMode="email" autoCapitalize="none" {...campo("email")} />
+          </Campo>
         </div>
       </section>
 
       <section className="sec">
         <h4>Acesso</h4>
-        <Campo rotulo="Login" dica="Sem espaços — é o que a pessoa digita para entrar (ex.: jessica).">
-          <input {...campo("username")} autoCapitalize="none" autoCorrect="off"
-                 onChange={(e) => setU((s) => ({ ...s, username: e.target.value.toLowerCase().replace(/\s/g, "") }))} />
+        <Campo rotulo="Login" obrigatorio erro={erros.username}
+               dica="Letras minúsculas e números, sem espaço nem acento (ex.: jessica).">
+          <input {...campo("username", { mascara: (v) => v.toLowerCase().normalize("NFD").replace(/[^a-z0-9._]/g, "").slice(0, 30) })}
+                 autoCapitalize="none" autoCorrect="off" spellCheck={false} />
         </Campo>
-        <Campo rotulo={novo ? "Senha inicial" : "Nova senha"}
+        <Campo rotulo={novo ? "Senha inicial" : "Nova senha"} obrigatorio={novo} erro={erros.senha}
                dica={novo ? "Mínimo 8 caracteres; passe para a pessoa trocar depois."
                  : "Deixe em branco para manter a senha atual."}>
           <div className="senhaCampo">

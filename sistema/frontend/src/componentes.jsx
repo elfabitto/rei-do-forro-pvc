@@ -40,10 +40,10 @@ export function Estado({ carregando, erro, vazio, children }) {
 }
 
 /* ---------------------------------------------------------------- formulário */
-export function Campo({ rotulo, erro, dica, children }) {
+export function Campo({ rotulo, erro, dica, obrigatorio, children }) {
   return (
-    <label className="f">
-      <span>{rotulo}</span>
+    <label className={`f${erro ? " comErro" : ""}`}>
+      <span>{rotulo}{obrigatorio && <i className="obrig" title="obrigatório"> *</i>}</span>
       {children}
       {dica && !erro && <small className="dica">{dica}</small>}
       {erro && <small className="erroCampo">{erro}</small>}
