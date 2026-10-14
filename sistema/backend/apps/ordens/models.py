@@ -52,6 +52,7 @@ class Modalidade(models.TextChoices):
 
     VISTA = "vista", "À vista"
     CARTAO = "cartao", "No cartão"
+    MISTO = "misto", "À vista + cartão"
 
 
 class FormaPagamento(models.TextChoices):
@@ -59,9 +60,17 @@ class FormaPagamento(models.TextChoices):
     PIX = "pix", "PIX"
     DEBITO = "debito", "Cartão de débito"
     CREDITO = "credito", "Cartão de crédito"
+    # As três abaixo não são mais oferecidas no fechamento; ficam para os
+    # pagamentos antigos continuarem com o nome certo.
     TRANSFERENCIA = "transferencia", "Transferência"
     BOLETO = "boleto", "Boleto"
     CHEQUE = "cheque", "Cheque"
+
+
+# O que conta como "à vista" e o que é cartão — a modalidade restringe as formas.
+FORMAS_VISTA = {FormaPagamento.PIX, FormaPagamento.DINHEIRO}
+FORMAS_CARTAO = {FormaPagamento.CREDITO, FormaPagamento.DEBITO}
+FORMAS_ACEITAS = FORMAS_VISTA | FORMAS_CARTAO
 
 
 class OrdemServico(models.Model):
@@ -207,6 +216,14 @@ class OrdemServico(models.Model):
         self.modalidade = modalidade
         self.valor_total = referencia
         return self
+
+    @property
+    def valor_base_fechamento(self):
+        """
+        No fechamento o preço é sempre o à vista; o que for pago no cartão leva
+        o acréscimo da maquininha, pago pelo cliente (Pagamento.acrescimo).
+        """
+        return self.valor_vista if self.valor_vista is not None else self.valor_total
 
     # --------------------------------------------------------------- atraso
     @property
@@ -361,7 +378,10 @@ class Agendamento(models.Model):
 class Pagamento(models.Model):
     ordem = models.ForeignKey(OrdemServico, on_delete=models.CASCADE, related_name="pagamentos")
     forma = models.CharField(max_length=16, choices=FormaPagamento.choices)
+    # `valor` é o que o cliente pagou de fato (no cartão, já com o acréscimo);
+    # `acrescimo` é a parte que cobre a taxa da maquininha, repassada ao cliente.
     valor = models.DecimalField(max_digits=11, decimal_places=2)
+    acrescimo = models.DecimalField("acréscimo do cartão", max_digits=11, decimal_places=2, default=0)
     parcelas = models.PositiveSmallIntegerField(default=1)
     data = models.DateField(default=timezone.localdate)
     observacao = models.CharField("observação", max_length=160, blank=True)
@@ -450,3 +470,52 @@ class ConfiguracaoAgenda(models.Model):
     def dias_sem_atendimento_lista(self):
         return [int(d) for d in self.dias_sem_atendimento.split(",") if d.strip().isdigit()]
 
+
+
+def _taxas_padrao():
+    # Tabela pública do PagBank, Visa/Master, faturamento de R$ 20 a 50 mil/mês,
+    # recebimento no mesmo dia. Ponto de partida: a diretoria troca pelas taxas
+    # reais da conta (app PagBank) na tela de Tabela de preços.
+    return {"1": "3.07", "2": "5.37", "3": "6.10", "4": "6.84", "5": "7.56", "6": "8.26",
+            "7": "8.98", "8": "9.68", "9": "10.37", "10": "11.04", "11": "11.73", "12": "12.38"}
+
+
+class TaxasCartao(models.Model):
+    """
+    Taxas da maquininha, em % sobre o valor passado. Servem para repassar o
+    custo do cartão ao cliente: a loja recebe o valor à vista e o cliente paga
+    valor ÷ (1 − taxa). Registro único.
+    """
+
+    debito = models.DecimalField("débito (%)", max_digits=5, decimal_places=2, default=Decimal("1.25"))
+    credito = models.JSONField("crédito por parcelas (%)", default=_taxas_padrao)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    PARCELAS_MAX = 12
+
+    class Meta:
+        verbose_name = "taxas do cartão"
+        verbose_name_plural = "taxas do cartão"
+
+    def __str__(self):
+        return "Taxas da maquininha"
+
+    @classmethod
+    def obter(cls):
+        taxas, _ = cls.objects.get_or_create(pk=1)
+        return taxas
+
+    def taxa(self, forma, parcelas=1):
+        """Percentual da maquininha para a forma e o número de parcelas (0 fora do cartão)."""
+        if forma == FormaPagamento.DEBITO:
+            return Decimal(self.debito)
+        if forma == FormaPagamento.CREDITO:
+            return Decimal(str(self.credito.get(str(parcelas), "0")))
+        return Decimal("0")
+
+    def acrescimo(self, base, forma, parcelas=1):
+        """Quanto somar a `base` para a loja receber `base` limpo depois da taxa."""
+        t = self.taxa(forma, parcelas) / 100
+        if t <= 0 or t >= 1:
+            return Decimal("0.00")
+        return (base / (1 - t) - base).quantize(CENTAVO)

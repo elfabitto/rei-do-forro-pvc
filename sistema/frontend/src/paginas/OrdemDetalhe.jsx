@@ -16,6 +16,7 @@ import {
   baixarImagemOS, compartilharOS, copiarImagemOS, itensExtras, montarOS, resumoRipao,
 } from "../osDoc";
 import FinalizarModal from "./FinalizarModal";
+import ReciboModal from "./ReciboModal";
 import ReagendarModal from "./ReagendarModal";
 import { periodoTexto } from "../agendaTexto";
 
@@ -32,6 +33,8 @@ export default function OrdemDetalhe({ id, aoFechar, aoMudar }) {
 
   const [msg, setMsg] = useState("");
   const [finalizando, setFinalizando] = useState(false);
+  // recibo aberto: { os, recem } — `recem` quando acabou de finalizar
+  const [recibo, setRecibo] = useState(null);
   const [cancelando, setCancelando] = useState(false);
   const [remarcando, setRemarcando] = useState(null);
 
@@ -134,6 +137,17 @@ export default function OrdemDetalhe({ id, aoFechar, aoMudar }) {
                   </BotaoAcao>
                 </div>
               </section>
+
+              {os.status === "finalizada" && (
+                <section className="sec">
+                  <h4>Recibo do cliente</h4>
+                  <div className="acts" style={{ padding: 0 }}>
+                    <button className="btn zap" onClick={() => setRecibo({ os, recem: false })}>
+                      <Icone nome="whatsapp" tamanho={15} /> Recibo — enviar ou baixar
+                    </button>
+                  </div>
+                </section>
+              )}
 
               <section className="sec">
                 <h4>Cliente e obra</h4>
@@ -263,7 +277,12 @@ export default function OrdemDetalhe({ id, aoFechar, aoMudar }) {
                           <tbody>
                             {os.pagamentos.map((p) => (
                               <tr key={p.id}>
-                                <td>{p.forma_display}</td>
+                                <td>
+                                  {p.forma_display}{p.parcelas > 1 ? ` ${p.parcelas}x` : ""}
+                                  {Number(p.acrescimo) > 0 && (
+                                    <div className="sub2">inclui {brl(p.acrescimo)} de taxa do cartão</div>
+                                  )}
+                                </td>
                                 <td>{data(p.data)}</td>
                                 <td className="num">{brl(p.valor)}</td>
                               </tr>
@@ -323,7 +342,14 @@ export default function OrdemDetalhe({ id, aoFechar, aoMudar }) {
 
       {finalizando && os && (
         <FinalizarModal os={os} aoFechar={() => setFinalizando(false)}
-                        aoConcluir={() => { setFinalizando(false); atualizar(); }} />
+                        aoConcluir={(finalizada) => {
+                          setFinalizando(false);
+                          atualizar();
+                          if (finalizada) setRecibo({ os: finalizada, recem: true });
+                        }} />
+      )}
+      {recibo && (
+        <ReciboModal os={recibo.os} recemFinalizada={recibo.recem} aoFechar={() => setRecibo(null)} />
       )}
       {cancelando && os && (
         <Confirmacao

@@ -4,6 +4,7 @@ from .models import (
     Agendamento,
     Bloqueio,
     ConfiguracaoAgenda,
+    TaxasCartao,
     HistoricoOS,
     OrdemServico,
     Pagamento,
@@ -79,6 +80,17 @@ class ConfiguracaoAgendaAdmin(admin.ModelAdmin):
 
     def has_add_permission(self, request):
         return not ConfiguracaoAgenda.objects.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(TaxasCartao)
+class TaxasCartaoAdmin(admin.ModelAdmin):
+    list_display = ["__str__", "debito", "atualizado_em"]
+
+    def has_add_permission(self, request):
+        return not TaxasCartao.objects.exists()
 
     def has_delete_permission(self, request, obj=None):
         return False

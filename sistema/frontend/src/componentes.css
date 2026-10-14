@@ -318,3 +318,57 @@ input.preco.erro{border-color:var(--critical);background:#fdf2f2}
                     border-left:7px solid var(--s-instalacao);border-right:0}
 .prazo .seta span{position:relative;background:var(--s-instalacao-bg);padding:0 4px;font-size:11.5px;
                   font-weight:800;color:var(--orange-dk);white-space:nowrap}
+
+/* linhas de pagamento do fechamento: forma | (parcelas) | valor */
+.pgto{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+.pgto.parc{grid-template-columns:1fr 1.25fr .9fr}
+.valcampo{display:flex;align-items:center;gap:8px}
+.valcampo input{flex:1;min-width:0}
+.valcampo .lnk{white-space:nowrap;font-size:12px}
+@media (max-width:520px){
+  .pgto,.pgto.parc{grid-template-columns:1fr 1fr}
+  .pgto > :first-child{grid-column:1 / -1}
+}
+
+/* recibo do cliente */
+.recibo-acoes{display:flex;flex-wrap:wrap;gap:8px}
+.recibo-previa{margin-top:14px;border:1px solid var(--line);border-radius:8px;overflow:hidden;
+               background:var(--surface-2);max-height:56vh;overflow-y:auto}
+.recibo-previa img{display:block;width:100%;height:auto}
+@media (max-width:520px){ .recibo-acoes .btn{flex:1 1 100%} }
+
+/* fechamento: quanto passar na maquininha, com a taxa repassada ao cliente */
+.pgbloco{padding-bottom:4px;margin-bottom:8px;border-bottom:1px dashed var(--line)}
+.pgbloco:last-of-type{border-bottom:0}
+.maquininha{display:flex;gap:14px;align-items:center;margin:-4px 0 10px;padding:10px 12px;
+            background:var(--s-entrega-bg);border:1px solid #bcd5f3;border-radius:8px}
+.mq-valor{display:flex;flex-direction:column;min-width:150px}
+.mq-valor small{font-size:10.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:#1b5496}
+.mq-valor b{font-size:22px;color:#123f74;font-variant-numeric:tabular-nums}
+.mq-valor span{font-size:12.5px;font-weight:700;color:#1b5496}
+.mq-conta{display:flex;flex-direction:column;gap:2px;font-size:12.5px;color:var(--ink-2)}
+.mq-conta b{font-variant-numeric:tabular-nums}
+.mq-conta em{font-size:11.5px;color:var(--muted)}
+table.taxas input.preco{width:80px}
+@media (max-width:520px){ .maquininha{flex-direction:column;align-items:flex-start;gap:6px} }
+
+/* escolha de parcelas: lista própria, com o valor de cada parcela em itálico */
+.parcsel{position:relative}
+.parcsel-campo{width:100%;display:flex;align-items:center;gap:6px;text-align:left;font:inherit;
+  font-size:14px;padding:10px 12px;border:1px solid var(--line);border-radius:6px;background:var(--surface);
+  color:var(--ink);cursor:pointer;min-height:42px}
+.parcsel-campo i{color:var(--ink-2)}
+.parcsel-campo .ph{color:var(--muted)}
+.parcsel-campo .seta{margin-left:auto;color:var(--muted);font-size:12px}
+.parcsel.aberta .parcsel-campo{border-color:var(--orange);box-shadow:0 0 0 3px var(--orange-bg)}
+.parcsel-lista{list-style:none;margin:0;padding:4px;border:1px solid var(--line);border-radius:8px;
+  background:var(--surface);box-shadow:0 10px 28px rgba(20,22,26,.16);max-height:300px;overflow-y:auto;
+  position:absolute;top:calc(100% + 4px);left:0;z-index:20;min-width:100%;width:max-content}
+.parcsel-lista li{white-space:nowrap}
+.parcsel-lista li{display:flex;align-items:baseline;gap:6px;padding:8px 10px;border-radius:5px;cursor:pointer;font-size:14px}
+.parcsel-lista li:hover{background:var(--surface-2)}
+.parcsel-lista li.on{background:var(--orange-bg)}
+.parcsel-lista li i{color:var(--ink-2)}
+.parcsel-lista li .tot{margin-left:auto;font-size:11.5px;color:var(--muted)}
+input.travado{background:var(--surface-2);color:var(--ink);font-weight:700;cursor:default}
+.parcsel-campo{white-space:nowrap;overflow:hidden}

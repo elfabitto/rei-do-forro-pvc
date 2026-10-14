@@ -10,6 +10,7 @@ from apps.core.permissions import pode_editar_registro
 from apps.orcamentos.serializers import OrcamentoResumoSerializer
 
 from .models import (
+    FORMAS_ACEITAS,
     Agendamento,
     Bloqueio,
     FormaPagamento,
@@ -19,6 +20,7 @@ from .models import (
     Pagamento,
     StatusOS,
     TipoAgendamento,
+    TaxasCartao,
     TipoServico,
     Turno,
 )
@@ -77,7 +79,7 @@ class PagamentoSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Pagamento
-        fields = ["id", "ordem", "forma", "forma_display", "valor", "parcelas", "data",
+        fields = ["id", "ordem", "forma", "forma_display", "valor", "acrescimo", "parcelas", "data",
                   "observacao", "registrado_por", "registrado_por_nome", "registrado_em"]
         read_only_fields = ["registrado_por", "registrado_em"]
 
@@ -258,11 +260,20 @@ class MudarStatusSerializer(serializers.Serializer):
 
 
 class PagamentoEntradaSerializer(serializers.Serializer):
-    """Pagamento enviado dentro do fechamento — a O.S. já é a da própria rota."""
+    """
+    Pagamento enviado dentro do fechamento — a O.S. já é a da própria rota.
+    Só PIX, dinheiro, crédito e débito; parcelas só no crédito.
+    """
 
-    forma = serializers.ChoiceField(choices=FormaPagamento.choices)
+    forma = serializers.ChoiceField(choices=[(f.value, f.label) for f in FormaPagamento if f in FORMAS_ACEITAS])
+    # no cartão, o valor à vista que esta forma quita; o acréscimo é calculado aqui
     valor = serializers.DecimalField(max_digits=11, decimal_places=2, min_value=Decimal("0.01"))
-    parcelas = serializers.IntegerField(required=False, default=1, min_value=1)
+    parcelas = serializers.IntegerField(required=False, default=1, min_value=1, max_value=12)
+
+    def validate(self, attrs):
+        if attrs["forma"] != FormaPagamento.CREDITO:
+            attrs["parcelas"] = 1
+        return attrs
     observacao = serializers.CharField(required=False, allow_blank=True, default="")
 
 
@@ -273,6 +284,8 @@ class FinalizarSerializer(serializers.Serializer):
     desconto = serializers.DecimalField(max_digits=11, decimal_places=2, required=False)
     observacao = serializers.CharField(required=False, allow_blank=True, default="")
     pagamentos = PagamentoEntradaSerializer(many=True, required=False)
+
+
 
 
 class ReagendarSerializer(serializers.Serializer):
@@ -287,3 +300,25 @@ class BloqueioSerializer(serializers.ModelSerializer):
         model = Bloqueio
         fields = ["id", "data", "turno", "motivo", "criado_por"]
         read_only_fields = ["criado_por"]
+
+
+class TaxasCartaoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TaxasCartao
+        fields = ["debito", "credito", "atualizado_em"]
+        read_only_fields = ["atualizado_em"]
+
+    def validate_credito(self, valor):
+        limpo = {}
+        for n in range(1, TaxasCartao.PARCELAS_MAX + 1):
+            bruto = valor.get(str(n), valor.get(n))
+            if bruto in (None, ""):
+                continue
+            try:
+                taxa = Decimal(str(bruto).replace(",", "."))
+            except Exception:
+                raise serializers.ValidationError(f"Taxa inválida em {n}x.")
+            if not (0 <= taxa < 100):
+                raise serializers.ValidationError(f"Taxa de {n}x deve ficar entre 0 e 100%.")
+            limpo[str(n)] = str(taxa.quantize(Decimal("0.01")))
+        return limpo

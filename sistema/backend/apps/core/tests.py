@@ -12,7 +12,7 @@ from rest_framework.test import APITestCase
 
 from apps.catalogo.models import Acabamento, Forro, Material
 from apps.clientes.models import Cliente, Endereco
-from apps.ordens.models import ConfiguracaoAgenda, OrdemServico, StatusOS
+from apps.ordens.models import ConfiguracaoAgenda, OrdemServico, StatusOS, TaxasCartao
 
 D = Decimal
 Usuario = get_user_model()
@@ -168,6 +168,59 @@ class OrdemServicoApiTest(ApiBase):
         self.assertEqual(r.status_code, 200, r.data)
         self.assertEqual(r.data["status"], StatusOS.FINALIZADA)
         self.assertEqual(r.data["saldo"], "0.00")
+
+    def com_referencia(self):
+        os_ = self.nova()
+        os_.valor_vista, os_.valor_cartao = D("1000.00"), D("1100.00")
+        os_.save()
+        self.client.force_authenticate(self.diretor)
+        return os_
+
+    def test_cartao_repassa_a_taxa_da_maquininha_ao_cliente(self):
+        """1.500 no dinheiro; os 500 restantes em 3x a 6,10% viram 532,48 na maquininha."""
+        taxas = TaxasCartao.obter()
+        taxas.credito = {**taxas.credito, "3": "6.10"}
+        taxas.save()
+        os_ = self.com_referencia()
+        os_.valor_vista = D("2000.00")
+        os_.save()
+        r = self.client.post(f"/api/ordens-servico/{os_.id}/finalizar/", {
+            "pagamentos": [{"forma": "dinheiro", "valor": "1500.00"},
+                           {"forma": "credito", "valor": "500.00", "parcelas": 3}],
+        }, format="json")
+        self.assertEqual(r.status_code, 200, r.data)
+        self.assertEqual(r.data["modalidade"], "misto")
+        cartao = r.data["pagamentos"][1]
+        self.assertEqual(cartao["acrescimo"], "32.48")          # 500 / (1 − 0,061) − 500
+        self.assertEqual(cartao["valor"], "532.48")
+        self.assertEqual(r.data["valor_total"], "2032.48")      # à vista + acréscimo do cliente
+        self.assertEqual(r.data["saldo"], "0.00")
+
+    def test_cartao_a_menos_nao_finaliza_e_nada_fica_gravado(self):
+        os_ = self.com_referencia()
+        r = self.client.post(f"/api/ordens-servico/{os_.id}/finalizar/", {
+            "pagamentos": [{"forma": "pix", "valor": "400.00"},
+                           {"forma": "credito", "valor": "500.00"}],
+        }, format="json")
+        self.assertEqual(r.status_code, 400)
+        self.assertEqual(os_.pagamentos.count(), 0)
+
+    def test_so_diretor_altera_as_taxas(self):
+        self.client.force_authenticate(self.vendedor)
+        self.assertEqual(self.client.get("/api/taxas-cartao/").status_code, 200)
+        r = self.client.put("/api/taxas-cartao/", {"debito": "1.10", "credito": {"1": "3"}}, format="json")
+        self.assertEqual(r.status_code, 403)
+        self.client.force_authenticate(self.diretor)
+        r = self.client.put("/api/taxas-cartao/", {"debito": "1.10", "credito": {"1": "3,5"}}, format="json")
+        self.assertEqual(r.status_code, 200, r.data)
+        self.assertEqual(r.data["credito"], {"1": "3.50"})
+
+    def test_formas_antigas_nao_sao_aceitas(self):
+        os_ = self.com_referencia()
+        r = self.client.post(f"/api/ordens-servico/{os_.id}/finalizar/", {
+            "pagamentos": [{"forma": "boleto", "valor": "1000.00"}],
+        }, format="json")
+        self.assertEqual(r.status_code, 400)
 
     def test_vendedor_nao_troca_quem_trouxe_o_cliente(self):
         os_ = self.nova()

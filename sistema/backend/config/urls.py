@@ -12,6 +12,7 @@ from apps.ordens.views import (
     OrdemServicoViewSet,
     PagamentoViewSet,
     agenda_disponibilidade,
+    taxas_cartao,
     comissoes,
     painel,
 )
@@ -35,6 +36,7 @@ urlpatterns = [
     path("api/painel/", painel, name="painel"),
     path("api/comissoes/", comissoes, name="comissoes"),
     path("api/agenda/disponibilidade/", agenda_disponibilidade, name="agenda-disponibilidade"),
+    path("api/taxas-cartao/", taxas_cartao, name="taxas-cartao"),
     path("api/token/", TokenObtainPairView.as_view(), name="token"),
     path("api/token/refresh/", TokenRefreshView.as_view(), name="token-refresh"),
 ]

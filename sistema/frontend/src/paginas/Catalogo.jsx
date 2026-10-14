@@ -6,6 +6,7 @@ import { useState } from "react";
 import { api } from "../api";
 import { useAuth } from "../auth";
 import { BotaoAcao, Estado, linhas, useApi } from "../componentes";
+import { PARCELAS_MAX, acrescimoCartao } from "../cartao";
 import { brl } from "../orcamentoDoc";
 
 /** Célula de preço editável no lugar, salva ao sair do campo. */
@@ -33,6 +34,92 @@ function Preco({ registro, campo, recurso, editavel, aoSalvar }) {
     <input className={`preco ${estado}`} value={valor} inputMode="decimal"
            onChange={(e) => setValor(e.target.value)} onBlur={salvar}
            onKeyDown={(e) => e.key === "Enter" && e.target.blur()} />
+  );
+}
+
+/**
+ * Taxas da maquininha: o fechamento usa para repassar o custo do cartão ao
+ * cliente. Cada conta PagBank tem as suas (bandeira e faturamento mudam a taxa).
+ */
+function TaxasMaquininha({ editavel }) {
+  const taxas = useApi("/taxas-cartao/");
+  const [edicao, setEdicao] = useState(null);
+  const [estado, setEstado] = useState("");
+  const atual = edicao ?? taxas.dados;
+
+  const linhasTaxa = [["debito", "Débito"],
+    ...Array.from({ length: PARCELAS_MAX }, (_, i) => [String(i + 1), `Crédito ${i + 1}x`])];
+
+  const valorDe = (chave) => (chave === "debito" ? atual?.debito : atual?.credito?.[chave]) ?? "";
+  const mudar = (chave, v) => {
+    const base = edicao ?? { debito: taxas.dados.debito, credito: { ...taxas.dados.credito } };
+    setEdicao(chave === "debito"
+      ? { ...base, debito: v }
+      : { ...base, credito: { ...base.credito, [chave]: v } });
+  };
+
+  async function salvar() {
+    if (!edicao) return;
+    try {
+      const num = (v) => String(v).replace(",", ".");
+      const credito = Object.fromEntries(Object.entries(edicao.credito).map(([k, v]) => [k, num(v)]));
+      await api.put("/taxas-cartao/", { debito: num(edicao.debito), credito });
+      setEdicao(null);
+      taxas.recarregar();
+      setEstado("ok");
+      setTimeout(() => setEstado(""), 1600);
+    } catch {
+      setEstado("erro");
+    }
+  }
+
+  const exemplo = 1000;
+  return (
+    <div className="card" style={{ marginTop: 18 }}>
+      <header>
+        <h2>Taxas da maquininha</h2>
+        <span className="hint">PagBank — repassadas ao cliente no pagamento com cartão</span>
+      </header>
+      <Estado carregando={taxas.carregando} erro={taxas.erro}>
+        <div className="tw">
+          <table className="taxas">
+            <thead>
+              <tr><th>Forma</th><th className="num">Taxa (%)</th>
+                <th className="num">R$ 1.000 à vista vira</th><th className="num">Parcela</th></tr>
+            </thead>
+            <tbody>
+              {linhasTaxa.map(([chave, rotulo]) => {
+                const forma = chave === "debito" ? "debito" : "credito";
+                const parcelas = chave === "debito" ? 1 : Number(chave);
+                const t = String(valorDe(chave)).replace(",", ".");
+                const total = exemplo + acrescimoCartao(
+                  { debito: t, credito: { [chave]: t } }, exemplo, forma, parcelas);
+                return (
+                  <tr key={chave}>
+                    <td><b>{rotulo}</b></td>
+                    <td className="num">
+                      {editavel ? (
+                        <input className={`preco ${estado}`} inputMode="decimal"
+                               value={String(valorDe(chave)).replace(".", ",")}
+                               onChange={(e) => mudar(chave, e.target.value)} onBlur={salvar}
+                               onKeyDown={(e) => e.key === "Enter" && e.target.blur()} />
+                      ) : `${String(valorDe(chave)).replace(".", ",")}%`}
+                    </td>
+                    <td className="num">{brl(total)}</td>
+                    <td className="num compacto">{parcelas > 1 ? `${parcelas}x de ${brl(total / parcelas)}` : "—"}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </Estado>
+      <p className="obs">
+        Valores iniciais: tabela pública do PagBank (Visa/Master, faturamento de R$ 20 a 50 mil/mês,
+        recebimento no mesmo dia). <b>Troque pelas taxas da sua conta</b> — no app PagBank, em taxas
+        da maquininha. A loja recebe o valor à vista; o cliente paga valor ÷ (1 − taxa).
+      </p>
+    </div>
   );
 }
 
@@ -171,6 +258,8 @@ export default function Catalogo() {
           </p>
         </div>
       </div>
+
+      <TaxasMaquininha editavel={editavel} />
     </div>
   );
 }

@@ -2,6 +2,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import transaction
 from django.db.models import Count, DecimalField, Q, Sum
 from django.db.models.functions import Coalesce
 from django.utils import timezone
@@ -16,6 +17,10 @@ from apps.orcamentos.models import Orcamento, StatusOrcamento
 
 from .models import (
     COMISSAO_POR_M2,
+    FORMAS_CARTAO,
+    FORMAS_VISTA,
+    Modalidade,
+    TaxasCartao,
     Agendamento,
     OrdemServico,
     Pagamento,
@@ -32,6 +37,7 @@ from .serializers import (
     OrdemServicoSerializer,
     PagamentoSerializer,
     ReagendarSerializer,
+    TaxasCartaoSerializer,
 )
 
 ZERO = Coalesce(Sum("valor"), 0, output_field=DecimalField(max_digits=12, decimal_places=2))
@@ -85,6 +91,7 @@ class OrdemServicoViewSet(viewsets.ModelViewSet):
         return Response(OrdemServicoSerializer(os_, context={"request": request}).data)
 
     @action(detail=True, methods=["post"], permission_classes=[SomenteDiretor])
+    @transaction.atomic
     def finalizar(self, request, pk=None):
         """
         Fecha a O.S.: escolhe a modalidade (à vista ou cartão), aplica desconto
@@ -96,19 +103,32 @@ class OrdemServicoViewSet(viewsets.ModelViewSet):
         dados.is_valid(raise_exception=True)
         v = dados.validated_data
 
-        try:
-            if v.get("modalidade"):
-                os_.aplicar_modalidade(v["modalidade"])
-            if v.get("desconto") is not None:
-                os_.desconto = v["desconto"]
-            if v.get("modalidade") or v.get("desconto") is not None:
-                os_.save()
-        except DjangoValidationError as e:
-            raise ValidationError(e.message_dict if hasattr(e, "message_dict") else e.messages)
-
+        # O preço é o à vista. O que for pago no cartão leva o acréscimo da
+        # maquininha, pago pelo cliente: a loja recebe o valor à vista limpo.
+        taxas = TaxasCartao.obter()
+        novos = []
         for p in v.get("pagamentos", []):
+            acrescimo = taxas.acrescimo(p["valor"], p["forma"], p.get("parcelas", 1))
+            novos.append((p, acrescimo))
+
+        if v.get("desconto") is not None:
+            os_.desconto = v["desconto"]
+        acrescimos = sum((a for _, a in novos), Decimal("0")) + sum(
+            (pg.acrescimo for pg in os_.pagamentos.all()), Decimal("0"))
+        os_.valor_total = os_.valor_base_fechamento + acrescimos
+
+        formas = {p["forma"] for p, _ in novos} | {pg.forma for pg in os_.pagamentos.all()}
+        if formas and formas <= FORMAS_VISTA:
+            os_.modalidade = Modalidade.VISTA
+        elif formas and formas <= FORMAS_CARTAO:
+            os_.modalidade = Modalidade.CARTAO
+        elif formas:
+            os_.modalidade = Modalidade.MISTO
+        os_.save()
+
+        for p, acrescimo in novos:
             Pagamento.objects.create(
-                ordem=os_, forma=p["forma"], valor=p["valor"],
+                ordem=os_, forma=p["forma"], valor=p["valor"] + acrescimo, acrescimo=acrescimo,
                 parcelas=p.get("parcelas", 1), observacao=p.get("observacao", ""),
                 registrado_por=request.user,
             )
@@ -276,6 +296,21 @@ def agenda_disponibilidade(request):
         "duracao_dias": duracao / 2 if duracao else None,
         "dias": dias,
     })
+
+
+# ------------------------------------------------------------- taxas do cartão
+@api_view(["GET", "PUT"])
+@permission_classes([IsAuthenticated])
+def taxas_cartao(request):
+    """Taxas da maquininha: todos leem (o fechamento usa); só a diretoria altera."""
+    taxas = TaxasCartao.obter()
+    if request.method == "PUT":
+        if not request.user.e_diretor:
+            return Response({"detail": "Apenas a diretoria altera as taxas."}, status=http.HTTP_403_FORBIDDEN)
+        dados = TaxasCartaoSerializer(taxas, data=request.data)
+        dados.is_valid(raise_exception=True)
+        dados.save()
+    return Response(TaxasCartaoSerializer(taxas).data)
 
 
 # ----------------------------------------------------------------- comissões
