@@ -49,7 +49,7 @@ jobs:
           rm banco.dump
 
       - name: Guarda por 30 dias
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7   # roda no Node 24 (a v4 usa o Node 20, que o GitHub está desligando)
         with:
           name: backup-banco-${{ github.run_number }}
           path: banco-*.dump.gpg

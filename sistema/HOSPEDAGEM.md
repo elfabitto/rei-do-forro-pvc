@@ -84,7 +84,7 @@ acesso, e a diretoria pode redefinir em **Usuários**.
 
    O resto (chave secreta, `DEBUG=False`, versões do Python e do Node) já vem pronto.
 4. **Apply**. O primeiro build leva uns 5 minutos. No fim aparece o endereço, algo
-   como `https://reidoforro.onrender.com`.
+   como `https://rei-do-forro.onrender.com` (o endereço é fixado quando o serviço é criado; trocar o nome depois não muda).
 
 ### 4. Primeiro acesso
 

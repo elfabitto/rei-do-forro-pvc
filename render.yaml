@@ -3,7 +3,7 @@
 # Guia passo a passo: sistema/HOSPEDAGEM.md
 services:
   - type: web
-    name: reidoforro          # vira o endereço: https://reidoforro.onrender.com
+    name: reidoforro          # nome no painel; o endereço (rei-do-forro.onrender.com) foi fixado na criação
     runtime: python
     plan: free
     region: virginia          # perto do Supabase em us-east-1 (cada consulta ao banco atravessa essa distância)
