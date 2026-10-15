@@ -118,7 +118,7 @@
     padding:9px 14px;box-shadow:var(--shadow);border-left:4px solid var(--deemph)}
 .rp b{font-size:20px}
 .rp span{font-size:12.5px;color:var(--muted);font-weight:700}
-.rp.diretor{border-left-color:var(--ink)}
+.rp.diretor,.rp.ti{border-left-color:var(--ink)}
 .rp.administrativo{border-left-color:var(--s-entrega)}
 .rp.vendedor{border-left-color:var(--orange)}
 .usuTab tbody tr{cursor:pointer}
@@ -128,11 +128,11 @@
 .usuNome{display:flex;align-items:center;gap:9px}
 .avatarMini{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:800;
             color:#fff;background:var(--orange);flex:0 0 auto}
-.avatarMini.diretor{background:var(--ink)}
+.avatarMini.diretor,.avatarMini.ti{background:var(--ink)}
 .avatarMini.administrativo{background:var(--s-entrega)}
 .voce{font-size:10.5px;font-weight:800;color:var(--orange-dk);background:var(--orange-bg);padding:1px 7px;border-radius:999px}
 .papelTag{background:var(--orange-bg);color:var(--orange-dk)}
-.papelTag.diretor{background:var(--ink);color:#fff}
+.papelTag.diretor,.papelTag.ti{background:var(--ink);color:#fff}
 .papelTag.administrativo{background:var(--s-entrega-bg);color:#1b5496}
 .senhaCampo{display:flex;gap:6px}
 .senhaCampo input{flex:1;min-width:0}

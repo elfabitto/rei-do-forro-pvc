@@ -78,7 +78,12 @@ class NotificacaoApiTest(OSFinalizadaMixin, ApiBase):
 
 
 class ChamadoApiTest(OSFinalizadaMixin, ApiBase):
+    """Chamados são do TI: a diretoria não atende."""
+
     def test_fluxo_do_chamado(self):
+        from apps.contas.models import Usuario
+        ti = Usuario.objects.create_user("fabio.lima", papel="ti", first_name="Fábio")
+
         self.client.force_authenticate(self.vendedor)
         r = self.client.post("/api/chamados/", {
             "titulo": "Filtro por bairro", "descricao": "Queria filtrar clientes por bairro",
@@ -86,23 +91,38 @@ class ChamadoApiTest(OSFinalizadaMixin, ApiBase):
         }, format="json")
         self.assertEqual(r.status_code, 201, r.data)
         cid = r.data["id"]
-        self.assertTrue(Notificacao.objects.filter(usuario=self.diretor, tipo="chamado").exists())
+        self.assertTrue(Notificacao.objects.filter(usuario=ti, tipo="chamado").exists())
+        self.assertFalse(Notificacao.objects.filter(usuario=self.diretor, tipo="chamado").exists())
 
         # vendedor não muda o status
         r = self.client.patch(f"/api/chamados/{cid}/", {"status": "concluido"}, format="json")
         self.assertEqual(r.status_code, 403)
 
+        # nem a diretoria — ela nem vê o chamado dos outros
         self.client.force_authenticate(self.diretor)
+        r = self.client.patch(f"/api/chamados/{cid}/", {"status": "concluido"}, format="json")
+        self.assertEqual(r.status_code, 404)
+
+        self.client.force_authenticate(ti)
         r = self.client.patch(f"/api/chamados/{cid}/", {"status": "em_andamento",
                                                          "resposta": "Entra na próxima versão."}, format="json")
         self.assertEqual(r.status_code, 200, r.data)
-        self.assertEqual(r.data["respondido_por_nome"], "Alan")
+        self.assertEqual(r.data["respondido_por_nome"], "Fábio")
         self.assertTrue(Notificacao.objects.filter(usuario=self.vendedor, tipo="chamado").exists())
 
-        # cada um só vê os próprios
+        # cada um só vê os próprios; o TI vê todos
         Chamado.objects.create(titulo="do diretor", descricao="x", autor=self.diretor)
         self.client.force_authenticate(self.vendedor)
         self.assertEqual(len(self.client.get("/api/chamados/").data), 1)
+        self.client.force_authenticate(ti)
+        self.assertEqual(len(self.client.get("/api/chamados/").data), 2)
+
+    def test_ti_tem_acesso_de_diretor(self):
+        from apps.contas.models import Usuario
+        ti = Usuario.objects.create_user("fabio.lima", papel="ti")
+        self.assertTrue(ti.e_diretor and ti.pode_ver_financeiro and ti.pode_finalizar_os)
+        self.assertTrue(ti.pode_atender_chamados)
+        self.assertFalse(self.diretor.pode_atender_chamados)
 
 
 class UsuarioCadastroTest(OSFinalizadaMixin, ApiBase):

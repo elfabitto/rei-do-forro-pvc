@@ -566,3 +566,35 @@ class ItemOutroApiTest(ApiBase):
         }, format="json")
         self.assertEqual(r.status_code, 201, r.data)
         self.assertEqual(r.data["total_vista"], "1127.40")     # 777,40 + 250 + 100
+
+
+class ExcluirOSApiTest(OSFinalizadaMixin, ApiBase):
+    """Excluir a O.S. apaga ela e tudo que ela gerou — só a diretoria."""
+
+    def test_vendedor_nao_exclui(self):
+        os_ = self.finalizada()
+        self.client.force_authenticate(self.vendedor)
+        r = self.client.delete(f"/api/ordens-servico/{os_['id']}/")
+        self.assertEqual(r.status_code, 403)
+        self.assertTrue(OrdemServico.objects.filter(pk=os_["id"]).exists())
+
+    def test_diretor_exclui_sem_deixar_rastro(self):
+        from apps.comunicacao.models import Notificacao
+        from apps.financeiro.models import Lancamento
+        from apps.orcamentos.models import Orcamento
+        from apps.ordens.models import Agendamento, HistoricoOS, Pagamento
+
+        os_ = self.finalizada()
+        self.client.post(f"/api/ordens-servico/{os_['id']}/pagar_comissao/", {}, format="json")
+        self.assertTrue(Lancamento.objects.filter(ordem_id=os_["id"]).exists())
+        self.assertTrue(Notificacao.objects.exists())
+
+        r = self.client.delete(f"/api/ordens-servico/{os_['id']}/")
+        self.assertEqual(r.status_code, 204, getattr(r, "data", None))
+        self.assertFalse(OrdemServico.objects.filter(pk=os_["id"]).exists())
+        self.assertFalse(Lancamento.objects.exists())
+        self.assertFalse(Pagamento.objects.exists())
+        self.assertFalse(Agendamento.objects.exists())
+        self.assertFalse(HistoricoOS.objects.exists())
+        self.assertFalse(Notificacao.objects.exists())
+        self.assertEqual(Orcamento.objects.get(pk=os_["orcamento"]).status, "aberto")

@@ -6,6 +6,7 @@ class Papel(models.TextChoices):
     DIRETOR = "diretor", "Diretor"
     ADMINISTRATIVO = "administrativo", "Administrativo"
     VENDEDOR = "vendedor", "Vendedor"
+    TI = "ti", "TI"
 
 
 class Usuario(AbstractUser):
@@ -34,11 +35,12 @@ class Usuario(AbstractUser):
     # --- atalhos de permissão, usados pelas views e pelo serializer ---
     @property
     def e_diretor(self):
-        return self.papel == Papel.DIRETOR or self.is_superuser
+        # o TI tem o mesmo acesso da diretoria
+        return self.papel in (Papel.DIRETOR, Papel.TI) or self.is_superuser
 
     @property
     def pode_ver_financeiro(self):
-        return self.papel in (Papel.DIRETOR, Papel.ADMINISTRATIVO) or self.is_superuser
+        return self.papel in (Papel.DIRETOR, Papel.TI, Papel.ADMINISTRATIVO) or self.is_superuser
 
     @property
     def pode_finalizar_os(self):
@@ -52,8 +54,13 @@ class Usuario(AbstractUser):
 
     @property
     def pode_ver_tudo(self):
-        return self.papel in (Papel.DIRETOR, Papel.ADMINISTRATIVO) or self.is_superuser
+        return self.papel in (Papel.DIRETOR, Papel.TI, Papel.ADMINISTRATIVO) or self.is_superuser
 
     @property
     def pode_vender(self):
-        return self.papel in (Papel.DIRETOR, Papel.ADMINISTRATIVO, Papel.VENDEDOR) or self.is_superuser
+        return self.papel in (Papel.DIRETOR, Papel.TI, Papel.ADMINISTRATIVO, Papel.VENDEDOR) or self.is_superuser
+
+    @property
+    def pode_atender_chamados(self):
+        """Ver todos os chamados, responder e mudar o status: só o TI."""
+        return self.papel == Papel.TI

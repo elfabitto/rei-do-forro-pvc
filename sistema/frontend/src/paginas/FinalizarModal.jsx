@@ -16,16 +16,23 @@ import { api, brl } from "../api";
 import { PARCELAS_MAX, acrescimoCartao, taxaDe } from "../cartao";
 import { BotaoAcao, Campo, Modal, Selecao, useApi } from "../componentes";
 import Icone from "../icones";
+import { decimal } from "../mascaras";
 
 const FORMAS = [["pix", "PIX"], ["dinheiro", "Dinheiro"],
   ["credito", "Cartão de crédito"], ["debito", "Cartão de débito"]];
 const ehCartao = (forma) => forma === "credito" || forma === "debito";
 
+/*
+ * Os campos de valor guardam sempre o formato da máscara: só dígitos e vírgula
+ * ("1234,50"), sem "R$" nem ponto de milhar — senão a conta se perde.
+ */
 const paraNumero = (v) => {
-  const n = parseFloat(String(v).replace(/\./g, "").replace(",", "."));
+  const n = parseFloat(decimal(v).replace(",", "."));
   return isFinite(n) ? n : 0;
 };
 const cent = (n) => Math.round(n * 100) / 100;
+/** 1234.5 → "1234,50", no formato que o campo aceita */
+const paraCampo = (n) => cent(n).toFixed(2).replace(".", ",");
 /** 1234.5 → "1.234,50" (sem R$, para caber na lista de parcelas) */
 const num2 = (n) => Number(n).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const pct = (n) => `${Number(n).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
@@ -179,7 +186,7 @@ export default function FinalizarModal({ os, aoFechar, aoConcluir }) {
 
       <Campo rotulo="Desconto" dica="Opcional — o preço pode ser negociado. Abate do valor à vista.">
         <input value={desconto} inputMode="decimal" placeholder="0,00"
-               onChange={(e) => setDesconto(e.target.value)} />
+               onChange={(e) => setDesconto(decimal(e.target.value))} />
       </Campo>
 
       <div className="lbl" style={{ marginTop: 6 }}>Pagamentos recebidos</div>
@@ -206,10 +213,10 @@ export default function FinalizarModal({ os, aoFechar, aoConcluir }) {
               <Campo rotulo="Valor">
                 <div className="valcampo">
                   <input value={l.valor} inputMode="decimal" placeholder="0,00"
-                         onChange={(e) => mudar(i, "valor", e.target.value)} />
+                         onChange={(e) => mudar(i, "valor", decimal(e.target.value))} />
                   {restante > 0.004 && (
                     <button type="button" className="lnk"
-                            onClick={() => mudar(i, "valor", brl(cent(paraNumero(l.valor) + restante)))}>
+                            onClick={() => mudar(i, "valor", paraCampo(paraNumero(l.valor) + restante))}>
                       completar
                     </button>
                   )}

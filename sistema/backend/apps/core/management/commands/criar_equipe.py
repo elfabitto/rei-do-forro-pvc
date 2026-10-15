@@ -19,6 +19,7 @@ EQUIPE = [
     ("felipe.marques",   "Felipe",   "Marques",  "diretor"),
     ("luciene.marques",  "Luciene",  "Marques",  "diretor"),
     ("jessica.barbosa",  "Jessica",  "Barbosa",  "vendedor"),
+    ("fabio.lima",       "Fábio",    "Lima",     "ti"),         # acesso total; o único que atende os chamados
 ]
 
 # logins antigos que viram os novos (mantém histórico e senha de quem já existia)
@@ -47,7 +48,7 @@ class Command(BaseCommand):
             usuario.last_name = sobrenome
             usuario.papel = papel
             usuario.is_active = True
-            usuario.is_staff = usuario.is_superuser = papel == "diretor"
+            usuario.is_staff = usuario.is_superuser = papel in ("diretor", "ti")
             if novo or opcoes["redefinir_senha"]:
                 usuario.set_password(senha)
             usuario.save()

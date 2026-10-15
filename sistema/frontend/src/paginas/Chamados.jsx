@@ -2,7 +2,7 @@
  * Sugestões e melhorias — chamados para o TI.
  *
  * Qualquer pessoa abre um chamado e acompanha os próprios; enquanto está
- * aberto, ela ainda pode editar. A diretoria (o TI) vê todos, muda o status
+ * aberto, ela ainda pode editar. O TI vê todos, muda o status
  * e responde — quem abriu recebe o aviso no sino.
  */
 import { useMemo, useState } from "react";

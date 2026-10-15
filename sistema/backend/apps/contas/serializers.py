@@ -34,8 +34,9 @@ class EuSerializer(UsuarioSerializer):
             "finalizarOS": obj.pode_finalizar_os,
             "verPainel": obj.e_diretor,
             "gerirUsuarios": obj.e_diretor,
-            "atenderChamados": obj.e_diretor,
+            "atenderChamados": obj.pode_atender_chamados,
             "cancelarOS": obj.e_diretor,
+            "excluirOS": obj.e_diretor,
             "trocarVendedor": obj.pode_trocar_vendedor,
             "verTudo": obj.pode_ver_tudo,
             "vender": obj.pode_vender,
@@ -82,7 +83,7 @@ class UsuarioGestaoSerializer(UsuarioSerializer):
         if self.instance and self.instance.pk == eu.pk:
             if dados.get("is_active") is False:
                 raise serializers.ValidationError({"is_active": "Você não pode desativar o próprio acesso."})
-            if dados.get("papel", eu.papel) != Papel.DIRETOR and not eu.is_superuser:
+            if dados.get("papel", eu.papel) not in (Papel.DIRETOR, Papel.TI) and not eu.is_superuser:
                 raise serializers.ValidationError({"papel": "Você não pode tirar o próprio acesso de diretor."})
         if not self.instance and not dados.get("senha"):
             raise serializers.ValidationError({"senha": "Informe uma senha inicial."})

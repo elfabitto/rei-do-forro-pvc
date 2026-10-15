@@ -14,6 +14,8 @@ import { erroEmail, erroTelefone, nomeProprio, telefone } from "../mascaras";
 const PAPEIS = [
   { valor: "diretor", rotulo: "Diretor", plural: "Diretores",
     dica: "Tudo: painel, financeiro, finaliza e cancela O.S., dá baixa em comissões, cadastra usuários." },
+  { valor: "ti", rotulo: "TI", plural: "TI",
+    dica: "O mesmo acesso da diretoria e, só ele, atende e responde os chamados." },
   { valor: "administrativo", rotulo: "Administrativo", plural: "Administrativos",
     dica: "Vê todas as vendas e o financeiro; não finaliza O.S. nem cadastra usuários." },
   { valor: "vendedor", rotulo: "Vendedor", plural: "Vendedores",
@@ -117,7 +119,7 @@ function FormUsuario({ usuario, eu, aoFechar, aoSalvar }) {
         <Campo rotulo="Função">
           <div className="papeis">
             {PAPEIS.map((p) => (
-              <button key={p.valor} type="button" disabled={souEu && p.valor !== "diretor"}
+              <button key={p.valor} type="button" disabled={souEu && !["diretor", "ti"].includes(p.valor)}
                       className={`${p.valor}${u.papel === p.valor ? " on" : ""}`}
                       onClick={() => setU((s) => ({ ...s, papel: p.valor }))}>
                 <b>{p.rotulo}</b><small>{p.dica}</small>
@@ -147,7 +149,7 @@ export default function Usuarios() {
   const todos = dados || [];
   const lista = useMemo(() => {
     const q = busca.trim().toLowerCase();
-    const ordem = { diretor: 0, administrativo: 1, vendedor: 2 };
+    const ordem = { diretor: 0, ti: 1, administrativo: 2, vendedor: 3 };
     return todos
       .filter((u) => (inativos || u.is_active) && (!q || `${u.nome} ${u.username} ${u.email}`.toLowerCase().includes(q)))
       .sort((a, b) => (b.is_active - a.is_active) || (ordem[a.papel] ?? 9) - (ordem[b.papel] ?? 9) || a.nome.localeCompare(b.nome));

@@ -7,7 +7,7 @@ from rest_framework.response import Response
 
 from .models import Chamado, Notificacao, StatusChamado, TipoNotificacao
 from .serializers import ChamadoSerializer, NotificacaoSerializer
-from .servicos import notificar, notificar_diretoria
+from .servicos import notificar, notificar_ti
 
 
 # ---------------------------------------------------------------- notificações
@@ -49,7 +49,7 @@ CAMPOS_DO_TI = {"status", "resposta"}
 class ChamadoViewSet(viewsets.ModelViewSet):
     """
     Sugestões e melhorias para o TI. Cada um vê e edita (enquanto aberto) os
-    próprios; a diretoria vê todos, muda o status e responde.
+    próprios; o TI vê todos, muda o status e responde.
     """
 
     serializer_class = ChamadoSerializer
@@ -60,21 +60,21 @@ class ChamadoViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = Chamado.objects.select_related("autor", "respondido_por")
-        if not self.request.user.e_diretor:
+        if not self.request.user.pode_atender_chamados:
             qs = qs.filter(autor=self.request.user)
         return qs
 
     def perform_create(self, serializer):
         c = serializer.save(autor=self.request.user, status=StatusChamado.ABERTO, resposta="")
         nome = self.request.user.get_full_name() or self.request.user.username
-        notificar_diretoria(TipoNotificacao.CHAMADO, f"Chamado #{c.numero}: {c.titulo}",
+        notificar_ti(TipoNotificacao.CHAMADO, f"Chamado #{c.numero}: {c.titulo}",
                             f"{nome} abriu um chamado ({c.get_categoria_display().lower()}).",
                             "/chamados", exceto=self.request.user)
 
     def perform_update(self, serializer):
         c, u = serializer.instance, self.request.user
         campos = set(serializer.validated_data)
-        if not u.e_diretor:
+        if not u.pode_atender_chamados:
             if c.autor_id != u.id or c.status != StatusChamado.ABERTO:
                 raise PermissionDenied("Só dá para editar o próprio chamado enquanto está aberto.")
             if campos & CAMPOS_DO_TI:
@@ -92,6 +92,6 @@ class ChamadoViewSet(viewsets.ModelViewSet):
 
     def perform_destroy(self, instance):
         u = self.request.user
-        if not (u.e_diretor or (instance.autor_id == u.id and instance.status == StatusChamado.ABERTO)):
+        if not (u.pode_atender_chamados or (instance.autor_id == u.id and instance.status == StatusChamado.ABERTO)):
             raise PermissionDenied("Só dá para excluir o próprio chamado enquanto está aberto.")
         instance.delete()

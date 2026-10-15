@@ -37,6 +37,7 @@ export default function OrdemDetalhe({ id, aoFechar, aoMudar }) {
   const [recibo, setRecibo] = useState(null);
   const [cancelando, setCancelando] = useState(false);
   const [remarcando, setRemarcando] = useState(null);
+  const [excluindo, setExcluindo] = useState(false);
 
   function atualizar() {
     recarregar();
@@ -59,6 +60,14 @@ export default function OrdemDetalhe({ id, aoFechar, aoMudar }) {
     await mudarStatus("cancelada", "Cancelada pela diretoria");
     setCancelando(false);
     return "cancelado";
+  }
+
+  async function excluir() {
+    await api.delete(`/ordens-servico/${os.id}/`);
+    setExcluindo(false);
+    aoMudar?.();
+    aoFechar();
+    return "excluída";
   }
 
   async function trocarVendedor(novo) {
@@ -105,6 +114,11 @@ export default function OrdemDetalhe({ id, aoFechar, aoMudar }) {
                     onClick={() => setCancelando(true)}>
               <Icone nome="fechar" tamanho={15} /> Cancelar Serviço
             </button>
+            {pode("excluirOS") && (
+              <button className="btn vermelho" onClick={() => setExcluindo(true)}>
+                <Icone nome="lixo" tamanho={15} /> Excluir O.S.
+              </button>
+            )}
           </div>
         )}
       >
@@ -361,6 +375,18 @@ export default function OrdemDetalhe({ id, aoFechar, aoMudar }) {
           rotulo="Sim, cancelar o serviço"
           aoFechar={() => setCancelando(false)}
           aoConfirmar={cancelar}
+        />
+      )}
+      {excluindo && os && (
+        <Confirmacao
+          titulo="Excluir O.S. de vez"
+          subtitulo={`${os.numero} — ${os.cliente_detalhe?.nome}`}
+          aviso="Apaga a O.S. do sistema e do banco: pagamentos, lançamentos no Financeiro,
+                 comissão, agenda, histórico e avisos. Não fica registro e não tem como desfazer.
+                 O orçamento de origem volta a ficar em aberto."
+          rotulo="Sim, excluir de vez"
+          aoFechar={() => setExcluindo(false)}
+          aoConfirmar={excluir}
         />
       )}
       {remarcando && os && (

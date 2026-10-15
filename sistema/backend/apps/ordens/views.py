@@ -64,6 +64,30 @@ class OrdemServicoViewSet(viewsets.ModelViewSet):
     def get_serializer_class(self):
         return OrdemServicoListaSerializer if self.action == "list" else OrdemServicoSerializer
 
+    def get_permissions(self):
+        # apagar some com a O.S. e com o rastro dela no caixa: só a diretoria
+        if self.action == "destroy":
+            return [SomenteDiretor()]
+        return super().get_permissions()
+
+    @transaction.atomic
+    def perform_destroy(self, instance):
+        """
+        Exclusão definitiva: a O.S. e tudo que ela gerou — lançamentos do
+        Financeiro (pagamentos e comissão), pagamentos, agenda, histórico e os
+        avisos do sino. O orçamento de origem volta a ficar em aberto.
+        """
+        from apps.comunicacao.models import Notificacao
+        from apps.financeiro.models import Lancamento
+
+        Lancamento.objects.filter(Q(ordem=instance) | Q(pagamento__ordem=instance)).delete()
+        Notificacao.objects.filter(
+            titulo__in=[f"{instance.numero} finalizada", f"Comissão paga — {instance.numero}"]
+        ).delete()
+        if instance.orcamento_id:
+            Orcamento.objects.filter(pk=instance.orcamento_id).update(status=StatusOrcamento.ABERTO)
+        instance.delete()   # pagamentos, agendamentos e histórico vão junto (CASCADE)
+
     def perform_create(self, serializer):
         """
         Quem trouxe o cliente é, por padrão, o usuário logado. A diretoria pode
