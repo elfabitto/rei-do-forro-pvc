@@ -141,6 +141,8 @@ if FRONTEND_DIST.is_dir():
     WHITENOISE_ROOT = FRONTEND_DIST
     # arquivos de /assets/ têm hash no nome: podem ficar em cache para sempre
     WHITENOISE_IMMUTABLE_FILE_TEST = lambda caminho, url: url.startswith("/assets/")  # noqa: E731
+    # o Python não conhece .webmanifest; sem isto o atalho do celular sai como arquivo genérico
+    WHITENOISE_MIMETYPES = {".webmanifest": "application/manifest+json"}
 
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
