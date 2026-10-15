@@ -102,6 +102,10 @@ if DATABASE_URL:
         _db["DISABLE_SERVER_SIDE_CURSORS"] = True
         _db["CONN_MAX_AGE"] = 0
     DATABASES = {"default": _db}
+elif not DEBUG:
+    # em produção, sem banco configurado é erro — não pode cair num SQLite que se apaga a cada deploy
+    from django.core.exceptions import ImproperlyConfigured
+    raise ImproperlyConfigured("DATABASE_URL não definida: configure o banco (Supabase) nas variáveis do serviço.")
 else:
     DATABASES = {
         "default": {

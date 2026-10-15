@@ -138,11 +138,5 @@ pg_restore --clean --if-exists --no-owner --dbname "<Session pooler 5432>" banco
   migrations sozinho. Mudanças só no `docs/` não republicam o sistema.
 - **Ver erros:** painel do Render → serviço → **Logs**.
 - **Admin do Django:** `https://<seu-endereço>.onrender.com/admin/`.
-- **Testar o modo produção no computador:**
-  ```bash
-  cd sistema/frontend && npm run build
-  cd ../backend && DEBUG=False python manage.py collectstatic --noinput
-  DEBUG=False python manage.py runserver 8001     # http://127.0.0.1:8001
-  ```
-  Apague `frontend/dist` depois. No desenvolvimento normal, quem serve as telas é o
-  Vite (porta 5173).
+- Sem `DATABASE_URL`, o sistema **não sobe** com `DEBUG=False`: o erro aparece no log do Render
+  em vez de o sistema rodar com um banco vazio e temporário.
