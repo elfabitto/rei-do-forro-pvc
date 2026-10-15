@@ -77,14 +77,14 @@ acesso, e a diretoria pode redefinir em **Usuários**.
 
 1. Em <https://render.com>, entre com a conta do GitHub.
 2. **New → Blueprint** e escolha o repositório `rei-do-forro-pvc`. O Render lê o
-   `render.yaml` da raiz e monta o serviço `rei-do-forro` (plano Free, Virgínia).
+   `render.yaml` da raiz e monta o serviço `reidoforro` (plano Free, Virgínia).
 3. Ele pede as duas variáveis marcadas para preencher:
    - `DATABASE_URL`: o **Transaction pooler (6543)**
    - `DATABASE_URL_MIGRACAO`: o **Session pooler (5432)**
 
    O resto (chave secreta, `DEBUG=False`, versões do Python e do Node) já vem pronto.
 4. **Apply**. O primeiro build leva uns 5 minutos. No fim aparece o endereço, algo
-   como `https://rei-do-forro.onrender.com`.
+   como `https://reidoforro.onrender.com`.
 
 ### 4. Primeiro acesso
 
