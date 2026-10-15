@@ -1,0 +1,2 @@
+# scripts de shell rodam no Linux do Render: sempre com quebra de linha LF
+*.sh text eol=lf

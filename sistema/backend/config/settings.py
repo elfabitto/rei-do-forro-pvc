@@ -7,7 +7,11 @@ quando DATABASE_URL não estiver definida.
 Atenção ao pooler do Supabase: a porta 6543 é o pgbouncer em modo *transaction*, que
 não suporta conexão persistente nem server-side cursor. Por isso CONN_MAX_AGE fica em 0
 e DISABLE_SERVER_SIDE_CURSORS em True quando a URL aponta para o pooler. As migrations
-devem rodar contra a conexão direta (porta 5432) — veja o README.
+rodam pela porta 5432 do pooler (modo session) — veja sistema/HOSPEDAGEM.md.
+
+Em produção (Render) o Django serve também as telas do React: o build do Vite
+(frontend/dist) sai pela raiz via WhiteNoise, e qualquer rota que não seja da API,
+do admin ou de arquivo estático devolve o index.html (config/urls.py).
 """
 from datetime import timedelta
 from pathlib import Path
@@ -21,6 +25,20 @@ SECRET_KEY = config("SECRET_KEY", default="dev-inseguro-trocar-em-producao")
 DEBUG = config("DEBUG", default=True, cast=bool)
 ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="localhost,127.0.0.1", cast=Csv())
 CSRF_TRUSTED_ORIGINS = config("CSRF_TRUSTED_ORIGINS", default="", cast=Csv())
+
+# o Render informa o próprio endereço público (ex.: reidoforro.onrender.com)
+RENDER_HOST = config("RENDER_EXTERNAL_HOSTNAME", default="")
+if RENDER_HOST:
+    ALLOWED_HOSTS.append(RENDER_HOST)
+    CSRF_TRUSTED_ORIGINS.append(f"https://{RENDER_HOST}")
+
+if not DEBUG:
+    # o HTTPS termina no Render; o Django confia no cabeçalho do proxy
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_HSTS_SECONDS = 60 * 60 * 24 * 30
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -102,7 +120,7 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 LANGUAGE_CODE = "pt-br"
-TIME_ZONE = "America/Cuiaba"
+TIME_ZONE = "America/Belem"   # Belém e região: UTC-3, sem horário de verão
 USE_I18N = True
 USE_TZ = True
 
@@ -112,6 +130,14 @@ STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
     "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
 }
+# telas do React já compiladas (npm run build). No desenvolvimento a pasta não
+# existe e quem serve as telas é o Vite, na porta 5173.
+FRONTEND_DIST = BASE_DIR.parent / "frontend" / "dist"
+if FRONTEND_DIST.is_dir():
+    WHITENOISE_ROOT = FRONTEND_DIST
+    # arquivos de /assets/ têm hash no nome: podem ficar em cache para sempre
+    WHITENOISE_IMMUTABLE_FILE_TEST = lambda caminho, url: url.startswith("/assets/")  # noqa: E731
+
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
@@ -145,6 +171,14 @@ CORS_ALLOWED_ORIGINS = config(
     default="http://localhost:5173,http://127.0.0.1:5173",
     cast=Csv(),
 )
+
+# erros 500 aparecem no log do Render (sem DEBUG, o Django não mostraria em lugar nenhum)
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {"console": {"class": "logging.StreamHandler"}},
+    "loggers": {"django.request": {"handlers": ["console"], "level": "ERROR"}},
+}
 
 # ----------------------------------------------------------------- regras do negócio
 # Capacidade padrão da agenda; a ConfiguracaoAgenda no banco pode sobrescrever.

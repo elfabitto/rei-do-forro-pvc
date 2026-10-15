@@ -1,0 +1,30 @@
+# Render Blueprint — o sistema inteiro num serviço só: o Django responde a API
+# (/api), o admin (/admin) e entrega as telas do React já compiladas.
+# Guia passo a passo: sistema/HOSPEDAGEM.md
+services:
+  - type: web
+    name: rei-do-forro
+    runtime: python
+    plan: free
+    region: virginia          # perto do Supabase em us-east-1 (cada consulta ao banco atravessa essa distância)
+    branch: main
+    rootDir: sistema
+    buildCommand: bash build.sh
+    startCommand: cd backend && gunicorn config.wsgi --bind 0.0.0.0:$PORT --workers 2 --timeout 60 --access-logfile -
+    healthCheckPath: /api/saude/
+    autoDeploy: true          # push no main publica; com rootDir, mudar só o docs/ não republica
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.10
+      - key: NODE_VERSION
+        value: "22"
+      - key: DEBUG
+        value: "False"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ALLOWED_HOSTS
+        value: localhost        # o endereço .onrender.com entra sozinho (RENDER_EXTERNAL_HOSTNAME)
+      - key: DATABASE_URL       # pooler do Supabase, porta 6543 — preencher no painel
+        sync: false
+      - key: DATABASE_URL_MIGRACAO   # mesmo pooler, porta 5432 — preencher no painel
+        sync: false

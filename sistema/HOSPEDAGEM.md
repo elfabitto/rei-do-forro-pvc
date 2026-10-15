@@ -1,87 +1,148 @@
-# Hospedagem
+# Hospedagem — colocar o sistema no ar (grátis)
 
-> Preços conferidos até meados de 2026 — confirme antes de contratar, mudam com frequência.
+> Condições dos planos gratuitos conferidas em outubro de 2026. Elas mudam: confira
+> antes de depender delas.
 
-## Resposta curta
+## Como fica
 
-**Supabase: sim, boa escolha.** **Render: funciona, mas o plano gratuito não serve
-para uso diário** — e, se for pagar, há opção melhor para o Brasil.
+| Peça | Onde | Custo |
+|---|---|---|
+| Sistema inteiro — API Django **e** telas React, num endereço só | **Render**, plano Free | grátis |
+| Banco de dados (Postgres) | **Supabase**, plano Free | grátis |
+| Manter o servidor acordado | **UptimeRobot** (ou cron-job.org) | grátis |
+| Backup diário do banco | **GitHub Actions** (`.github/workflows/backup-banco.yml`) | grátis |
 
-## Supabase
+O site estático do GitHub Pages (`docs/`) não faz parte disso e não é afetado.
 
-Encaixa bem porque com Django você usa só o Postgres gerenciado, que é o pedaço
-mais chato de administrar. Vantagens concretas:
+No Render, o build (`sistema/build.sh`) compila o React, instala o Django e aplica as
+migrations. Depois o Django entrega a API em `/api`, o admin em `/admin` e as telas do
+React em todo o resto. Cada `git push` no `main` publica sozinho.
 
-- **Região São Paulo** (`sa-east-1`) — para Rondonópolis é a menor latência disponível.
-- Backup automático, painel de SQL, e um Storage pronto para quando quiser guardar
-  foto da obra junto da O.S.
-- Gratuito até 500 MB de banco. Pro ~US$ 25/mês quando apertar.
+### Limites que importam
 
-Dois pontos de atenção:
+- **Render Free dorme após 15 min sem acesso.** O primeiro acesso depois disso leva
+  cerca de 1 minuto. O monitoramento (passo 5) evita isso, acessando o sistema a cada
+  5 minutos. O plano dá 750 horas por mês, o suficiente para ficar ligado o mês todo.
+- **Supabase Free:** 500 MB de banco (sobra para anos de orçamentos), **pausa após 7
+  dias sem uso** (o monitoramento também conta como uso) e **não guarda backup**. Por
+  isso existe o backup diário do passo 6.
+- Se a espera ou os limites incomodarem: Render Starter (~US$ 7/mês, nunca dorme) e
+  Supabase Pro (~US$ 25/mês, backup incluso). Não muda nada no código.
 
-1. **Use o `auth` do Django, não o Supabase Auth.** Misturar os dois gera trabalho sem
-   retorno — o projeto já tem usuários, papéis e permissões no Django. Do Supabase,
-   use só o banco (e o Storage depois).
-2. **Pooler x conexão direta.** A porta `6543` é o pgbouncer em modo *transaction*, que
-   não aceita conexão persistente nem cursor do lado do servidor. Rode as *migrations*
-   pela porta `5432` (direta) e deixe a aplicação na `6543`. O `settings.py` já detecta
-   isso e ajusta `CONN_MAX_AGE` e `DISABLE_SERVER_SIDE_CURSORS` sozinho.
-3. No plano gratuito, o projeto **pausa após 7 dias sem acesso**. Em uso diário isso
-   nunca dispara, mas é bom saber antes de depender dele.
+### Por que tudo nos EUA (Virgínia) e não em São Paulo
 
-## Onde rodar o Django
+Cada tela faz várias consultas ao banco. O servidor do Render mais perto do Brasil fica
+na Virgínia. Com o banco em São Paulo, **cada consulta** atravessaria esse caminho (≈120 ms
+cada), e o Painel, com dezenas de consultas, levaria segundos. Com servidor e banco
+lado a lado na Virgínia, as consultas são quase instantâneas e só a ida e volta do
+celular até o servidor (≈130 ms, uma vez por tela) fica longa.
 
-| Opção | Custo inicial | Dorme? | Região BR | Observação |
-|---|---|---|---|---|
-| **Render Free** | US$ 0 | **sim, após 15 min** (~50 s para acordar) | não | Inviável: o vendedor abre o sistema e espera quase um minuto |
-| **Render Starter** | ~US$ 7/mês | não | não | Simples, suporte nativo a Django. Latência maior (EUA) |
-| **Fly.io** | ~US$ 3–5/mês | opcional | **sim (GRU)** | Mais rápido para o Brasil; exige Docker e um pouco mais de configuração |
-| **Railway** | ~US$ 5/mês de crédito | não | não | Mais fácil que o Fly, Postgres junto se quiser |
-| **Hostinger VPS** | ~US$ 5–8/mês | não | varia | O destino que você já tem em mente |
+---
 
-**Vercel não serve para o Django.** É excelente para a parte React, mas o backend
-teria de virar funções serverless — reescrita grande, sem ganho.
+## Passo a passo
 
-## O que eu faria
+### 1. Supabase — criar o banco
 
+1. Em <https://supabase.com>, entre e clique em **New project**.
+2. **Region: East US (North Virginia)**. Guarde a **senha do banco** que você definir.
+3. Com o projeto criado, clique em **Connect** (no topo) → aba **Connection string** →
+   **URI**. Você vai precisar de dois endereços do **pooler** (`…pooler.supabase.com`):
+   - **Transaction pooler**, porta **6543**: este é o `DATABASE_URL`.
+   - **Session pooler**, porta **5432**: este é o `DATABASE_URL_MIGRACAO`.
+
+   Troque `[YOUR-PASSWORD]` pela senha do banco. **Não use** o endereço
+   `db.<ref>.supabase.co`: ele só funciona em IPv6, e o Render não alcança.
+
+### 2. Carregar o catálogo e a equipe (uma vez, do seu computador)
+
+No PowerShell, dentro de `sistema/backend`, com o endereço **Session pooler (5432)**:
+
+```powershell
+$env:DATABASE_URL = "postgresql://postgres.<ref>:<senha>@aws-0-us-east-1.pooler.supabase.com:5432/postgres"
+.venv\Scripts\python.exe manage.py migrate
+.venv\Scripts\python.exe manage.py carregar_catalogo   # forros, materiais, acabamentos e comissões
+.venv\Scripts\python.exe manage.py criar_equipe --senha "<senha inicial>"   # Felipe, Luciene (diretoria) e Jessica
+Remove-Item Env:DATABASE_URL                           # volta a usar o SQLite local
 ```
-React  →  Cloudflare Pages ou Vercel   (grátis, rápido, build automático)
-Django →  Render Starter (simples) ou Fly.io GRU (mais rápido daqui)
-Banco  →  Supabase, região São Paulo
-```
 
-Separar o React do Django é o que dá flexibilidade: a interface é um monte de
-arquivos estáticos e pode morar em qualquer lugar de graça; só o Django precisa
-de servidor.
+A senha inicial vai na linha de comando, nunca no código (o repositório é público).
+Quem não está na equipe do comando é removido do banco. Cada um troca a senha no primeiro
+acesso, e a diretoria pode redefinir em **Usuários**.
 
-**Para começar com o menor atrito:** Render Starter + Supabase. É um painel só,
-deploy direto do GitHub, e o Django roda sem adaptação. Quando a latência incomodar
-ou a conta crescer, migrar para Fly.io ou para o VPS da Hostinger é trocar o
-`Dockerfile` de lugar — o código não muda.
+> Os dados do seu computador hoje (orçamentos e O.S. de teste) **não** vão para o banco
+> novo, e o sistema começa limpo. Se você alterou preços na Tabela de preços localmente,
+> confira-os de novo depois de publicar.
 
-**Não use o Render Free** para isso. 50 segundos de espera na primeira venda do dia
-acaba com a adoção do sistema pela equipe.
+### 3. Render — publicar o sistema
 
-## Migrar para a Hostinger depois
+1. Em <https://render.com>, entre com a conta do GitHub.
+2. **New → Blueprint** e escolha o repositório `rei-do-forro-pvc`. O Render lê o
+   `render.yaml` da raiz e monta o serviço `rei-do-forro` (plano Free, Virgínia).
+3. Ele pede as duas variáveis marcadas para preencher:
+   - `DATABASE_URL`: o **Transaction pooler (6543)**
+   - `DATABASE_URL_MIGRACAO`: o **Session pooler (5432)**
 
-O projeto já está preparado:
+   O resto (chave secreta, `DEBUG=False`, versões do Python e do Node) já vem pronto.
+4. **Apply**. O primeiro build leva uns 5 minutos. No fim aparece o endereço, algo
+   como `https://rei-do-forro.onrender.com`.
 
-- `gunicorn` e `whitenoise` nas dependências — servem a aplicação e os estáticos sem Nginx extra.
-- Toda a configuração sai de variáveis de ambiente (`.env.example`), nada fixo no código.
-- `DATABASE_URL` aponta para onde você quiser: Supabase ou um Postgres no próprio VPS.
+### 4. Primeiro acesso
 
-Na prática: VPS da Hostinger com Docker, um container para o Django e o React servido
-como estático. Se quiser trazer o banco junto, é um `pg_dump` do Supabase restaurado
-no VPS — mas manter o banco no Supabase é menos trabalho de manutenção e backup.
+Abra o endereço no celular, entre como `felipe.marques` com a senha inicial e **troque a senha**.
+Para instalar como aplicativo, use o menu do navegador → **Adicionar à tela inicial**.
 
-## Custo estimado para começar
+### 5. Manter acordado (UptimeRobot)
 
-| Item | Mês |
+1. Em <https://uptimerobot.com>, crie uma conta grátis.
+2. **New monitor** → tipo **HTTP(s)** → URL `https://<seu-endereço>.onrender.com/api/saude/`
+   → intervalo **5 minutos**.
+
+A rota `/api/saude/` não pede login e responde `{"ok": true, "banco": "ok"}`. Se o banco
+cair, ela responde erro 503, e o UptimeRobot avisa você por e-mail.
+
+### 6. Backup diário (GitHub Actions)
+
+No GitHub do repositório: **Settings → Secrets and variables → Actions → New repository
+secret**. Crie dois:
+
+| Secret | Valor |
 |---|---|
-| Supabase | US$ 0 (grátis até 500 MB) |
-| Render Starter | ~US$ 7 |
-| Cloudflare Pages (React) | US$ 0 |
-| **Total** | **~US$ 7/mês** (~R$ 40) |
+| `SUPABASE_DB_URL` | o **Session pooler (5432)** |
+| `BACKUP_SENHA` | uma senha longa. **Guarde fora do computador**: sem ela o backup não abre |
 
-Dá para começar em US$ 0 com o Render Free apenas para *testar em equipe*, aceitando
-a demora do primeiro acesso. Para uso real, o Starter é o mínimo.
+Depois, em **Actions → Backup do banco → Run workflow**, rode uma vez para testar. A partir
+daí roda sozinho todo dia às 03:00 e guarda os últimos 30 dias.
+
+O repositório é público, por isso o arquivo sai **criptografado**. Quem baixar sem a
+senha não consegue abrir.
+
+> O GitHub desliga agendamentos de repositório público que fica **60 dias sem nenhum
+> commit**. Se isso acontecer, ele avisa por e-mail; é só reativar em Actions.
+
+#### Restaurar um backup
+
+1. Em **Actions → Backup do banco**, abra a execução do dia e baixe o arquivo
+   (vem zipado; extraia o `banco-AAAA-MM-DD.dump.gpg`).
+2. Abra com a senha e restaure no banco (precisa do `gpg` e do cliente do Postgres 17):
+
+```bash
+gpg --output banco.dump --decrypt banco-AAAA-MM-DD.dump.gpg
+pg_restore --clean --if-exists --no-owner --dbname "<Session pooler 5432>" banco.dump
+```
+
+---
+
+## Dia a dia
+
+- **Publicar mudanças:** `git push` no `main`. O Render refaz o build e aplica as
+  migrations sozinho. Mudanças só no `docs/` não republicam o sistema.
+- **Ver erros:** painel do Render → serviço → **Logs**.
+- **Admin do Django:** `https://<seu-endereço>.onrender.com/admin/`.
+- **Testar o modo produção no computador:**
+  ```bash
+  cd sistema/frontend && npm run build
+  cd ../backend && DEBUG=False python manage.py collectstatic --noinput
+  DEBUG=False python manage.py runserver 8001     # http://127.0.0.1:8001
+  ```
+  Apague `frontend/dist` depois. No desenvolvimento normal, quem serve as telas é o
+  Vite (porta 5173).

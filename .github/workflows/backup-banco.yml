@@ -1,0 +1,57 @@
+# Backup diário do banco (Supabase) — o plano gratuito do Supabase não guarda backup.
+#
+# O repositório é PÚBLICO: o arquivo sai criptografado (gpg, AES-256) com a senha do
+# secret BACKUP_SENHA. Sem a senha, o arquivo baixado não abre.
+#
+# Secrets (GitHub → Settings → Secrets and variables → Actions):
+#   SUPABASE_DB_URL  pooler do Supabase na porta 5432 (modo session)
+#   BACKUP_SENHA     senha longa; guarde num lugar seguro, sem ela o backup não abre
+#
+# Restaurar: veja sistema/HOSPEDAGEM.md, seção "Backup".
+name: Backup do banco
+
+on:
+  schedule:
+    - cron: "0 6 * * *"     # 03:00 em Belém, todo dia
+  workflow_dispatch:         # botão "Run workflow" para fazer um agora
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Instala o cliente do Postgres 17
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y -qq postgresql-client-17
+
+      - name: Copia o banco (só as tabelas do sistema)
+        env:
+          DB: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          test -n "$DB" || { echo "Falta o secret SUPABASE_DB_URL"; exit 1; }
+          /usr/lib/postgresql/17/bin/pg_dump "$DB" --schema=public --no-owner --no-privileges \
+            --format=custom --file=banco.dump
+          ls -lh banco.dump
+
+      - name: Criptografa
+        env:
+          SENHA: ${{ secrets.BACKUP_SENHA }}
+        run: |
+          test -n "$SENHA" || { echo "Falta o secret BACKUP_SENHA"; exit 1; }
+          gpg --batch --yes --pinentry-mode loopback --passphrase "$SENHA" \
+              --symmetric --cipher-algo AES256 --output "banco-$(date -u +%F).dump.gpg" banco.dump
+          rm banco.dump
+
+      - name: Guarda por 30 dias
+        uses: actions/upload-artifact@v4
+        with:
+          name: backup-banco-${{ github.run_number }}
+          path: banco-*.dump.gpg
+          retention-days: 30
+          if-no-files-found: error
