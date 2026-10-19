@@ -5,6 +5,9 @@
  * Além do cadastro novo, dá para apontar um cliente já existente, senão o mesmo
  * comprador vira dois registros a cada obra. Se o telefone digitado já é de um
  * cliente, o sistema avisa e oferece usar o cadastro dele.
+ *
+ * `useEscolhaCliente` é o formulário sem a moldura do modal — a página de
+ * agendar visita técnica usa o mesmo, direto na tela.
  */
 import { useState } from "react";
 import { api } from "../api";
@@ -14,7 +17,11 @@ import {
   corpoCliente, corpoEndereco, errosDaApi, paramsBusca, validarCliente, validarEndereco,
 } from "./formCliente";
 
-export default function ClienteModal({ aoFechar, aoConcluir, subtitulo }) {
+/**
+ * Novo cliente ou já cadastrado. `confirmar()` valida, grava se for novo e
+ * devolve {cliente, endereco} (ids) — ou lança erro, já mostrado no formulário.
+ */
+export function useEscolhaCliente({ rotuloEndereco = "Endereço da obra", comObservacao = true } = {}) {
   const [aba, setAba] = useState("novo");
   const [c, setC] = useState({ ...CLIENTE_VAZIO });
   const [e, setE] = useState({ ...ENDERECO_VAZIO });
@@ -34,8 +41,7 @@ export default function ClienteModal({ aoFechar, aoConcluir, subtitulo }) {
       if (!existente) { setErro("Escolha o cliente."); throw new Error("escolha o cliente"); }
       const end = existente.enderecos?.find((x) => x.principal) ?? existente.enderecos?.[0];
       if (!end) { setErro("Este cliente não tem endereço. Cadastre em Clientes."); throw new Error("sem endereço"); }
-      aoConcluir({ cliente: existente.id, endereco: end.id });
-      return "selecionado";
+      return { cliente: existente.id, endereco: end.id, nome: existente.nome };
     }
 
     const ec = validarCliente(c);
@@ -49,8 +55,7 @@ export default function ClienteModal({ aoFechar, aoConcluir, subtitulo }) {
     try {
       const cliente = await api.post("/clientes/", corpoCliente(c));
       const endereco = await api.post("/enderecos/", { ...corpoEndereco(e), cliente: cliente.id, principal: true });
-      aoConcluir({ cliente: cliente.id, endereco: endereco.id });
-      return "cadastrado";
+      return { cliente: cliente.id, endereco: endereco.id, nome: cliente.nome };
     } catch (err) {
       const campos = errosDaApi(err);
       if (campos) setErros(campos);
@@ -68,18 +73,8 @@ export default function ClienteModal({ aoFechar, aoConcluir, subtitulo }) {
     setAba("existente");
   }
 
-  return (
-    <Modal
-      titulo="Dados do cliente"
-      subtitulo={subtitulo ?? "Preencha para transformar o orçamento em Ordem de Serviço."}
-      aoFechar={aoFechar}
-      rodape={
-        <div className="btnrow" style={{ padding: 0 }}>
-          <BotaoAcao classe="btn p" aoClicar={confirmar}>Confirmar e continuar</BotaoAcao>
-          <button className="btn" onClick={aoFechar}>Cancelar</button>
-        </div>
-      }
-    >
+  const conteudo = (
+    <>
       <div className="seg" style={{ marginBottom: 18 }}>
         <button type="button" className={aba === "novo" ? "on" : ""}
                 onClick={() => setAba("novo")}>Novo cliente</button>
@@ -117,14 +112,42 @@ export default function ClienteModal({ aoFechar, aoConcluir, subtitulo }) {
       ) : (
         <>
           <CamposCliente c={c} setC={setC} erros={erros} setErros={setErros} autoFocus />
-          <div className="lbl" style={{ marginTop: 6 }}>Endereço da obra</div>
+          <div className="lbl" style={{ marginTop: 6 }}>{rotuloEndereco}</div>
           <CamposEndereco e={e} setE={setE} erros={errosE} setErros={setErrosE} />
-          <Campo rotulo="Observação">
+          {comObservacao && <Campo rotulo="Observação">
             <textarea rows={2} value={c.observacoes} onChange={(ev) => setC((s) => ({ ...s, observacoes: ev.target.value }))}
                       placeholder="Combinados, cuidados na entrega, horário preferido…" />
-          </Campo>
+          </Campo>}
         </>
       )}
+    </>
+  );
+
+  return { conteudo, confirmar };
+}
+
+export default function ClienteModal({ aoFechar, aoConcluir, subtitulo }) {
+  const { conteudo, confirmar } = useEscolhaCliente();
+
+  async function continuar() {
+    const escolhido = await confirmar();
+    await aoConcluir(escolhido);
+    return "ok";
+  }
+
+  return (
+    <Modal
+      titulo="Dados do cliente"
+      subtitulo={subtitulo ?? "Preencha para transformar o orçamento em Ordem de Serviço."}
+      aoFechar={aoFechar}
+      rodape={
+        <div className="btnrow" style={{ padding: 0 }}>
+          <BotaoAcao classe="btn p" aoClicar={continuar}>Confirmar e continuar</BotaoAcao>
+          <button className="btn" onClick={aoFechar}>Cancelar</button>
+        </div>
+      }
+    >
+      {conteudo}
     </Modal>
   );
 }

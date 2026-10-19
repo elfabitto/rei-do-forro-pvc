@@ -51,7 +51,7 @@
   .kpi .ico{width:24px;height:24px}
 }
 
-.faixaInfo{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));background:var(--surface);
+.faixaInfo{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));background:var(--surface);
            border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow)}
 .faixaInfo > div{padding:11px 15px;border-left:1px solid var(--line-2);display:flex;flex-direction:column;gap:2px;min-width:0}
 .faixaInfo > div:first-child{border-left:0}
@@ -147,6 +147,8 @@
               display:grid;place-items:center;color:#fff}
 .cmDia .pi{background:var(--s-instalacao)}
 .cmDia .pe{background:var(--s-entrega)}
+.cmDia .pv{background:#8a5cd6}
+.faixaInfo .faixaSub{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .calMini .legend{margin:10px 0 0}
 .calMini .obs{padding:0}
 

@@ -7,9 +7,12 @@
  * sai da loja precisa ter número e ficar registrado.
  *
  * A mesma tela edita um orçamento já salvo (rota /orcamentos/:id/editar).
+ *
+ * Vindo de uma visita técnica (?visita=ID), o orçamento já nasce com o cliente
+ * da visita e ligado a ela; fechar o negócio segue direto para a O.S.
  */
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api, num } from "../api";
 import {
   BotaoAcao, Campo, DocumentoOrcamento, Estado, linhas, useApi,
@@ -35,6 +38,11 @@ export default function OrcamentoNovo() {
   const navegar = useNavigate();
   const { id } = useParams();
   const editando = Boolean(id);
+  const [params] = useSearchParams();
+  const visitaId = editando ? null : params.get("visita");
+  const visita = useApi(visitaId ? `/visitas/${visitaId}/` : null, null, [visitaId]);
+  const v = visita.dados;
+  const voltarPara = visitaId ? "/visitas" : "/orcamentos";
 
   const forros = useApi("/forros/", { ativo: true });
   const materiais = useApi("/materiais/", { ativo: true });
@@ -174,6 +182,8 @@ export default function OrcamentoNovo() {
       forro: forro.id,
       acabamento: tipo === "instalado" ? acabamento.id : null,
       observacoes,
+      // só na criação: liga o orçamento à visita e traz o cliente dela
+      ...(visitaId && !alvoId ? { visita: Number(visitaId) } : {}),
       itens: [
         ...(tipo === "material"
           ? itens.map((i) => ({
@@ -227,7 +237,7 @@ export default function OrcamentoNovo() {
     setErro("");
     try {
       const registro = salvo ?? (await gravar());
-      navegar(`/ordens/nova?orcamento=${registro.id}`);
+      navegar(`/ordens/nova?orcamento=${registro.id}${v ? `&endereco=${v.endereco}` : ""}`);
       return "salvo";
     } catch (e) {
       setErro(e.message);
@@ -257,8 +267,8 @@ export default function OrcamentoNovo() {
 
   return (
     <div className="pagina">
-      <button className="voltar" onClick={() => navegar("/orcamentos")}>
-        <span aria-hidden="true">←</span> Orçamentos
+      <button className="voltar" onClick={() => navegar(voltarPara)}>
+        <span aria-hidden="true">←</span> {visitaId ? "Visitas técnicas" : "Orçamentos"}
       </button>
       <h1>{editando ? `Editar ${original.dados?.numero ?? "orçamento"}` : "Novo orçamento"}</h1>
       <p className="sub">
@@ -267,8 +277,29 @@ export default function OrcamentoNovo() {
           : "Preencha as etapas; o documento à direita atualiza sozinho."}
       </p>
 
-      <Estado carregando={forros.carregando || original.carregando}
-              erro={forros.erro || materiais.erro || acabamentos.erro || original.erro}>
+      {v && (
+        <div className="faixaVisita">
+          <Icone nome="visita" tamanho={18} />
+          <span>
+            Orçamento da visita <b>{v.numero}</b> — <b>{v.cliente_detalhe?.nome}</b>, {v.bairro}.
+            {" "}Preencha a medida tirada, o forro e o tipo; depois <b>Salvar e gerar serviço</b>.
+          </span>
+        </div>
+      )}
+      {v?.orcamento && !gravadoId && (
+        <div className="aviso">
+          <span className="ic">⚠</span>
+          <span>
+            Esta visita já tem o orçamento {v.orcamento_numero}.{" "}
+            <button className="lnk" onClick={() => navegar(`/ordens/nova?orcamento=${v.orcamento}&endereco=${v.endereco}`)}>
+              Seguir com ele para a O.S.
+            </button>
+          </span>
+        </div>
+      )}
+
+      <Estado carregando={forros.carregando || original.carregando || visita.carregando}
+              erro={forros.erro || materiais.erro || acabamentos.erro || original.erro || visita.erro}>
         <div className="cols c-2">
           {/* ------------------------------------------------ entrada */}
           <section className="card">
@@ -473,7 +504,8 @@ export default function OrcamentoNovo() {
               <div className="step">
                 {passo(6, "Observações")}
                 <Campo rotulo="Observações"
-                       dica="Os dados do cliente são pedidos só na hora de fechar o negócio.">
+                       dica={v ? `Cliente da visita: ${v.cliente_detalhe?.nome}.`
+                         : "Os dados do cliente são pedidos só na hora de fechar o negócio."}>
                   <textarea rows={2} value={observacoes}
                             onChange={(e) => alterou(setObservacoes)(e.target.value)}
                             placeholder="Detalhes combinados com o cliente" />
@@ -503,28 +535,43 @@ export default function OrcamentoNovo() {
                     <Icone nome="salvar" tamanho={14} /> Gravar no sistema
                   </span>
                   <div className="acts">
+                    {visitaId && (
+                      <BotaoAcao classe="btn verde" aoClicar={salvarEFechar}>
+                        <Icone nome="ordem" tamanho={15} /> {salvo ? "Gerar serviço" : "Salvar e gerar serviço"}
+                      </BotaoAcao>
+                    )}
                     {salvo ? (
                       // travado enquanto nada mudar: o mesmo documento não se salva duas vezes
                       <button className="btn ok" disabled>
                         ✓ Salvo — {salvo.numero}
                       </button>
                     ) : (
-                      <BotaoAcao classe="btn p" aoClicar={salvar}>
+                      <BotaoAcao classe={visitaId ? "btn" : "btn p"} aoClicar={salvar}>
                         <Icone nome="salvar" tamanho={15} />
                         {alvoId ? " Salvar alterações" : " Salvar orçamento"}
                       </BotaoAcao>
                     )}
-                    <BotaoAcao aoClicar={salvarEFechar}>
-                      <Icone nome="fechado" tamanho={15} /> {salvo ? "Fechar negócio" : "Salvar e fechar negócio"}
-                    </BotaoAcao>
-                    <button className="btn" onClick={() => navegar("/orcamentos")}>
-                      Voltar para orçamentos
+                    {!visitaId && (
+                      <BotaoAcao aoClicar={salvarEFechar}>
+                        <Icone nome="fechado" tamanho={15} /> {salvo ? "Fechar negócio" : "Salvar e fechar negócio"}
+                      </BotaoAcao>
+                    )}
+                    <button className="btn" onClick={() => navegar(voltarPara)}>
+                      {visitaId ? "Voltar para visitas" : "Voltar para orçamentos"}
                     </button>
                   </div>
-                  <p className="grupoNota">
-                    <b>Salvar</b> guarda a proposta sem cliente e libera o envio abaixo.
-                    <b> Fechar negócio</b> já pede os dados do cliente e gera a Ordem de Serviço.
-                  </p>
+                  {visitaId ? (
+                    <p className="grupoNota">
+                      <b>Salvar e gerar serviço</b> grava o orçamento na visita e abre a Ordem de Serviço
+                      para agendar. <b>Salvar</b> só guarda — o cliente ainda vai pensar; o serviço
+                      sai depois pelo botão Gerar Serviço da visita.
+                    </p>
+                  ) : (
+                    <p className="grupoNota">
+                      <b>Salvar</b> guarda a proposta sem cliente e libera o envio abaixo.
+                      <b> Fechar negócio</b> já pede os dados do cliente e gera a Ordem de Serviço.
+                    </p>
+                  )}
                 </div>
 
                 {salvo ? (

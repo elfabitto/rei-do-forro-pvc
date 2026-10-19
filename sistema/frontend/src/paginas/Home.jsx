@@ -5,6 +5,7 @@
  *
  * Vendedor: orçamento, O.S., comissões, agenda, clientes e tabela de preços.
  * Diretoria: painel, orçamento, O.S., agenda, financeiro e comissões.
+ * Para todos, logo abaixo: agendar visita técnica (orçamento presencial).
  */
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
@@ -39,10 +40,12 @@ export default function Home() {
   const agendadas = useApi("/ordens-servico/",
     { status: "gerada", page_size: 1, ...(diretoria ? {} : { vendedor: usuario.id }) });
   const comissoes = useApi("/comissoes/");
+  const visitas = useApi("/visitas/", { status: "agendada", de: hoje, page_size: 1 });
 
   const qtdHoje = agenda.dados?.count;
   const qtdOS = agendadas.dados?.count;
   const aReceber = comissoes.dados?.resumo?.aberto;
+  const qtdVisitas = visitas.dados?.count;
 
   const txtHoje = qtdHoje === undefined ? null : qtdHoje ? `${qtdHoje} hoje` : "nada hoje";
   const txtOS = qtdOS === undefined ? null : qtdOS ? `${qtdOS} agendada${qtdOS > 1 ? "s" : ""}` : "nenhuma agendada";
@@ -80,6 +83,24 @@ export default function Home() {
       <div className="homeGrade" role="navigation" aria-label="Atalhos">
         {botoes.map((b) => <Botao key={b.to} {...b} />)}
       </div>
+
+      <Link to="/visitas/nova" className="homeVisita">
+        <span className="ico"><Icone nome="visita" tamanho={26} /></span>
+        <span>
+          <b>Agendar visita</b>
+          <small>
+            Orçamento presencial
+            {qtdVisitas ? ` · ${qtdVisitas} visita${qtdVisitas > 1 ? "s" : ""} agendada${qtdVisitas > 1 ? "s" : ""}` : ""}
+          </small>
+        </span>
+        <span className="seta" aria-hidden="true">›</span>
+      </Link>
+
+      <Link to="/visitas" className="homeLink">
+        <Icone nome="visita" tamanho={18} />
+        <span>Ver visitas técnicas</span>
+        <span className="seta">›</span>
+      </Link>
 
       <Link to="/orcamentos" className="homeLink">
         <Icone nome="orcamento" tamanho={18} />

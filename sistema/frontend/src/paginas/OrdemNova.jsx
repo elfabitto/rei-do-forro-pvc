@@ -29,7 +29,8 @@ export default function OrdemNova() {
   const orcamento = useApi(orcamentoId ? `/orcamentos/${orcamentoId}/` : "/orcamentos/", null, [orcamentoId]);
   const usuarios = useApi("/usuarios/");
 
-  const [enderecoId, setEnderecoId] = useState("");
+  // vindo da visita técnica, já chega com o endereço onde foi a medição
+  const [enderecoId, setEnderecoId] = useState(params.get("endereco") ?? "");
   const [vendedorId, setVendedorId] = useState("");
   const [entrega, setEntrega] = useState({ data: "", turno: "" });
   const [instalacao, setInstalacao] = useState({ data: "", turno: "" });
@@ -142,11 +143,14 @@ export default function OrdemNova() {
 
   return (
     <div className="pagina">
-      <button className="voltar" onClick={() => navegar("/orcamentos")}>
-        <span aria-hidden="true">←</span> Orçamentos
+      <button className="voltar" onClick={() => navegar(orc?.visita_numero ? "/visitas" : "/orcamentos")}>
+        <span aria-hidden="true">←</span> {orc?.visita_numero ? "Visitas técnicas" : "Orçamentos"}
       </button>
       <h1>Gerar Ordem de Serviço</h1>
-      <p className="sub">A partir do orçamento {orc?.numero ?? "…"}</p>
+      <p className="sub">
+        A partir do orçamento {orc?.numero ?? "…"}
+        {orc?.visita_numero ? ` — visita técnica ${orc.visita_numero}` : ""}
+      </p>
 
       <Estado carregando={orcamento.carregando} erro={orcamento.erro}>
         {orc && (
@@ -246,7 +250,9 @@ export default function OrdemNova() {
                     <Icone nome="ordem" tamanho={15} /> Gerar Ordem de Serviço
                   </BotaoAcao>
                 )}
-                <button className="btn" onClick={() => navegar("/orcamentos")}>Voltar para orçamentos</button>
+                <button className="btn" onClick={() => navegar(orc.visita_numero ? "/visitas" : "/orcamentos")}>
+                  {orc.visita_numero ? "Voltar para visitas" : "Voltar para orçamentos"}
+                </button>
               </div>
             </section>
 

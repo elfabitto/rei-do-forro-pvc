@@ -18,6 +18,8 @@ import Chamados from "./paginas/Chamados";
 import Financeiro from "./paginas/Financeiro";
 import Home from "./paginas/Home";
 import Usuarios from "./paginas/Usuarios";
+import VisitaNova from "./paginas/VisitaNova";
+import Visitas from "./paginas/Visitas";
 import Sino from "./Sino";
 
 /* `so` restringe o item a uma permissão calculada pelo backend. */
@@ -26,6 +28,7 @@ const MENU = [
   { to: "/inicio", rotulo: "Início", icone: "casa" },
   { to: "/painel", rotulo: "Painel", icone: "painel", so: "verPainel" },
   { to: "/orcamentos", rotulo: "Orçamentos", icone: "orcamento" },
+  { to: "/visitas", rotulo: "Visitas técnicas", icone: "visita" },
   { to: "/ordens", rotulo: "Ordens de Serviço", icone: "ordem" },
   { to: "/agenda", rotulo: "Agenda", icone: "agenda" },
   // cada um vê as próprias; a diretoria vê todas e dá a baixa
@@ -139,6 +142,8 @@ export default function App() {
           <Route path="/orcamentos" element={<Orcamentos />} />
           <Route path="/orcamentos/novo" element={<OrcamentoNovo />} />
           <Route path="/orcamentos/:id/editar" element={<OrcamentoNovo />} />
+          <Route path="/visitas" element={<Visitas />} />
+          <Route path="/visitas/nova" element={<VisitaNova />} />
           <Route path="/ordens" element={<OrdensServico />} />
           <Route path="/ordens/nova" element={<OrdemNova />} />
           <Route path="/agenda" element={<Agenda />} />

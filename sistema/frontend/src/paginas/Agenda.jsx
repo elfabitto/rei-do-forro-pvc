@@ -1,11 +1,13 @@
 /**
  * Agenda do mês. A instalação aparece em todos os dias que ocupa (dia 1/3,
- * 2/3…); a entrega, no dia dela. Azul é entrega, laranja é instalação.
+ * 2/3…); a entrega, no dia dela. Azul é entrega, laranja é instalação, roxo é
+ * visita técnica (orçamento presencial, que ocupa uma vaga de entrega).
  *
  * No celular o mês vira uma grade compacta com marcações coloridas, e tocar
  * num dia abre a lista daquele dia logo abaixo — é o uso mais comum.
  */
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { inicial, textoDias } from "../agendaTexto";
 import { Estado, linhas, useApi } from "../componentes";
 import Icone from "../icones";
@@ -16,6 +18,15 @@ const iso = (d) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const ROT_TURNO = { manha: "manhã", tarde: "tarde" };
 const primeiroNome = (n) => String(n ?? "").split(" ")[0];
+const ICONE = { entrega: "entrega", instalacao: "instalacao", visita: "visita" };
+
+/** A visita técnica no mesmo formato de um agendamento, para entrar na mesma grade. */
+const comoCompromisso = (v) => ({
+  id: `v${v.id}`, visita: v.id, tipo: "visita", tipo_display: "Visita técnica",
+  data: v.data, turno: v.turno, ocupacao: [`${v.data}:${v.turno}`],
+  os_numero: v.numero, atrasado: v.atrasada, cliente_nome: v.cliente_detalhe?.nome,
+  cliente_telefone: v.cliente_detalhe?.telefone, bairro: v.bairro, endereco_resumo: v.endereco_resumo,
+});
 
 /**
  * Espalha cada compromisso pelos dias que ele ocupa. Para cada dia, guarda os
@@ -51,6 +62,7 @@ const turnoDoDia = (e) =>
   e.turnosDia.length === 2 ? "dia todo" : ROT_TURNO[e.turnosDia[0]];
 
 export default function Agenda() {
+  const navegar = useNavigate();
   const [offset, setOffset] = useState(0);
   const [aberta, setAberta] = useState(null);
   const [selecionado, setSelecionado] = useState(iso(new Date()));
@@ -70,9 +82,15 @@ export default function Agenda() {
 
   const disp = useApi("/agenda/disponibilidade/", { de: inicio, ate: fim }, [inicio, fim]);
   const ags = useApi("/agendamentos/", { de: inicio, ate: fim, page_size: 300 }, [inicio, fim]);
+  const vis = useApi("/visitas/", { de: inicio, ate: fim, page_size: 300 }, [inicio, fim]);
 
-  const lista = linhas(ags.dados);
-  const porDia = useMemo(() => espalhar(lista), [ags.dados]); // eslint-disable-line react-hooks/exhaustive-deps
+  // visita perdida não ocupa mais a agenda
+  const visitas = linhas(vis.dados).filter((v) => v.status !== "perdida").map(comoCompromisso);
+  const lista = [...linhas(ags.dados), ...visitas];
+  const porDia = useMemo(() => espalhar(lista), [ags.dados, vis.dados]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // a visita abre no painel de visitas; o resto, na gaveta da O.S.
+  const abrir = (e) => (e.tipo === "visita" ? navegar(`/visitas?abrir=${e.visita}`) : setAberta(e.ordem));
 
   const hoje = iso(new Date());
   const dias = disp.dados?.dias ?? [];
@@ -82,6 +100,7 @@ export default function Agenda() {
 
   const nEntregas = lista.filter((a) => a.tipo === "entrega").length;
   const nInstalacoes = lista.filter((a) => a.tipo === "instalacao").length;
+  const nVisitas = visitas.length;
 
   const diaSel = dias.find((d) => d.data === selecionado);
   const eventosSel = porDia[selecionado] ?? [];
@@ -96,7 +115,7 @@ export default function Agenda() {
       <h1>Agenda</h1>
       <p className="sub">
         Toque num dia para ver os compromissos. {capInst} instalações por turno e {capEnt} entregas
-        por dia — a instalação conta como entrega no dia em que começa.
+        por dia — a instalação conta como entrega no dia em que começa, e a visita técnica também.
       </p>
 
       <div className="card">
@@ -110,11 +129,13 @@ export default function Agenda() {
           <div className="agcont">
             <span className="tag-ent"><i />{nEntregas} entrega(s)</span>
             <span className="tag-ins"><i />{nInstalacoes} instalação(ões)</span>
+            <span className="tag-vis"><i />{nVisitas} visita(s)</span>
           </div>
         </header>
 
         <div className="body">
-          <Estado carregando={disp.carregando || ags.carregando} erro={disp.erro || ags.erro}>
+          <Estado carregando={disp.carregando || ags.carregando || vis.carregando}
+                  erro={disp.erro || ags.erro || vis.erro}>
             <div className="cal">
               {DIAS.map((d) => <div className="hd" key={d}>{d}</div>)}
               {Array.from({ length: vazios }, (_, i) => <div className="dy vazio" key={`v${i}`} />)}
@@ -139,9 +160,9 @@ export default function Agenda() {
                       {eventos.map((e) => (
                         <button className={`ev ${e.tipo}${e.atrasado ? " atrasado" : ""}${e.partes > 1 ? " cont" : ""}`}
                                 key={`${e.id}-${e.parte}`}
-                                onClick={(ev) => { ev.stopPropagation(); setAberta(e.ordem); }}
+                                onClick={(ev) => { ev.stopPropagation(); abrir(e); }}
                                 title={`${e.os_numero} · ${e.tipo_display} · ${e.cliente_nome} — ${e.bairro}`}>
-                          <Icone nome={e.tipo === "entrega" ? "entrega" : "instalacao"} tamanho={12} />
+                          <Icone nome={ICONE[e.tipo]} tamanho={12} />
                           <span className="tx">
                             {primeiroNome(e.cliente_nome)}
                             <small>{turnoDoDia(e)}{e.partes > 1 ? ` · ${e.parte}/${e.partes}` : ""}</small>
@@ -161,7 +182,7 @@ export default function Agenda() {
                     {dia.atende && dia.data >= hoje && (
                       <div className="vagas">
                         <span className={`ve${entLivre ? "" : " zero"}`} title="entregas livres">{entLivre}</span>
-                        <span className={`vi${instLivre ? "" : " zero"}`} title="equipes livres">{instLivre}</span>
+                        <span className={`vi${instLivre ? "" : " zero"}`} title="vagas de instalação livres">{instLivre}</span>
                       </div>
                     )}
                   </div>
@@ -171,8 +192,9 @@ export default function Agenda() {
             <div className="legend">
               <span><i style={{ background: "var(--s-entrega)" }} />Entrega</span>
               <span><i style={{ background: "var(--s-instalacao)" }} />Instalação</span>
+              <span><i style={{ background: "var(--s-visita)" }} />Visita técnica</span>
               <span className="leg-vagas">
-                Números no canto: <b className="ve">entregas</b> e <b className="vi">equipes</b> livres
+                Números no canto: vagas livres de <b className="ve">entrega</b> e de <b className="vi">instalação</b>
               </span>
             </div>
           </Estado>
@@ -185,7 +207,7 @@ export default function Agenda() {
           <h2 style={{ textTransform: "none" }}>{tituloSel}</h2>
           {diaSel?.atende && (
             <span className="hint">
-              {diaSel.entregas.livre} de {diaSel.entregas.total} entregas livres · equipes livres:{" "}
+              {diaSel.entregas.livre} de {diaSel.entregas.total} entregas livres · instalação livre:{" "}
               {diaSel.turnos.map((t) => `${t.instalacoes.livre} ${ROT_TURNO[t.turno]}`).join(", ")}
             </span>
           )}
@@ -198,10 +220,10 @@ export default function Agenda() {
           <div className="agdia">
             {eventosSel.map((e) => (
               <button key={`${e.id}-${e.parte}`} className={`agcard ${e.tipo}${e.atrasado ? " atrasado" : ""}`}
-                      onClick={() => setAberta(e.ordem)}>
+                      onClick={() => abrir(e)}>
                 <div className="topo">
                   <span className={`pill p-${e.tipo}`}>
-                    <Icone nome={e.tipo === "entrega" ? "entrega" : "instalacao"} tamanho={12} /> {e.tipo_display}
+                    <Icone nome={ICONE[e.tipo]} tamanho={12} /> {e.tipo_display}
                   </span>
                   <span className="quando">{turnoDoDia(e)}</span>
                   {e.partes > 1 && <span className="parte">dia {e.parte} de {e.partes}</span>}
@@ -225,7 +247,7 @@ export default function Agenda() {
 
       {aberta && (
         <OrdemDetalhe id={aberta} aoFechar={() => setAberta(null)}
-                      aoMudar={() => { disp.recarregar(); ags.recarregar(); }} />
+                      aoMudar={() => { disp.recarregar(); ags.recarregar(); vis.recarregar(); }} />
       )}
     </div>
   );

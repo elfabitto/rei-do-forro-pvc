@@ -9,6 +9,7 @@ from .models import (
     HistoricoOS,
     OrdemServico,
     Pagamento,
+    VisitaTecnica,
 )
 
 
@@ -106,3 +107,12 @@ class ParametrosComissaoAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+@admin.register(VisitaTecnica)
+class VisitaTecnicaAdmin(admin.ModelAdmin):
+    list_display = ["numero", "cliente", "data", "turno", "status", "vendedor"]
+    list_filter = ["status", "data"]
+    search_fields = ["numero", "cliente__nome"]
+    raw_id_fields = ["cliente", "endereco", "orcamento"]
+

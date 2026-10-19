@@ -9,6 +9,8 @@ a diretoria ver se está subindo ou caindo.
 - Serviço executado / entrega feita = agendamento do período cuja O.S. já
   foi finalizada. O resto do período é "previsto" (ou "atrasado", se a data
   já passou e a O.S. não fechou).
+- Visita técnica = orçamento presencial com data no período. Convertida conta
+  como "feito"; a perdida sai da agenda (não ocupa vaga) mas entra na contagem.
 """
 from calendar import monthrange
 from collections import defaultdict
@@ -30,8 +32,10 @@ from .models import (
     OrdemServico,
     Pagamento,
     StatusOS,
+    StatusVisita,
     TipoAgendamento,
     TipoServico,
+    VisitaTecnica,
 )
 
 ZERO = Decimal("0")
@@ -90,6 +94,16 @@ def _agendamentos(de, ate):
     )
 
 
+def _visitas(de, ate):
+    return list(VisitaTecnica.objects.filter(data__range=(de, ate)).select_related("cliente").order_by("data", "turno"))
+
+
+def _situacao_visita(v, hoje):
+    if v.status == StatusVisita.CONVERTIDA:
+        return "feito"
+    return "atrasado" if v.data < hoje else "previsto"
+
+
 def _situacao(ag, hoje):
     if ag.ordem.status == StatusOS.FINALIZADA:
         return "feito"
@@ -117,6 +131,10 @@ def _resumo(de, ate, hoje):
         if _situacao(a, hoje) == "feito":
             feitos[a.tipo] += 1
 
+    visitas = _visitas(de, ate)
+    v_convertidas = sum(1 for v in visitas if v.status == StatusVisita.CONVERTIDA)
+    v_perdidas = sum(1 for v in visitas if v.status == StatusVisita.PERDIDA)
+
     return {
         "vendas": len(vendas),
         "valor": valor,
@@ -130,7 +148,11 @@ def _resumo(de, ate, hoje):
         "instalacoes_feitas": feitos[TipoAgendamento.INSTALACAO],
         "entregas": totais[TipoAgendamento.ENTREGA],
         "entregas_feitas": feitos[TipoAgendamento.ENTREGA],
-    }, vendas, ags
+        "visitas": len(visitas),
+        "visitas_convertidas": v_convertidas,
+        "visitas_perdidas": v_perdidas,
+        "visitas_conversao": round(v_convertidas / len(visitas) * 100) if visitas else 0,
+    }, vendas, ags, visitas
 
 
 def _escala(de, ate):
@@ -158,10 +180,10 @@ def _escala(de, ate):
 
 
 def _semana_vigente(hoje):
-    """Segunda a domingo da semana de hoje: instalações em obra e entregas por dia."""
+    """Segunda a domingo da semana de hoje: instalações em obra, entregas e visitas por dia."""
     seg = hoje - timedelta(days=hoje.weekday())
     dom = seg + timedelta(days=6)
-    dias = {seg + timedelta(days=k): {"instalacoes": 0, "entregas": 0} for k in range(7)}
+    dias = {seg + timedelta(days=k): {"instalacoes": 0, "entregas": 0, "visitas": 0} for k in range(7)}
     ags = (Agendamento.objects.exclude(ordem__status=StatusOS.CANCELADA)
            .filter(data__lte=dom).exclude(data_fim__lt=seg).exclude(data_fim__isnull=True, data__lt=seg))
     for a in ags:
@@ -172,6 +194,9 @@ def _semana_vigente(hoje):
             for d in _dias_da_instalacao(a):
                 if d in dias:
                     dias[d]["instalacoes"] += 1
+    for d in (VisitaTecnica.objects.filter(data__range=(seg, dom)).exclude(status=StatusVisita.PERDIDA)
+              .values_list("data", flat=True)):
+        dias[d]["visitas"] += 1
     return {"de": seg, "ate": dom,
             "dias": [{"data": d, **v} for d, v in sorted(dias.items())]}
 
@@ -188,8 +213,8 @@ def painel(request):
     ant_ate = de - timedelta(days=1)
     ant_de = ant_ate - timedelta(days=tamanho - 1)
 
-    atual, vendas, ags = _resumo(de, ate, hoje)
-    anterior, _, _ = _resumo(ant_de, ant_ate, hoje)
+    atual, vendas, ags, visitas = _resumo(de, ate, hoje)
+    anterior, _, _, _ = _resumo(ant_de, ant_ate, hoje)
 
     # -------------------------------------------------- por vendedor
     pessoas = {}
@@ -280,6 +305,7 @@ def painel(request):
             "a_receber": a_receber,
             "os_agendadas": sum(1 for o in ativas if o.status == StatusOS.GERADA),
             "os_em_execucao": sum(1 for o in ativas if o.status == StatusOS.EM_EXECUCAO),
+            "visitas_agendadas": VisitaTecnica.objects.filter(status=StatusVisita.AGENDADA).count(),
             "comissao_pendente": sum((r["comissao_pendente"] for r in por_vendedor), ZERO),
         },
         "por_vendedor": por_vendedor,
@@ -297,18 +323,23 @@ def painel(request):
             "perdidos": orcs.filter(status=StatusOrcamento.PERDIDO).count(),
         },
         "forros": sorted(({"nome": k, **v} for k, v in forros.items()), key=lambda r: -r["m2"])[:6],
-        "servicos": [{
+        # serviços, entregas e visitas do período, na ordem da agenda
+        "servicos": sorted([{
             "id": a.id, "ordem": a.ordem_id, "numero": a.ordem.numero, "cliente": a.ordem.cliente.nome,
             "tipo": a.tipo, "data": a.data, "data_fim": a.data_fim, "turno": a.turno,
             "situacao": _situacao(a, hoje),
-        } for a in ags],
+        } for a in ags] + [{
+            "id": v.id, "visita": v.id, "numero": v.numero, "cliente": v.cliente.nome,
+            "tipo": "visita", "data": v.data, "data_fim": None, "turno": v.turno,
+            "situacao": _situacao_visita(v, hoje),
+        } for v in visitas if v.status != StatusVisita.PERDIDA], key=lambda r: (r["data"], r["turno"])),
     })
 
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def painel_calendario(request):
-    """Mês compacto: quantas instalações (em obra) e entregas há em cada dia."""
+    """Mês compacto: quantas instalações (em obra), entregas e visitas há em cada dia."""
     if not request.user.e_diretor:
         return _proibido()
     hoje = timezone.localdate()
@@ -319,7 +350,7 @@ def painel_calendario(request):
         primeiro = hoje.replace(day=1)
     ultimo = primeiro.replace(day=monthrange(primeiro.year, primeiro.month)[1])
 
-    dias = defaultdict(lambda: {"instalacoes": 0, "entregas": 0})
+    dias = defaultdict(lambda: {"instalacoes": 0, "entregas": 0, "visitas": 0})
     ags = (Agendamento.objects.exclude(ordem__status=StatusOS.CANCELADA)
            .filter(data__lte=ultimo, data__gte=primeiro - timedelta(days=14)))
     for a in ags:
@@ -330,4 +361,7 @@ def painel_calendario(request):
             for d in _dias_da_instalacao(a):
                 if primeiro <= d <= ultimo:
                     dias[d.isoformat()]["instalacoes"] += 1
+    for d in (VisitaTecnica.objects.filter(data__range=(primeiro, ultimo)).exclude(status=StatusVisita.PERDIDA)
+              .values_list("data", flat=True)):
+        dias[d.isoformat()]["visitas"] += 1
     return Response({"mes": primeiro.strftime("%Y-%m"), "dias": dias})

@@ -24,6 +24,7 @@ from .models import (
     TaxasCartao,
     TipoServico,
     Turno,
+    VisitaTecnica,
 )
 
 
@@ -334,3 +335,69 @@ class ParametrosComissaoSerializer(serializers.ModelSerializer):
         model = ParametrosComissao
         fields = ["instalado_m2", "material_forro_m2", "material_servico_m2", "atualizado_em"]
         read_only_fields = ["atualizado_em"]
+
+
+class VisitaTecnicaSerializer(serializers.ModelSerializer):
+    """Visita técnica (orçamento presencial) — card, agenda e detalhe."""
+
+    cliente_detalhe = ClienteResumoSerializer(source="cliente", read_only=True)
+    endereco_detalhe = EnderecoSerializer(source="endereco", read_only=True)
+    bairro = serializers.CharField(source="endereco.bairro", read_only=True)
+    endereco_resumo = serializers.CharField(source="endereco.__str__", read_only=True)
+    turno_display = serializers.CharField(source="get_turno_display", read_only=True)
+    status_display = serializers.CharField(source="get_status_display", read_only=True)
+    vendedor_nome = serializers.CharField(source="vendedor.get_full_name", read_only=True)
+    orcamento_numero = serializers.CharField(source="orcamento.numero", read_only=True, default=None)
+    atrasada = serializers.BooleanField(read_only=True)
+    os_id = serializers.SerializerMethodField()
+    os_numero = serializers.SerializerMethodField()
+    pode_editar = serializers.SerializerMethodField()
+
+    class Meta:
+        model = VisitaTecnica
+        fields = ["id", "numero", "cliente", "cliente_detalhe", "endereco", "endereco_detalhe", "bairro",
+                  "endereco_resumo", "data", "turno", "turno_display", "status", "status_display",
+                  "observacoes", "orcamento", "orcamento_numero", "os_id", "os_numero", "vendedor",
+                  "vendedor_nome", "criado_em", "motivo_perda", "perdida_em", "atrasada", "pode_editar"]
+        read_only_fields = ["numero", "status", "orcamento", "criado_em", "motivo_perda", "perdida_em"]
+        extra_kwargs = {"vendedor": {"required": False}}
+
+    def _os(self, obj):
+        orc = obj.orcamento
+        return getattr(orc, "ordem_servico", None) if orc else None
+
+    def get_os_id(self, obj):
+        os_ = self._os(obj)
+        return os_.id if os_ else None
+
+    def get_os_numero(self, obj):
+        os_ = self._os(obj)
+        return os_.numero if os_ else None
+
+    def get_pode_editar(self, obj):
+        return pode_editar_registro(self.context["request"].user, obj)
+
+    def validate(self, attrs):
+        from django.utils import timezone
+
+        atual = self.instance
+        if atual and atual.status != "agendada" and ({"data", "turno", "cliente", "endereco"} & set(attrs)):
+            raise serializers.ValidationError("Visita encerrada: não dá mais para remarcar.")
+        data = attrs.get("data")
+        if data and data < timezone.localdate() and (not atual or data != atual.data):
+            raise serializers.ValidationError({"data": "Escolha uma data de hoje em diante."})
+        # roda o clean() do modelo: vaga no dia, turno bloqueado, endereço do cliente
+        campos = {f: getattr(atual, f) for f in ("cliente", "endereco", "data", "turno", "status")} if atual else {}
+        instancia = VisitaTecnica(**{**campos, **{k: v for k, v in attrs.items()
+                                                 if k in ("cliente", "endereco", "data", "turno")}})
+        instancia.pk = atual.pk if atual else None
+        try:
+            instancia.clean()
+        except DjangoValidationError as e:
+            raise serializers.ValidationError(e.message_dict if hasattr(e, "message_dict") else e.messages)
+        return attrs
+
+
+class PerderVisitaSerializer(serializers.Serializer):
+    motivo = serializers.CharField(required=False, allow_blank=True, default="")
+

@@ -26,8 +26,10 @@ from .models import (
     OrdemServico,
     Pagamento,
     StatusOS,
+    StatusVisita,
     TipoAgendamento,
     Turno,
+    VisitaTecnica,
 )
 from . import eventos
 from .agenda import Grade, chave, turnos_instalacao
@@ -38,9 +40,11 @@ from .serializers import (
     OrdemServicoListaSerializer,
     OrdemServicoSerializer,
     PagamentoSerializer,
+    PerderVisitaSerializer,
     ReagendarSerializer,
     ParametrosComissaoSerializer,
     TaxasCartaoSerializer,
+    VisitaTecnicaSerializer,
 )
 
 ZERO = Coalesce(Sum("valor"), 0, output_field=DecimalField(max_digits=12, decimal_places=2))
@@ -75,7 +79,8 @@ class OrdemServicoViewSet(viewsets.ModelViewSet):
         """
         Exclusão definitiva: a O.S. e tudo que ela gerou — lançamentos do
         Financeiro (pagamentos e comissão), pagamentos, agenda, histórico e os
-        avisos do sino. O orçamento de origem volta a ficar em aberto.
+        avisos do sino. O orçamento de origem volta a ficar em aberto (e a visita
+        técnica dele, a agendada).
         """
         from apps.comunicacao.models import Notificacao
         from apps.financeiro.models import Lancamento
@@ -86,6 +91,7 @@ class OrdemServicoViewSet(viewsets.ModelViewSet):
         ).delete()
         if instance.orcamento_id:
             Orcamento.objects.filter(pk=instance.orcamento_id).update(status=StatusOrcamento.ABERTO)
+            VisitaTecnica.objects.filter(orcamento_id=instance.orcamento_id).update(status=StatusVisita.AGENDADA)
         instance.delete()   # pagamentos, agendamentos e histórico vão junto (CASCADE)
 
     def perform_create(self, serializer):
@@ -101,6 +107,7 @@ class OrdemServicoViewSet(viewsets.ModelViewSet):
 
         if os_.orcamento_id:
             Orcamento.objects.filter(pk=os_.orcamento_id).update(status=StatusOrcamento.CONVERTIDO)
+            VisitaTecnica.objects.filter(orcamento_id=os_.orcamento_id).update(status=StatusVisita.CONVERTIDA)
 
     # ------------------------------------------------------------------ ações
     # Quem executa o serviço não é necessariamente quem o lançou: qualquer um
@@ -247,6 +254,59 @@ class PagamentoViewSet(viewsets.ModelViewSet):
         eventos.pagamento_lancado(pg, self.request.user)
 
 
+# ------------------------------------------------------------ visitas técnicas
+class VisitaTecnicaViewSet(viewsets.ModelViewSet):
+    """
+    Orçamento presencial. Como os serviços, a lista é da equipe toda; mexer é de
+    quem agendou e da diretoria. Excluir, só a diretoria — o normal é dar como
+    perdida.
+    """
+
+    queryset = VisitaTecnica.objects.select_related(
+        "cliente", "endereco", "vendedor", "orcamento__ordem_servico"
+    )
+    serializer_class = VisitaTecnicaSerializer
+    permission_classes = [DonoOuSuperior]
+    filterset_fields = ["status", "vendedor", "cliente"]
+    search_fields = ["numero", "cliente__nome", "endereco__bairro"]
+    ordering_fields = ["data", "criado_em", "numero"]
+
+    def get_permissions(self):
+        if self.action == "destroy":
+            return [SomenteDiretor()]
+        return super().get_permissions()
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        p = self.request.query_params
+        if p.get("de"):
+            qs = qs.filter(data__gte=p["de"])
+        if p.get("ate"):
+            qs = qs.filter(data__lte=p["ate"])
+        return qs
+
+    def perform_create(self, serializer):
+        usuario = self.request.user
+        vendedor = serializer.validated_data.get("vendedor")
+        if not vendedor or not usuario.pode_trocar_vendedor:
+            vendedor = usuario
+        serializer.save(criado_por=usuario, vendedor=vendedor)
+
+    @action(detail=True, methods=["post"])
+    def perder(self, request, pk=None):
+        """O cliente desistiu: a visita sai da agenda e libera a vaga do dia."""
+        visita = self.get_object()
+        if visita.status != StatusVisita.AGENDADA:
+            raise ValidationError({"status": "Só a visita agendada pode ser dada como perdida."})
+        dados = PerderVisitaSerializer(data=request.data)
+        dados.is_valid(raise_exception=True)
+        visita.status = StatusVisita.PERDIDA
+        visita.motivo_perda = dados.validated_data["motivo"]
+        visita.perdida_em = timezone.now()
+        visita.save()
+        return Response(VisitaTecnicaSerializer(visita, context={"request": request}).data)
+
+
 # --------------------------------------------------------------------- agenda
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
@@ -259,7 +319,8 @@ def agenda_disponibilidade(request):
 
     Com `tipo=instalacao` e `area` (ou `turnos`), diz também em que turnos uma
     instalação daquele tamanho pode começar e onde ela termina. `excluir` tira da
-    conta o próprio agendamento que está sendo remarcado.
+    conta o próprio agendamento que está sendo remarcado (`excluir_visita`, a
+    visita técnica). `tipo=visita` segue a regra da entrega: 1 vaga no dia.
     """
     hoje = timezone.localdate()
     p = request.query_params
@@ -267,6 +328,7 @@ def agenda_disponibilidade(request):
     ate = date.fromisoformat(p.get("ate", str(hoje + timedelta(days=45))))
     tipo = p.get("tipo", "")
     excluir = p.get("excluir") or None
+    excluir_visita = p.get("excluir_visita") or None
 
     duracao = None
     if tipo == TipoAgendamento.INSTALACAO:
@@ -275,7 +337,7 @@ def agenda_disponibilidade(request):
         else:
             duracao = turnos_instalacao(Decimal(p["area"]) if p.get("area") else None)
 
-    grade = Grade(de, ate, excluir=excluir)
+    grade = Grade(de, ate, excluir=excluir, excluir_visita=excluir_visita)
     dias = []
     d = de
     while d <= ate:
@@ -287,6 +349,7 @@ def agenda_disponibilidade(request):
                 "usado": grade.entregas.get(d, 0),
                 "total": grade.cap_entrega,
                 "livre": grade.entregas_livres(d) if atende else 0,
+                "visitas": grade.visitas.get(d, 0),
             },
             "turnos": [],
         }
@@ -312,7 +375,7 @@ def agenda_disponibilidade(request):
                     t["termina"] = {"data": str(fim_d), "turno": fim_t, "turno_display": Turno(fim_t).label}
                     # cada turno que a instalação tomaria — a tela pinta o prazo no calendário
                     t["periodo"] = [chave(pd, pt) for pd, pt in periodo]
-            elif tipo == TipoAgendamento.ENTREGA:
+            elif tipo in (TipoAgendamento.ENTREGA, "visita"):
                 motivo = grade.motivo_entrega(d) or ("" if trabalha else "Turno bloqueado na agenda.")
                 t["disponivel"] = not motivo
                 t["motivo"] = motivo

@@ -69,6 +69,9 @@ const FORMAS = {
            <circle cx="12" cy="12" r="3" /></>,
   comissao: <><circle cx="12" cy="12" r="9" /><path d="M9.5 9.5h5M9.5 14.5h5" />
                <path d="M10.5 7v10M13.5 7v10" /></>,
+  // trena: visita técnica (medição e orçamento no cliente)
+  visita: <><rect x="2.5" y="6" width="13" height="13" rx="3" /><circle cx="9" cy="12.5" r="2.6" />
+             <path d="M15.5 15.5h6v3.5h-6" /><path d="M18 15.5v1.6M20 15.5v1.6" /></>,
   enviar: <><path d="M21 3 10.5 13.5" /><path d="M21 3l-6.8 18-3.7-7.5L3 9.8z" /></>,
 };
 

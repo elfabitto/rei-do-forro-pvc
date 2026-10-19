@@ -8,6 +8,7 @@ Regras de capacidade da agenda.
 - Entrega: no máximo `capacidade_entrega_dia` (4) por dia. A instalação leva o
   material, então consome 1 dessas vagas no dia em que começa. O turno da
   entrega é informativo; o limite é do dia.
+- Visita técnica (orçamento presencial): também ocupa 1 vaga de entrega no dia.
 
 Tudo que a tela mostra como vaga sai daqui, e é a mesma conta que o modelo
 confere ao gravar.
@@ -66,8 +67,10 @@ class Grade:
     # folga para trás: uma instalação iniciada antes de `de` ainda pode ocupar o intervalo
     FOLGA = 21
 
-    def __init__(self, de, ate, excluir=None):
-        from .models import Agendamento, Bloqueio, ConfiguracaoAgenda, StatusOS, TipoAgendamento
+    def __init__(self, de, ate, excluir=None, excluir_visita=None):
+        from .models import (
+            Agendamento, Bloqueio, ConfiguracaoAgenda, StatusOS, StatusVisita, TipoAgendamento, VisitaTecnica,
+        )
 
         self.cfg = ConfiguracaoAgenda.obter()
         self.sem_atendimento = set(self.cfg.dias_sem_atendimento_lista)
@@ -89,13 +92,22 @@ class Grade:
             qs = qs.exclude(pk=excluir)
 
         self.instalacoes = {}     # (data, turno) -> nº de instalações ocupando
-        self.entregas = {}        # data -> entregas + instalações que começam no dia
+        self.entregas = {}        # data -> entregas + instalações que começam no dia + visitas
+        self.visitas = {}         # data -> visitas técnicas (já somadas em `entregas`)
         for a in qs.only("tipo", "data", "turno", "ocupacao"):
             self.entregas[a.data] = self.entregas.get(a.data, 0) + 1
             if a.tipo == TipoAgendamento.INSTALACAO:
                 for k in a.ocupacao or [chave(a.data, a.turno)]:
                     d, t = ler_chave(k)
                     self.instalacoes[(d, t)] = self.instalacoes.get((d, t), 0) + 1
+
+        # a visita perdida libera a vaga; a convertida já aconteceu e segue contando no dia dela
+        visitas = VisitaTecnica.objects.filter(data__range=(de, fim_bloqueios)).exclude(status=StatusVisita.PERDIDA)
+        if excluir_visita:
+            visitas = visitas.exclude(pk=excluir_visita)
+        for d in visitas.values_list("data", flat=True):
+            self.entregas[d] = self.entregas.get(d, 0) + 1
+            self.visitas[d] = self.visitas.get(d, 0) + 1
 
     # ------------------------------------------------------------ calendário
     def atende(self, dia):
@@ -142,7 +154,8 @@ class Grade:
             return "Data bloqueada na agenda."
         if not self.entregas_livres(dia):
             usado = self.entregas.get(dia, 0)
-            return f"Dia cheio: {usado} de {self.cap_entrega} entregas já marcadas (instalação conta como entrega)."
+            return (f"Dia cheio: {usado} de {self.cap_entrega} entregas já marcadas "
+                    "(instalação e visita técnica contam como entrega).")
         return None
 
     def motivo_instalacao(self, dia, turno, n):

@@ -176,17 +176,19 @@ function CalendarioCompacto({ periodo, aoEscolherDia }) {
           return (
             <button type="button" key={d} onClick={() => aoEscolherDia(d)}
                     className={`cmDia${d === hoje ? " hoje" : ""}${noPeriodo ? " sel" : ""}${domingo ? " dom" : ""}`}
-                    title={q ? `${q.instalacoes} instalação(ões) · ${q.entregas} entrega(s)` : "livre"}>
+                    title={q ? `${q.instalacoes} instalação(ões) · ${q.entregas} entrega(s) · ${q.visitas ?? 0} visita(s)` : "livre"}>
               <span className="n">{i + 1}</span>
               <span className="pts">
                 {q?.instalacoes > 0 && <i className="pi">{q.instalacoes}</i>}
                 {q?.entregas > 0 && <i className="pe">{q.entregas}</i>}
+                {q?.visitas > 0 && <i className="pv">{q.visitas}</i>}
               </span>
             </button>
           );
         })}
       </div>
-      <Legenda itens={[{ rotulo: "Instalações em obra", cor: C.laranja }, { rotulo: "Entregas", cor: C.azul }]} />
+      <Legenda itens={[{ rotulo: "Instalações em obra", cor: C.laranja }, { rotulo: "Entregas", cor: C.azul },
+                       { rotulo: "Visitas técnicas", cor: C.roxo }]} />
       <p className="obs" style={{ margin: "6px 0 0" }}>Clique num dia para ver o painel daquele dia.</p>
     </div>
   );
@@ -206,6 +208,8 @@ const COLUNAS_RESUMO = [
 ];
 
 /* --------------------------------------------------------------- a página */
+const TIPO_AGENDA = { entrega: "Entrega", instalacao: "Instalação", visita: "Visita técnica" };
+
 const SITUACAO = {
   feito: ["Feito", "t-finalizada"],
   previsto: ["Previsto", "t-gerada"],
@@ -275,6 +279,7 @@ function Conteudo({ d, ov, oc, R, alternar, escolherDia }) {
   const idxHoje = d.semana.dias.findIndex((x) => x.data === hoje);
   const semInst = d.semana.dias.reduce((s, x) => s + x.instalacoes, 0);
   const semEnt = d.semana.dias.reduce((s, x) => s + x.entregas, 0);
+  const semVis = d.semana.dias.reduce((s, x) => s + (x.visitas ?? 0), 0);
 
   // resumo por vendedor: clique no título ordena; clicar de novo inverte
   const [ordem, setOrdem] = useState({ campo: "valor", cresc: false });
@@ -325,6 +330,10 @@ function Conteudo({ d, ov, oc, R, alternar, escolherDia }) {
           <Variacao atual={a.conversao} anterior={b.conversao} /></div>
         <div><span>Total de serviços</span><b>{a.instalacoes}</b></div>
         <div><span>Total de entregas</span><b>{a.entregas}</b></div>
+        <div title={`${a.visitas_convertidas} convertida(s) em serviço, ${a.visitas_perdidas} perdida(s) · ${d.carteira.visitas_agendadas} agendada(s) hoje`}>
+          <span>Visitas técnicas</span><b>{a.visitas}</b>
+          <small className="faixaSub">{a.visitas_convertidas} convertida(s) · {d.carteira.visitas_agendadas} agendada(s)</small>
+        </div>
         <div><span>Comissões a pagar</span><b>{oc ? MASCARA : brl(d.carteira.comissao_pendente)}</b></div>
       </div>
 
@@ -394,11 +403,13 @@ function Conteudo({ d, ov, oc, R, alternar, escolherDia }) {
 
       {/* ------------------------------------------------------- agenda */}
       <div className="cols g-21 mb">
-        <Cartao titulo="Semana vigente" dica={`${data(d.semana.de)} a ${data(d.semana.ate)} · ${semInst} instalação(ões) em obra, ${semEnt} entrega(s)`}>
-          <Legenda itens={[{ rotulo: "Instalações", cor: C.laranja }, { rotulo: "Entregas", cor: C.azul }]} />
+        <Cartao titulo="Semana vigente" dica={`${data(d.semana.de)} a ${data(d.semana.ate)} · ${semInst} instalação(ões) em obra, ${semEnt} entrega(s), ${semVis} visita(s)`}>
+          <Legenda itens={[{ rotulo: "Instalações", cor: C.laranja }, { rotulo: "Entregas", cor: C.azul },
+                           { rotulo: "Visitas técnicas", cor: C.roxo }]} />
           <Colunas categorias={semanaCats} destaque={idxHoje} formato={(v) => num(v, 0)}
                    series={[{ rotulo: "Instalações", cor: C.laranja, valores: d.semana.dias.map((x) => x.instalacoes) },
-                            { rotulo: "Entregas", cor: C.azul, valores: d.semana.dias.map((x) => x.entregas) }]} />
+                            { rotulo: "Entregas", cor: C.azul, valores: d.semana.dias.map((x) => x.entregas) },
+                            { rotulo: "Visitas", cor: C.roxo, valores: d.semana.dias.map((x) => x.visitas ?? 0) }]} />
         </Cartao>
         <Cartao titulo="Calendário">
           <CalendarioCompacto periodo={d.periodo} aoEscolherDia={escolherDia} />
@@ -440,16 +451,16 @@ function Conteudo({ d, ov, oc, R, alternar, escolherDia }) {
                                                      sub: `${x.vendas} venda${x.vendas > 1 ? "s" : ""}` }))} />
             )}
         </Cartao>
-        <Cartao titulo="Serviços e entregas do período" dica={`${d.servicos.length} no total`}>
+        <Cartao titulo="Serviços, entregas e visitas do período" dica={`${d.servicos.length} no total`}>
           {d.servicos.length === 0 ? <div className="vazio">Nada agendado no período.</div> : (
             <div className="tw servTab">
               <table>
                 <thead><tr><th>Data</th><th>Tipo</th><th>Cliente</th><th>O.S.</th><th>Situação</th></tr></thead>
                 <tbody>
                   {d.servicos.map((s) => (
-                    <tr key={s.id}>
+                    <tr key={`${s.tipo}-${s.id}`}>
                       <td>{diaCurto(s.data)}{s.data_fim && s.data_fim !== s.data && <small> → {curta(s.data_fim)}</small>}</td>
-                      <td><span className={`pill p-${s.tipo}`}>{s.tipo === "entrega" ? "Entrega" : "Instalação"}</span></td>
+                      <td><span className={`pill p-${s.tipo}`}>{TIPO_AGENDA[s.tipo]}</span></td>
                       <td>{s.cliente}</td>
                       <td className="mono">{s.numero.replace("OS-", "")}</td>
                       <td><span className={`tag ${SITUACAO[s.situacao][1]}`}>{SITUACAO[s.situacao][0]}</span></td>

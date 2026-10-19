@@ -430,6 +430,90 @@ class Agendamento(models.Model):
         return super().save(*args, **kwargs)
 
 
+class StatusVisita(models.TextChoices):
+    AGENDADA = "agendada", "Agendado"
+    CONVERTIDA = "convertida", "Convertido em Serviço"
+    PERDIDA = "perdida", "Perdido"
+
+
+class VisitaTecnica(models.Model):
+    """
+    Orçamento presencial: o técnico vai ao cliente medir e orçar. Ocupa 1 das
+    vagas de entrega do dia (a equipe sai da loja); o turno é informativo, como
+    na entrega. Na visita o técnico faz o orçamento, que vira serviço pelo
+    caminho de sempre — e a visita fica "Convertido em Serviço".
+    """
+
+    numero = models.CharField(max_length=16, unique=True, editable=False)
+    cliente = models.ForeignKey("clientes.Cliente", on_delete=models.PROTECT, related_name="visitas")
+    endereco = models.ForeignKey("clientes.Endereco", on_delete=models.PROTECT, related_name="visitas")
+    data = models.DateField()
+    turno = models.CharField(max_length=6, choices=Turno.choices)
+    status = models.CharField(max_length=10, choices=StatusVisita.choices, default=StatusVisita.AGENDADA)
+    observacoes = models.TextField("observações", blank=True)
+
+    # o orçamento feito na visita; quando ele vira O.S., a visita está convertida
+    orcamento = models.OneToOneField(
+        "orcamentos.Orcamento", on_delete=models.SET_NULL, related_name="visita", null=True, blank=True
+    )
+
+    vendedor = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="visitas_agendadas",
+        help_text="Quem agendou a visita (trouxe o cliente).",
+    )
+    criado_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+    motivo_perda = models.TextField(blank=True)
+    perdida_em = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["data", "turno", "id"]
+        verbose_name = "visita técnica"
+        verbose_name_plural = "visitas técnicas"
+        indexes = [models.Index(fields=["data", "status"])]
+
+    def __str__(self):
+        return f"{self.numero} — {self.cliente}"
+
+    @staticmethod
+    def _proximo_numero():
+        """VT-20260001: sequência anual."""
+        ano = timezone.localdate().year
+        final = re.compile(rf"{ano}(\d{{4}})$")
+        seq = 0
+        for numero in VisitaTecnica.objects.values_list("numero", flat=True):
+            achado = final.search(numero)
+            if achado:
+                seq = max(seq, int(achado.group(1)))
+        return f"VT-{ano}{seq + 1:04d}"
+
+    @property
+    def atrasada(self):
+        return self.status == StatusVisita.AGENDADA and self.data < timezone.localdate()
+
+    def clean(self):
+        if self.endereco_id and self.cliente_id and self.endereco.cliente_id != self.cliente_id:
+            raise ValidationError({"endereco": "O endereço não é deste cliente."})
+        if self.status != StatusVisita.AGENDADA:
+            return
+        from .agenda import Grade
+
+        grade = Grade(self.data, self.data, excluir_visita=self.pk)
+        motivo = grade.motivo_entrega(self.data)
+        if not motivo and not grade.trabalha(self.data, self.turno):
+            motivo = "Turno bloqueado na agenda."
+        if motivo:
+            raise ValidationError({"data": motivo})
+
+    def save(self, *args, **kwargs):
+        with transaction.atomic():
+            if not self.numero:
+                self.numero = self._proximo_numero()
+            self.full_clean()
+            return super().save(*args, **kwargs)
+
+
 class Pagamento(models.Model):
     ordem = models.ForeignKey(OrdemServico, on_delete=models.CASCADE, related_name="pagamentos")
     forma = models.CharField(max_length=16, choices=FormaPagamento.choices)

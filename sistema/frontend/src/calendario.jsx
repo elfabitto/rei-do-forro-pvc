@@ -6,6 +6,9 @@
  * área (1 a 6 dias úteis) e o backend diz em que turnos ela pode começar sem
  * faltar equipe em nenhum dos dias seguintes — e onde termina.
  *
+ * Visita técnica: segue a regra da entrega (1 vaga do dia) e destaca as datas
+ * com mais folga — são as que convém preencher primeiro.
+ *
  * É a mesma conta que o backend confere ao gravar; se a vaga sumir entre a
  * escolha e o envio, o servidor recusa e nada é criado pela metade.
  */
@@ -18,9 +21,10 @@ const SEMANA = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
 const iso = (d) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
-export default function CalendarioVagas({ valor, aoMudar, tipo = "entrega", titulo, area, excluir }) {
+export default function CalendarioVagas({ valor, aoMudar, tipo = "entrega", titulo, area, excluir, excluirVisita }) {
   const [offset, setOffset] = useState(0);
   const instalacao = tipo === "instalacao";
+  const visita = tipo === "visita";
 
   const { inicio, fim, ref } = useMemo(() => {
     const hoje = new Date();
@@ -32,7 +36,8 @@ export default function CalendarioVagas({ valor, aoMudar, tipo = "entrega", titu
   const params = { de: inicio, ate: fim, tipo };
   if (instalacao && area) params.area = area;
   if (excluir) params.excluir = excluir;
-  const disp = useApi("/agenda/disponibilidade/", params, [inicio, fim, tipo, area, excluir]);
+  if (excluirVisita) params.excluir_visita = excluirVisita;
+  const disp = useApi("/agenda/disponibilidade/", params, [inicio, fim, tipo, area, excluir, excluirVisita]);
 
   const hoje = iso(new Date());
   const dias = disp.dados?.dias ?? [];
@@ -87,6 +92,25 @@ export default function CalendarioVagas({ valor, aoMudar, tipo = "entrega", titu
     return Math.max(0, ...dia.turnos.filter((t) => t.disponivel).map((t) => t.instalacoes.livre));
   };
 
+  /*
+   * Visita: quanto mais vaga sobrando no dia, mais destaque — dia vazio ("livre"),
+   * metade ou mais livre ("folga"), só uma vaga ("aperto"). As sugestões são os
+   * dias com mais folga do mês na tela, os mais próximos primeiro.
+   */
+  const folgaDoDia = (dia) => {
+    if (!visita || !dia.disponivel || dia.data < hoje) return "";
+    const { livre, total } = dia.entregas;
+    if (livre >= total) return " livre";
+    if (livre >= Math.ceil(total / 2)) return " folga";
+    return livre === 1 ? " aperto" : "";
+  };
+  const sugestoes = visita
+    ? dias.filter((d) => d.disponivel && d.data >= hoje)
+        .sort((a, b) => b.entregas.livre - a.entregas.livre || a.data.localeCompare(b.data))
+        .slice(0, 4)
+        .sort((a, b) => a.data.localeCompare(b.data))
+    : [];
+
   return (
     <div className="agbox">
       <div className="agtit">
@@ -102,6 +126,17 @@ export default function CalendarioVagas({ valor, aoMudar, tipo = "entrega", titu
       </div>
 
       <Estado carregando={disp.carregando} erro={disp.erro}>
+        {visita && sugestoes.length > 0 && (
+          <div className="calsug">
+            <span>Datas sugeridas</span>
+            {sugestoes.map((d) => (
+              <button type="button" key={d.data} className={d.data === valor?.data ? "on" : ""}
+                      onClick={() => aoMudar({ data: d.data, turno: "" })}>
+                {diaCurto(d.data)} <small>{d.entregas.livre} de {d.entregas.total} livres</small>
+              </button>
+            ))}
+          </div>
+        )}
         <div className={`calvagas ${tipo}`}>
           {SEMANA.map((d) => <div className="hd" key={d}>{d}</div>)}
           {Array.from({ length: vazios }, (_, i) => <div key={`v${i}`} />)}
@@ -119,7 +154,7 @@ export default function CalendarioVagas({ valor, aoMudar, tipo = "entrega", titu
                 key={dia.data}
                 disabled={bloqueado}
                 className={`cvd${marcado ? " on" : ""}${naFaixa ? " faixa" : ""}${ehFim ? " fim" : ""}`
-                  + `${bloqueado ? " off" : ""}${dia.data === hoje ? " hoje" : ""}`}
+                  + `${bloqueado ? " off" : ""}${dia.data === hoje ? " hoje" : ""}${folgaDoDia(dia)}`}
                 onClick={() => aoMudar({ data: dia.data, turno: "" })}
                 title={bloqueado
                   ? (passado ? "data passada" : !dia.atende ? "sem atendimento" : "sem vaga")
@@ -133,11 +168,19 @@ export default function CalendarioVagas({ valor, aoMudar, tipo = "entrega", titu
             );
           })}
         </div>
-        <p className="calleg">
-          {instalacao
-            ? "Número = equipes livres. Com o dia marcado, os dias do serviço ficam pintados e o número já mostra o que sobra."
-            : "Número = entregas livres no dia (4 por dia, contando as instalações que começam nele)."}
-        </p>
+        {visita ? (
+          <p className="calleg">
+            <span className="lg"><i style={{ background: "#d4f0dc", borderColor: "#5cbf75" }} />dia vazio</span>
+            <span className="lg"><i style={{ background: "#e8f7ec", borderColor: "#9fd9ae" }} />com folga</span>
+            Número = vagas livres no dia. A visita ocupa 1 das entregas do dia — prefira os dias em verde.
+          </p>
+        ) : (
+          <p className="calleg">
+            {instalacao
+              ? "Número = equipes livres. Com o dia marcado, os dias do serviço ficam pintados e o número já mostra o que sobra."
+              : "Número = entregas livres no dia (4 por dia, contando as instalações que começam nele e as visitas técnicas)."}
+          </p>
+        )}
 
         {instalacao && previa && (
           <div className={`prazo${previa.provisoria ? " prov" : ""}`}>

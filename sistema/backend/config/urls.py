@@ -14,6 +14,7 @@ from apps.ordens.views import (
     AgendamentoViewSet,
     OrdemServicoViewSet,
     PagamentoViewSet,
+    VisitaTecnicaViewSet,
     agenda_disponibilidade,
     taxas_cartao,
     parametros_comissao,
@@ -32,6 +33,7 @@ router.register("acabamentos", AcabamentoViewSet)
 router.register("orcamentos", OrcamentoViewSet)
 router.register("ordens-servico", OrdemServicoViewSet)
 router.register("agendamentos", AgendamentoViewSet)
+router.register("visitas", VisitaTecnicaViewSet)
 router.register("pagamentos", PagamentoViewSet)
 router.register("lancamentos", LancamentoViewSet, basename="lancamento")
 router.register("chamados", ChamadoViewSet, basename="chamado")

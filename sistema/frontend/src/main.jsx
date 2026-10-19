@@ -9,6 +9,7 @@ import "./layout.css";
 import "./status.css";
 import "./painel.css";
 import "./gestao.css";
+import "./visitas.css";
 
 createRoot(document.getElementById("root")).render(
   <React.StrictMode>

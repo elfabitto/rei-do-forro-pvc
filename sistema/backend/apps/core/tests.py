@@ -598,3 +598,98 @@ class ExcluirOSApiTest(OSFinalizadaMixin, ApiBase):
         self.assertFalse(HistoricoOS.objects.exists())
         self.assertFalse(Notificacao.objects.exists())
         self.assertEqual(Orcamento.objects.get(pk=os_["orcamento"]).status, "aberto")
+
+
+class VisitaTecnicaApiTest(ApiBase):
+    """Orçamento presencial: ocupa vaga de entrega e vira serviço pelo orçamento."""
+
+    def setUp(self):
+        hoje = timezone.localdate()
+        self.dia = hoje + timedelta(days=(7 - hoje.weekday()) % 7 or 7)   # próxima segunda
+        self.client.force_authenticate(self.vendedor)
+
+    def agendar(self, **extra):
+        return self.client.post("/api/visitas/", {
+            "cliente": self.cliente.id, "endereco": self.endereco.id,
+            "data": str(self.dia), "turno": "manha", **extra,
+        }, format="json")
+
+    def test_agenda_e_ocupa_vaga_de_entrega(self):
+        r = self.agendar()
+        self.assertEqual(r.status_code, 201, r.data)
+        self.assertTrue(r.data["numero"].startswith("VT-"))
+        self.assertEqual(r.data["status"], "agendada")
+        self.assertEqual(r.data["vendedor"], self.vendedor.id)
+
+        disp = self.client.get("/api/agenda/disponibilidade/",
+                               {"de": str(self.dia), "ate": str(self.dia), "tipo": "visita"}).data
+        dia = disp["dias"][0]
+        self.assertEqual((dia["entregas"]["usado"], dia["entregas"]["visitas"]), (1, 1))
+        self.assertTrue(dia["disponivel"])
+
+    def test_dia_cheio_recusa_e_perdida_libera(self):
+        ids = [self.agendar().data["id"] for _ in range(4)]   # 4 entregas por dia
+        r = self.agendar()
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("Dia cheio", str(r.data))
+
+        r = self.client.post(f"/api/visitas/{ids[0]}/perder/", {"motivo": "desistiu"}, format="json")
+        self.assertEqual(r.status_code, 200, r.data)
+        self.assertEqual(r.data["status"], "perdida")
+        self.assertEqual(self.agendar().status_code, 201)
+
+    def test_data_passada_recusa(self):
+        r = self.agendar(data=str(timezone.localdate() - timedelta(days=1)))
+        self.assertEqual(r.status_code, 400)
+
+    def test_orcamento_da_visita_vira_servico(self):
+        visita = self.agendar().data
+        # quem mede pode ser outro: o diretor faz o orçamento da visita do vendedor
+        self.client.force_authenticate(self.diretor)
+        orc = self.client.post("/api/orcamentos/", {
+            "visita": visita["id"], "tipo": "material", "area_m2": "30", "forro": self.forro.id,
+        }, format="json")
+        self.assertEqual(orc.status_code, 201, orc.data)
+        self.assertEqual(orc.data["cliente"], self.cliente.id)
+        self.assertEqual(orc.data["visita_numero"], visita["numero"])
+
+        v = self.client.get(f"/api/visitas/{visita['id']}/").data
+        self.assertEqual((v["orcamento"], v["status"]), (orc.data["id"], "agendada"))
+
+        # a mesma visita não ganha um segundo orçamento
+        r = self.client.post("/api/orcamentos/", {
+            "visita": visita["id"], "tipo": "material", "area_m2": "30", "forro": self.forro.id,
+        }, format="json")
+        self.assertEqual(r.status_code, 400)
+
+        dia_entrega = self.dia + timedelta(days=1)
+        os_ = self.client.post("/api/ordens-servico/", {
+            "orcamento": orc.data["id"], "endereco": self.endereco.id, "modalidade": "vista",
+            "agendar_entrega": {"data": str(dia_entrega), "turno": "manha"},
+        }, format="json")
+        self.assertEqual(os_.status_code, 201, os_.data)
+        v = self.client.get(f"/api/visitas/{visita['id']}/").data
+        self.assertEqual((v["status"], v["os_numero"]), ("convertida", os_.data["numero"]))
+
+        # excluir a O.S. devolve a visita para agendada
+        self.client.delete(f"/api/ordens-servico/{os_.data['id']}/")
+        self.assertEqual(self.client.get(f"/api/visitas/{visita['id']}/").data["status"], "agendada")
+
+    def test_so_diretoria_exclui(self):
+        vid = self.agendar().data["id"]
+        self.assertEqual(self.client.delete(f"/api/visitas/{vid}/").status_code, 403)
+        self.client.force_authenticate(self.diretor)
+        self.assertEqual(self.client.delete(f"/api/visitas/{vid}/").status_code, 204)
+
+    def test_painel_conta_as_visitas(self):
+        r = self.agendar()
+        self.client.force_authenticate(self.diretor)
+        p = self.client.get("/api/painel/", {"de": str(self.dia), "ate": str(self.dia)}).data
+        self.assertEqual((p["atual"]["visitas"], p["carteira"]["visitas_agendadas"]), (1, 1))
+        self.assertEqual([s["tipo"] for s in p["servicos"]], ["visita"])
+        cal = self.client.get("/api/painel/calendario/", {"mes": self.dia.strftime("%Y-%m")}).data
+        self.assertEqual(cal["dias"][str(self.dia)]["visitas"], 1)
+
+        self.client.post(f"/api/visitas/{r.data['id']}/perder/", {}, format="json")
+        p = self.client.get("/api/painel/", {"de": str(self.dia), "ate": str(self.dia)}).data
+        self.assertEqual((p["atual"]["visitas"], p["atual"]["visitas_perdidas"], len(p["servicos"])), (1, 1, 0))

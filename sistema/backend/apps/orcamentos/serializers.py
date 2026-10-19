@@ -1,3 +1,4 @@
+from django.db import transaction
 from rest_framework import serializers
 
 from apps.clientes.serializers import ClienteResumoSerializer
@@ -43,10 +44,14 @@ class OrcamentoSerializer(serializers.ModelSerializer):
     tem_os = serializers.SerializerMethodField()
     os_id = serializers.SerializerMethodField()
     pode_editar = serializers.SerializerMethodField()
+    # orçamento feito numa visita técnica: na criação, liga os dois e traz o cliente dela
+    visita = serializers.IntegerField(write_only=True, required=False, allow_null=True)
+    visita_numero = serializers.CharField(source="visita.numero", read_only=True, default=None)
 
     class Meta:
         model = Orcamento
         fields = ["id", "numero", "cliente", "cliente_detalhe", "tipo", "tipo_display",
+                  "visita", "visita_numero",
                   "largura", "comprimento", "tamanho_folha", "quantidade_folhas",
                   "area_m2", "forro", "forro_nome",
                   "acabamento", "acabamento_nome", "preco_m2_vista", "preco_m2_cartao",
@@ -93,16 +98,39 @@ class OrcamentoSerializer(serializers.ModelSerializer):
                 )
         return attrs
 
+    def validate_visita(self, valor):
+        if valor is None:
+            return None
+        from apps.ordens.models import StatusVisita, VisitaTecnica
+
+        visita = VisitaTecnica.objects.filter(pk=valor).first()
+        if not visita:
+            raise serializers.ValidationError("Visita técnica não encontrada.")
+        if visita.status != StatusVisita.AGENDADA:
+            raise serializers.ValidationError("Esta visita já foi encerrada.")
+        if visita.orcamento_id:
+            raise serializers.ValidationError(f"Esta visita já tem o orçamento {visita.orcamento.numero}.")
+        # quem vai medir nem sempre é quem agendou: qualquer um que faz orçamento pode
+        return visita
+
+    @transaction.atomic
     def create(self, validated):
         itens = validated.pop("itens", [])
+        visita = validated.pop("visita", None)
+        if visita:
+            validated["cliente"] = visita.cliente
         orcamento = Orcamento.objects.create(**validated)
         for item in itens:
             OrcamentoItem.objects.create(orcamento=orcamento, **item)
         orcamento.save()  # recalcula os totais já com os itens
+        if visita:
+            visita.orcamento = orcamento
+            visita.save(update_fields=["orcamento", "atualizado_em"])
         return orcamento
 
     def update(self, instancia, validated):
         itens = validated.pop("itens", None)
+        validated.pop("visita", None)   # a ligação com a visita só nasce na criação
         for campo, valor in validated.items():
             setattr(instancia, campo, valor)
         if itens is not None:

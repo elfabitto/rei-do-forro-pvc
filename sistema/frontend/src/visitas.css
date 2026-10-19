@@ -1,0 +1,76 @@
+/* =========================================================================
+   Visita técnica (orçamento presencial) — roxo.
+   Ocupa 1 vaga de entrega no dia; na agenda e no calendário de vagas aparece
+   sempre com o ícone e o rótulo, a cor só reforça.
+   ========================================================================= */
+:root{--s-visita:#7c4dcc;--s-visita-bg:#f2ecfb;--s-visita-tx:#5a2fa6}
+
+.p-visita{background:var(--s-visita-bg);color:var(--s-visita-tx)}
+
+/* status da visita */
+.tag.t-agendada  {background:var(--s-visita-bg);color:var(--s-visita-tx)}
+.tag.t-convertida{background:var(--st-verde-bg);color:var(--st-verde-tx)}
+.tag.t-perdida   {background:var(--st-vermelho-bg);color:var(--st-vermelho-tx)}
+.cardItem.st-agendada  {border-top-color:var(--s-visita)}
+.cardItem.st-convertida{border-top-color:var(--st-verde)}
+.cardItem.st-perdida   {border-top-color:var(--st-vermelho);opacity:.82}
+.cardItem .tipoServico.visita{background:var(--s-visita-bg);color:var(--s-visita-tx)}
+.btn.roxo{background:var(--s-visita);border-color:var(--s-visita);color:#fff;font-weight:700}
+.btn.roxo:hover{background:#6a3db8;border-color:#6a3db8}
+.btn.roxo:disabled{background:#fff;border-color:var(--line);color:var(--muted);font-weight:600}
+.li .ic-vis{color:var(--s-visita)}
+
+/* agenda do mês */
+.tag-vis{color:var(--s-visita-tx)}.tag-vis i{background:var(--s-visita)}
+.ev.visita{background:var(--s-visita-bg);color:var(--s-visita-tx);box-shadow:inset 3px 0 0 var(--s-visita)}
+.agcard.visita{border-left-color:var(--s-visita)}
+.marcas i.visita{background:var(--s-visita)}
+
+/* calendário de vagas no modo visita: destaque nos dias com folga */
+.calvagas.visita .cvd .v{color:var(--s-visita-tx)}
+.calvagas.visita .cvd:hover:not(.off){border-color:var(--s-visita);background:var(--s-visita-bg)}
+.calvagas.visita .cvd.on{background:var(--s-visita);border-color:var(--s-visita)}
+.calvagas.visita .cvd.folga:not(.on){background:#e8f7ec;border-color:#9fd9ae}
+.calvagas.visita .cvd.folga:not(.on) .v{color:#0a6b0a}
+.calvagas.visita .cvd.livre:not(.on){background:#d4f0dc;border-color:#5cbf75;box-shadow:inset 0 0 0 1px #5cbf75}
+.calvagas.visita .cvd.livre:not(.on) .v{color:#0a6b0a;font-weight:800}
+.calvagas.visita .cvd.aperto:not(.on) .v{color:#a8430c}
+.calsug{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0 0 10px}
+.calsug > span{font-size:11.5px;font-weight:800;color:var(--ink-2);letter-spacing:.3px;text-transform:uppercase;margin-right:2px}
+.calsug button{display:inline-flex;align-items:baseline;gap:5px;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer;
+               border:1px solid #9fd9ae;background:#e8f7ec;color:#0a6b0a;border-radius:999px;padding:4px 11px}
+.calsug button small{font-size:11px;font-weight:600;color:#3d7a4a}
+.calsug button:hover{border-color:#0ca30c}
+.calsug button.on{background:var(--s-visita);border-color:var(--s-visita);color:#fff}
+.calsug button.on small{color:#fff}
+.calleg .lg{display:inline-flex;align-items:center;gap:4px;margin-right:10px}
+.calleg .lg i{display:inline-block;width:10px;height:10px;border-radius:3px;border:1px solid}
+
+/* página de agendamento: passos numerados */
+.passoTit{display:flex;align-items:center;gap:9px;margin:4px 0 12px;font-weight:800;font-size:14.5px}
+.passoTit .n{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:12.5px;
+             background:var(--s-visita);color:#fff}
+.passoTit.feito .n{background:var(--good)}
+.visitaResumo{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;
+              background:var(--s-visita-bg);color:var(--s-visita-tx);font-weight:700;font-size:13.5px;margin-bottom:14px}
+
+/* faixa da visita no orçamento feito durante ela */
+.faixaVisita{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:11px 14px;border-radius:10px;margin:0 0 16px;
+             background:var(--s-visita-bg);border:1px solid #d9c9f3;color:var(--s-visita-tx);font-size:13.5px}
+.faixaVisita b{color:var(--ink)}
+
+/* espaço na tela Início */
+.homeVisita{display:flex;align-items:center;gap:14px;margin-top:14px;padding:16px 18px;border-radius:18px;text-decoration:none;
+            color:#fff;background:var(--s-visita);box-shadow:var(--shadow);transition:transform .12s ease}
+.homeVisita:hover{transform:translateY(-2px)}
+.homeVisita:active{transform:scale(.98)}
+.homeVisita:focus-visible{outline:3px solid var(--s-visita);outline-offset:2px}
+.homeVisita .ico{width:52px;height:52px;border-radius:15px;display:grid;place-items:center;background:rgba(255,255,255,.2);flex:0 0 auto}
+.homeVisita b{display:block;font-size:15.5px;line-height:1.2}
+.homeVisita small{display:block;font-size:12.5px;color:rgba(255,255,255,.88);margin-top:2px}
+.homeVisita .seta{margin-left:auto;font-size:24px;line-height:1;opacity:.85}
+@media (max-width:620px){
+  .homeVisita{margin-top:10px;padding:13px 14px;border-radius:16px}
+  .homeVisita .ico{width:44px;height:44px;border-radius:13px}
+  .homeVisita b{font-size:14px}
+}
