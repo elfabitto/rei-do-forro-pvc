@@ -298,6 +298,14 @@ export default function OrdemNova() {
                   </div>
                 </div>
               )}
+              {Number(orc.desconto) > 0 && (
+                <div className="rows">
+                  <div className="row sm item">
+                    <span className="k">Desconto do orçamento</span>
+                    <span className="v">− {brl(orc.desconto)}</span>
+                  </div>
+                </div>
+              )}
               <div className="totais">
                 <div className={`tot${modalidade === "cartao" ? "" : " b"}`}>
                   <span className="k">Total à vista</span>

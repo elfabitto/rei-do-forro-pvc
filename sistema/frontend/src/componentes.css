@@ -293,6 +293,9 @@ input.preco.erro{border-color:var(--critical);background:#fdf2f2}
 .extra .vl{display:flex;align-items:center;gap:5px;flex:0 0 auto}
 .extra .vl .cifrao{font-size:12px;font-weight:700;color:var(--muted)}
 .extra .vl input{width:96px;text-align:right;font-variant-numeric:tabular-nums}
+.campoReais{display:flex;align-items:center;gap:6px;max-width:220px}
+.campoReais .cifrao{font-size:13px;font-weight:700;color:var(--muted)}
+.campoReais input{text-align:right;font-variant-numeric:tabular-nums}
 .extra .x{flex:0 0 auto;width:30px;height:30px;border:1px solid var(--line);border-radius:6px;
           background:var(--surface);color:var(--muted);font-size:17px;line-height:1;cursor:pointer}
 .extra .x:hover{border-color:var(--st-vermelho);color:var(--st-vermelho-tx);background:#fff}

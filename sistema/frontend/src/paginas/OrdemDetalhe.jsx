@@ -141,7 +141,7 @@ export default function OrdemDetalhe({ id, aoFechar, aoMudar }) {
                 <h4>Enviar para Gestão</h4>
                 <div className="acts" style={{ padding: 0 }}>
                   <BotaoAcao classe="btn verde" aoClicar={() => compartilharOS(doc)}>
-                    <Icone nome="whatsapp" tamanho={15} /> Compartilhar
+                    <Icone nome="whatsapp" tamanho={15} /> WhatsApp (texto)
                   </BotaoAcao>
                   <BotaoAcao aoClicar={() => copiarImagemOS(doc)}>
                     <Icone nome="imagem" tamanho={15} /> Copiar imagem

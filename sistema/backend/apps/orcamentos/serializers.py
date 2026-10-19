@@ -30,7 +30,15 @@ class OrcamentoResumoSerializer(serializers.ModelSerializer):
         fields = ["id", "numero", "tipo", "tipo_display", "area_m2", "largura", "comprimento",
                   "tamanho_folha", "quantidade_folhas",
                   "forro_nome", "acabamento_nome", "preco_m2_vista", "preco_m2_cartao",
-                  "taxa_logistica", "total_vista", "total_cartao", "observacoes", "itens"]
+                  "taxa_logistica", "desconto", "total_vista", "total_cartao", "observacoes", "itens"]
+
+
+def _conferir_desconto(orcamento):
+    """Depois de somar os itens: o desconto não passa do valor à vista."""
+    if orcamento.desconto and orcamento.desconto > orcamento.subtotal_vista:
+        raise serializers.ValidationError(
+            {"desconto": f"O desconto passa do valor à vista (R$ {orcamento.subtotal_vista})."}
+        )
 
 
 class OrcamentoSerializer(serializers.ModelSerializer):
@@ -55,7 +63,8 @@ class OrcamentoSerializer(serializers.ModelSerializer):
                   "largura", "comprimento", "tamanho_folha", "quantidade_folhas",
                   "area_m2", "forro", "forro_nome",
                   "acabamento", "acabamento_nome", "preco_m2_vista", "preco_m2_cartao",
-                  "taxa_logistica", "total_vista", "total_cartao", "status", "status_display", "validade_dias",
+                  "taxa_logistica", "desconto", "total_vista", "total_cartao", "status", "status_display",
+                  "validade_dias",
                   "observacoes", "vendedor", "vendedor_nome", "criado_por", "criado_em",
                   "itens", "tem_os", "os_id", "pode_editar"]
         read_only_fields = ["numero", "preco_m2_vista", "preco_m2_cartao", "taxa_logistica", "total_vista",
@@ -78,6 +87,11 @@ class OrcamentoSerializer(serializers.ModelSerializer):
         """
         pedido = self.context.get("request")
         return bool(pedido and pode_editar_registro(pedido.user, obj))
+
+    def validate_desconto(self, valor):
+        if valor is not None and valor < 0:
+            raise serializers.ValidationError("O desconto não pode ser negativo.")
+        return valor
 
     def validate(self, attrs):
         tipo = attrs.get("tipo", getattr(self.instance, "tipo", None))
@@ -123,11 +137,13 @@ class OrcamentoSerializer(serializers.ModelSerializer):
         for item in itens:
             OrcamentoItem.objects.create(orcamento=orcamento, **item)
         orcamento.save()  # recalcula os totais já com os itens
+        _conferir_desconto(orcamento)
         if visita:
             visita.orcamento = orcamento
             visita.save(update_fields=["orcamento", "atualizado_em"])
         return orcamento
 
+    @transaction.atomic
     def update(self, instancia, validated):
         itens = validated.pop("itens", None)
         validated.pop("visita", None)   # a ligação com a visita só nasce na criação
@@ -138,4 +154,5 @@ class OrcamentoSerializer(serializers.ModelSerializer):
             for item in itens:
                 OrcamentoItem.objects.create(orcamento=instancia, **item)
         instancia.save()
+        _conferir_desconto(instancia)
         return instancia

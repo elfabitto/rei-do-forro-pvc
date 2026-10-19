@@ -50,9 +50,27 @@ export const descricaoItem = (i) =>
  *
  * `extras` são os itens "Outro": descrição livre e valor fechado, que existem
  * nos dois tipos de orçamento para o que não cabe na tabela. `servico` é o valor
- * fechado do serviço, só no orçamento de Material (0 = sem serviço).
+ * fechado do serviço, só no orçamento de Material (0 = sem serviço). `desconto`
+ * é em R$ e abate dos dois totais — a mesma conta do backend.
  */
-export function montarDocumento({ tipo, area, forro, acabamento, itens = [], extras = [], servico = 0 }) {
+export function montarDocumento({ tipo, area, forro, acabamento, itens = [], extras = [], servico = 0, desconto = 0 }) {
+  const doc = montarSemDesconto({ tipo, area, forro, acabamento, itens, extras, servico });
+  const d = cent(desconto);
+  if (d > 0) {
+    doc.desconto = d;
+    doc.subtotalVista = doc.totalVista;
+    doc.secoes.push({ titulo: "Desconto", linhas: [["Desconto", `− R$ ${brl(d)}`]] });
+    doc.totalVista = Math.max(0, cent(doc.totalVista - d));
+    doc.totalCartao = Math.max(0, cent(doc.totalCartao - d));
+    doc.texto = doc.texto
+      .replace("----------\n*VALOR TOTAL*", `\n*DESCONTO*: − R$ ${brl(d)}\n----------\n*VALOR TOTAL*`)
+      .replace(/💵 \*À vista\*: R\$ [\d.,]+/, `💵 *À vista*: R$ ${brl(doc.totalVista)}`)
+      .replace(/💳 \*No cartão\*: R\$ [\d.,]+/, `💳 *No cartão*: R$ ${brl(doc.totalCartao)}`);
+  }
+  return doc;
+}
+
+function montarSemDesconto({ tipo, area, forro, acabamento, itens, extras, servico }) {
   const instalado = tipo === "instalado";
   const somaExtras = extras.reduce((s, e) => s + cent(e.valor), 0);
   const linhasExtras = extras.map((e) => [e.descricao, `R$ ${brl(cent(e.valor))}`]);

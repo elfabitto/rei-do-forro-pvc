@@ -18,7 +18,7 @@ const FILTROS = [
 ];
 
 /**
- * A imagem precisa da ficha completa (endereço, pedido, preço do m²), que a
+ * O texto precisa da ficha completa (endereço, pedido, preço do m²), que a
  * listagem não carrega — por isso o card busca o detalhe antes de compartilhar.
  */
 async function compartilharDaLista(o, verFinanceiro) {
@@ -115,7 +115,7 @@ function CardOS({ o, verFinanceiro, pode, aoAbrir, aoFinalizar, aoMudarStatus, a
         )}
 
         <BotaoAcao classe="btn zap" aoClicar={() => compartilharDaLista(o, verFinanceiro)}>
-          <Icone nome="whatsapp" tamanho={15} /> Compartilhar
+          <Icone nome="whatsapp" tamanho={15} /> WhatsApp
         </BotaoAcao>
       </footer>
     </article>

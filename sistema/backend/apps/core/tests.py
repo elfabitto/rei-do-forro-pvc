@@ -73,6 +73,37 @@ class OrcamentoApiTest(ApiBase):
         # vendedor é o próprio usuário logado
         self.assertEqual(r.data["vendedor"], self.vendedor.id)
 
+    def test_desconto_abate_dos_dois_totais_e_vai_para_a_os(self):
+        self.client.force_authenticate(self.vendedor)
+        r = self.client.post("/api/orcamentos/", {
+            "cliente": self.cliente.id, "tipo": "instalado", "area_m2": "23",
+            "forro": self.forro.id, "acabamento": self.sanca.id, "desconto": "56.00",
+        }, format="json")
+        self.assertEqual(r.status_code, 201, r.data)
+        self.assertEqual((r.data["total_vista"], r.data["total_cartao"]), ("1600.00", "1715.00"))
+
+        os_ = self.client.post("/api/ordens-servico/", {
+            "orcamento": r.data["id"], "endereco": self.endereco.id, "modalidade": "vista",
+        }, format="json")
+        self.assertEqual(os_.status_code, 201, os_.data)
+        self.assertEqual(os_.data["valor_total"], "1600.00")
+        self.assertEqual(os_.data["orcamento_detalhe"]["desconto"], "56.00")
+
+        # edição: tirar o desconto volta ao total cheio
+        r = self.client.patch(f"/api/orcamentos/{r.data['id']}/", {"desconto": "0"}, format="json")
+        self.assertEqual(r.data["total_vista"], "1656.00")
+
+    def test_desconto_maior_que_o_total_recusa(self):
+        self.client.force_authenticate(self.vendedor)
+        r = self.client.post("/api/orcamentos/", {
+            "cliente": self.cliente.id, "tipo": "instalado", "area_m2": "23",
+            "forro": self.forro.id, "acabamento": self.sanca.id, "desconto": "2000.00",
+        }, format="json")
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("desconto", r.data)
+        from apps.orcamentos.models import Orcamento
+        self.assertFalse(Orcamento.objects.exists())
+
     def test_material_recusa_acabamento(self):
         self.client.force_authenticate(self.vendedor)
         r = self.client.post("/api/orcamentos/", {

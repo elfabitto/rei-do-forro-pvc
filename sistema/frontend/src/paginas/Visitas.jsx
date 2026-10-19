@@ -15,6 +15,8 @@ import CalendarioVagas from "../calendario";
 import { BotaoAcao, Campo, Confirmacao, Estado, Etiqueta, Gaveta, Modal, linhas, useApi } from "../componentes";
 import Icone from "../icones";
 import { digitos } from "../mascaras";
+import { copiarTexto } from "../orcamentoDoc";
+import { abrirWhatsApp } from "../osDoc";
 
 const FILTROS = [
   ["", "Todas"],
@@ -25,6 +27,26 @@ const FILTROS = [
 
 const quandoTexto = (v) => `${diaCurto(v.data)} · ${v.turno_display}`;
 const zap = (tel) => `https://wa.me/55${digitos(tel)}`;
+
+/** Texto para o grupo de gestão no WhatsApp — no mesmo modelo do texto da O.S. */
+export function textoVisita(v) {
+  const e = v.endereco_detalhe;
+  const endereco = e
+    ? [e.logradouro, e.numero].filter(Boolean).join(", ") + (e.complemento ? ` — ${e.complemento}` : "")
+    : v.endereco_resumo;
+  const linhas = (pares) => pares.filter(([, val]) => val).map(([k, val]) => `${k}: ${val}`).join("\n");
+  return `*VISITA TÉCNICA ${v.numero}*
+_ORÇAMENTO PRESENCIAL_
+Situação: ${v.status_display}
+----------
+*INFORMAÇÕES DO CLIENTE*
+${linhas([["Cliente", v.cliente_detalhe?.nome], ["Telefone", v.cliente_detalhe?.telefone],
+          ["Endereço", endereco], ["Bairro", e?.bairro ?? v.bairro], ["Cidade", e?.cidade]])}
+*AGENDAMENTO*
+${linhas([["Visita", quandoTexto(v)], ["Agendado por", v.vendedor_nome],
+          ["Orçamento", v.orcamento_numero], ["Serviço", v.os_numero]])}${
+    v.observacoes ? `\n----------\n_${v.observacoes}_` : ""}`;
+}
 
 /** Gerar Serviço: faz o orçamento da visita; se ele já existe, segue para a O.S. */
 function useGerarServico() {
@@ -69,6 +91,11 @@ function AcoesVisita({ v, aoRemarcar, aoPerder, aoAbrir }) {
       {v.os_id && (
         <button className="btn azul" onClick={() => navegar(`/ordens?abrir=${v.os_id}`)}>
           <Icone nome="ordem" tamanho={15} /> Ver serviço
+        </button>
+      )}
+      {aoAbrir && (
+        <button className="btn zap" onClick={() => abrirWhatsApp(textoVisita(v))}>
+          <Icone nome="whatsapp" tamanho={15} /> WhatsApp
         </button>
       )}
     </>
@@ -156,6 +183,18 @@ function VisitaDetalhe({ id, aoFechar, ...acoes }) {
                 <span>A data da visita passou. Gere o serviço, remarque ou marque como perdida.</span>
               </div>
             )}
+
+            <section className="sec">
+              <h4>Enviar para Gestão</h4>
+              <div className="acts" style={{ padding: 0 }}>
+                <button className="btn verde" onClick={() => abrirWhatsApp(textoVisita(v))}>
+                  <Icone nome="whatsapp" tamanho={15} /> WhatsApp (texto)
+                </button>
+                <BotaoAcao aoClicar={() => copiarTexto({ texto: textoVisita(v) })}>
+                  <Icone nome="copiar" tamanho={15} /> Copiar texto
+                </BotaoAcao>
+              </div>
+            </section>
 
             <section className="sec">
               <h4>Visita</h4>

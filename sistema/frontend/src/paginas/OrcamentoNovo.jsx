@@ -69,6 +69,8 @@ export default function OrcamentoNovo() {
   // itens "Outro": descrição livre e valor fechado, nos dois tipos de orçamento
   const [extras, setExtras] = useState([]);
   const [observacoes, setObservacoes] = useState("");
+  // desconto em R$, dado já no orçamento: abate do total à vista e do cartão
+  const [desconto, setDesconto] = useState("");
   const [erro, setErro] = useState("");
 
   // orçamento já gravado nesta sessão — libera o envio ao cliente
@@ -90,6 +92,7 @@ export default function OrcamentoNovo() {
     setForroId(String(o.forro));
     setAcabamentoId(o.acabamento ? String(o.acabamento) : "");
     setObservacoes(o.observacoes ?? "");
+    setDesconto(Number(o.desconto) > 0 ? String(Number(o.desconto)).replace(".", ",") : "");
     if (o.tamanho_folha && o.quantidade_folhas) {
       setModo("folhas");
       setTamanhoFolha(String(o.tamanho_folha).replace(".", ","));
@@ -166,12 +169,16 @@ export default function OrcamentoNovo() {
     [extras]
   );
 
+  const valorDesconto = paraNumero(desconto);
   const completo = areaFinal > 0 && forro && tipo && (tipo === "material" || acabamento);
   const doc = completo
-    ? montarDocumento({ tipo, area: areaFinal, forro, acabamento, itens, extras: extrasValidos, servico: valorServico })
+    ? montarDocumento({ tipo, area: areaFinal, forro, acabamento, itens, extras: extrasValidos,
+                        servico: valorServico, desconto: valorDesconto })
     : null;
+  const descontoDemais = doc && valorDesconto > (doc.subtotalVista ?? doc.totalVista);
 
   async function gravar() {
+    if (descontoDemais) throw new Error("O desconto passa do valor à vista do orçamento.");
     const corpo = {
       tipo,
       area_m2: areaFinal.toFixed(2),
@@ -182,6 +189,7 @@ export default function OrcamentoNovo() {
       forro: forro.id,
       acabamento: tipo === "instalado" ? acabamento.id : null,
       observacoes,
+      desconto: valorDesconto.toFixed(2),
       // só na criação: liga o orçamento à visita e traz o cliente dela
       ...(visitaId && !alvoId ? { visita: Number(visitaId) } : {}),
       itens: [
@@ -501,8 +509,24 @@ export default function OrcamentoNovo() {
                 </div>
               )}
 
+              {tipo && (
+                <div className="step">
+                  {passo(6, "Desconto")}
+                  <Campo rotulo="Desconto (R$)" erro={descontoDemais ? "Maior que o valor à vista do orçamento." : ""}
+                         dica={doc && valorDesconto > 0
+                           ? `Abate dos dois totais: à vista R$ ${brl(doc.subtotalVista)} → R$ ${brl(doc.totalVista)}.`
+                           : "Opcional. Abate do total à vista e do total no cartão."}>
+                    <div className="campoReais">
+                      <span className="cifrao">R$</span>
+                      <input value={desconto} placeholder="0,00" inputMode="decimal"
+                             onChange={(e) => alterou(setDesconto)(decimal(e.target.value))} />
+                    </div>
+                  </Campo>
+                </div>
+              )}
+
               <div className="step">
-                {passo(6, "Observações")}
+                {passo(tipo ? 7 : 6, "Observações")}
                 <Campo rotulo="Observações"
                        dica={v ? `Cliente da visita: ${v.cliente_detalhe?.nome}.`
                          : "Os dados do cliente são pedidos só na hora de fechar o negócio."}>

@@ -53,6 +53,8 @@ class Orcamento(models.Model):
     preco_m2_vista = models.DecimalField(max_digits=9, decimal_places=2)
     preco_m2_cartao = models.DecimalField(max_digits=9, decimal_places=2)
     taxa_logistica = models.DecimalField("taxa de logística", max_digits=9, decimal_places=2, default=0)
+    # desconto em R$ dado já no orçamento: abate dos dois totais (à vista e cartão)
+    desconto = models.DecimalField(max_digits=11, decimal_places=2, default=0)
     total_vista = models.DecimalField(max_digits=11, decimal_places=2, default=0)
     total_cartao = models.DecimalField(max_digits=11, decimal_places=2, default=0)
 
@@ -129,8 +131,10 @@ class Orcamento(models.Model):
         if self.pk:
             itens = sum((i.total for i in self.itens.all()), Decimal("0")).quantize(CENTAVO)
 
-        self.total_vista = forro_vista + itens + self.taxa_logistica
-        self.total_cartao = forro_cartao + itens + self.taxa_logistica
+        desconto = self.desconto or Decimal("0")
+        self.subtotal_vista = forro_vista + itens + self.taxa_logistica   # antes do desconto
+        self.total_vista = max(Decimal("0"), self.subtotal_vista - desconto)
+        self.total_cartao = max(Decimal("0"), forro_cartao + itens + self.taxa_logistica - desconto)
         return self
 
     def save(self, *args, **kwargs):

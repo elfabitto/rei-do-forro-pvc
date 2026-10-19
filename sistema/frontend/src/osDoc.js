@@ -78,6 +78,13 @@ export function montarOS(os, { verFinanceiro = true } = {}) {
   d.pedido = [];
   if (orc) {
     d.pedido.push(["Área", `${m2(orc.area_m2)} m²`]);
+    // como a área foi tirada: medidas do cômodo ou contagem de folhas
+    if (Number(orc.largura) > 0 && Number(orc.comprimento) > 0) {
+      d.pedido.push(["Medidas", `${m2(orc.largura)} m × ${m2(orc.comprimento)} m`]);
+    } else if (Number(orc.tamanho_folha) > 0 && Number(orc.quantidade_folhas) > 0) {
+      const q = Number(orc.quantidade_folhas);
+      d.pedido.push(["Folhas", `${q} folha${q > 1 ? "s" : ""} de ${m2(orc.tamanho_folha)} m`]);
+    }
     d.pedido.push(["Forro", orc.forro_nome ?? "—"]);
     if (orc.acabamento_nome) d.pedido.push(["Acabamento", orc.acabamento_nome]);
     const ripao = resumoRipao(orc.itens);
@@ -90,6 +97,7 @@ export function montarOS(os, { verFinanceiro = true } = {}) {
     for (const extra of itensExtras(orc.itens)) {
       d.pedido.push([extra.descricao, `R$ ${brl(extra.total)}`]);
     }
+    if (Number(orc.desconto) > 0) d.pedido.push(["Desconto", `− R$ ${brl(orc.desconto)}`]);
 
     d.m2Vista = Number(orc.preco_m2_vista);
     d.m2Cartao = Number(orc.preco_m2_cartao);
@@ -289,35 +297,14 @@ export async function baixarImagemOS(d) {
 }
 
 /**
- * Copia a imagem e abre o WhatsApp com o texto.
- * Não dá para anexar imagem pela URL do WhatsApp; o caminho possível é deixar a
- * imagem na área de transferência para o usuário colar na conversa.
+ * WhatsApp só com o texto — pedido da diretoria. A imagem continua nos botões
+ * de copiar e baixar PNG.
  */
-export async function compartilharOS(d) {
-  await logoPronta;
-  const blob = await paraBlob(desenharOS(d));
-  const arquivo = new File([blob], nomeArquivo(d), { type: "image/png" });
-
-  // celular: compartilhamento nativo manda a imagem direto
-  if (navigator.canShare?.({ files: [arquivo] })) {
-    try {
-      await navigator.share({ files: [arquivo], text: d.texto });
-      return "compartilhada";
-    } catch (e) {
-      if (e.name === "AbortError") return "cancelado";
-    }
-  }
-
-  // computador: imagem na área de transferência + WhatsApp Web com o texto
-  let copiou = false;
-  try {
-    await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
-    copiou = true;
-  } catch {
-    baixar(blob, nomeArquivo(d));
-  }
-  window.open(`https://wa.me/?text=${encodeURIComponent(d.texto)}`, "_blank", "noopener");
-  return copiou ? "imagem copiada — cole no WhatsApp" : "imagem baixada";
+export function abrirWhatsApp(texto) {
+  window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, "_blank", "noopener");
+  return "WhatsApp aberto";
 }
+
+export const compartilharOS = (d) => abrirWhatsApp(d.texto);
 
 export { brl, m2 };
