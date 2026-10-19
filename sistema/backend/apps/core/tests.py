@@ -627,7 +627,8 @@ class ExcluirOSApiTest(OSFinalizadaMixin, ApiBase):
         self.assertFalse(Pagamento.objects.exists())
         self.assertFalse(Agendamento.objects.exists())
         self.assertFalse(HistoricoOS.objects.exists())
-        self.assertFalse(Notificacao.objects.exists())
+        # nenhum aviso da O.S. sobra (o do orçamento fica: ele continua existindo)
+        self.assertEqual(set(Notificacao.objects.values_list("tipo", flat=True)), {"orcamento_novo"})
         self.assertEqual(Orcamento.objects.get(pk=os_["orcamento"]).status, "aberto")
 
 
@@ -649,6 +650,8 @@ class VisitaTecnicaApiTest(ApiBase):
         r = self.agendar()
         self.assertEqual(r.status_code, 201, r.data)
         self.assertTrue(r.data["numero"].startswith("VT-"))
+        from apps.comunicacao.models import Notificacao   # diretoria avisada da visita agendada
+        self.assertTrue(Notificacao.objects.filter(usuario=self.diretor, tipo="visita_nova").exists())
         self.assertEqual(r.data["status"], "agendada")
         self.assertEqual(r.data["vendedor"], self.vendedor.id)
 
@@ -701,6 +704,9 @@ class VisitaTecnicaApiTest(ApiBase):
         self.assertEqual(os_.status_code, 201, os_.data)
         v = self.client.get(f"/api/visitas/{visita['id']}/").data
         self.assertEqual((v["status"], v["os_numero"]), ("convertida", os_.data["numero"]))
+        from apps.comunicacao.models import Notificacao   # quem agendou fica sabendo que fechou
+        aviso = Notificacao.objects.get(usuario=self.vendedor, tipo="visita_convertida")
+        self.assertIn(os_.data["numero"], aviso.mensagem)
 
         # excluir a O.S. devolve a visita para agendada
         self.client.delete(f"/api/ordens-servico/{os_.data['id']}/")
@@ -724,3 +730,105 @@ class VisitaTecnicaApiTest(ApiBase):
         self.client.post(f"/api/visitas/{r.data['id']}/perder/", {}, format="json")
         p = self.client.get("/api/painel/", {"de": str(self.dia), "ate": str(self.dia)}).data
         self.assertEqual((p["atual"]["visitas"], p["atual"]["visitas_perdidas"], len(p["servicos"])), (1, 1, 0))
+
+
+class NotificacoesTest(OSFinalizadaMixin, ApiBase):
+    """Quem recebe cada aviso, preferências do sino, rotinas de horário e push."""
+
+    def avisos(self, usuario, tipo=None):
+        from apps.comunicacao.models import Notificacao
+
+        qs = Notificacao.objects.filter(usuario=usuario)
+        return list(qs.filter(tipo=tipo) if tipo else qs)
+
+    def test_orcamento_servico_e_finalizacao(self):
+        self.finalizada()   # vendedor orça e gera a O.S.; diretor finaliza
+        self.assertEqual(len(self.avisos(self.diretor, "orcamento_novo")), 1)
+        gerada = self.avisos(self.diretor, "os_gerada")
+        self.assertEqual(len(gerada), 1)
+        self.assertIn("virou serviço", gerada[0].titulo)
+        self.assertIn("Marcos", gerada[0].mensagem)       # quem converteu a venda
+        fim = self.avisos(self.vendedor, "os_finalizada")
+        self.assertIn("R$ 110,00", fim[0].mensagem)       # comissão que caiu no painel
+        self.assertEqual(self.avisos(self.vendedor, "orcamento_novo"), [])
+
+    def test_preferencias_por_perfil_e_desligar(self):
+        self.client.force_authenticate(self.vendedor)
+        tipos = {i["tipo"] for i in self.client.get("/api/notificacoes/preferencias/").data["itens"]}
+        self.assertIn("comissao_paga", tipos)
+        self.assertNotIn("orcamento_novo", tipos)
+
+        self.client.force_authenticate(self.diretor)
+        tipos = {i["tipo"] for i in self.client.get("/api/notificacoes/preferencias/").data["itens"]}
+        self.assertTrue({"orcamento_novo", "os_vencida", "agenda_dia"} <= tipos)
+        self.assertNotIn("comissao_paga", tipos)
+
+        ti = Usuario.objects.create_user("fabio.lima", papel="ti")
+        self.client.force_authenticate(ti)
+        tipos = {i["tipo"] for i in self.client.get("/api/notificacoes/preferencias/").data["itens"]}
+        self.assertTrue({"orcamento_novo", "comissao_paga"} <= tipos)
+
+        self.client.force_authenticate(self.vendedor)
+        r = self.client.put("/api/notificacoes/preferencias/", {"ligadas": {"os_finalizada": False}}, format="json")
+        self.assertFalse(next(i for i in r.data["itens"] if i["tipo"] == "os_finalizada")["ligado"])
+        self.finalizada()
+        self.assertEqual(self.avisos(self.vendedor, "os_finalizada"), [])
+
+    def test_rotinas_de_horario_sem_repetir(self):
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+
+        from apps.ordens.models import Agendamento
+        from apps.ordens.rotinas import executar
+
+        hoje = timezone.localdate()
+        seg = hoje + timedelta(days=(7 - hoje.weekday()) % 7 or 7)
+        os_ = OrdemServico.objects.create(cliente=self.cliente, endereco=self.endereco, vendedor=self.vendedor,
+                                          criado_por=self.vendedor, valor_total=D("500"), tipo="material")
+        Agendamento.objects.create(ordem=os_, tipo="entrega", data=seg, turno="manha")
+        belem = ZoneInfo("America/Belem")
+
+        executar(datetime(seg.year, seg.month, seg.day, 7, 0, tzinfo=belem))
+        self.assertEqual(len(self.avisos(self.diretor, "agenda_dia")), 1)
+        self.assertEqual(len(self.avisos(self.vendedor, "agenda_dia")), 1)
+        self.assertEqual(self.avisos(self.vendedor, "os_nao_iniciada"), [])   # ainda não deu 10h
+
+        for _ in range(2):   # rodar de novo não repete aviso
+            executar(datetime(seg.year, seg.month, seg.day, 10, 30, tzinfo=belem))
+        self.assertEqual(len(self.avisos(self.vendedor, "os_nao_iniciada")), 1)
+        self.assertEqual(len(self.avisos(self.diretor, "os_nao_iniciada")), 1)
+        self.assertEqual(len(self.avisos(self.diretor, "agenda_dia")), 1)
+
+        ter = seg + timedelta(days=1)
+        executar(datetime(ter.year, ter.month, ter.day, 8, 0, tzinfo=belem))
+        vencidas = self.avisos(self.diretor, "os_vencida")
+        self.assertEqual(len(vencidas), 1)
+        self.assertIn(os_.numero.replace("OS-", ""), vencidas[0].mensagem)
+
+        self.assertEqual(self.client.post("/api/rotinas/").status_code, 200)   # GitHub Actions, sem login
+
+    def test_push_assina_e_envia(self):
+        from unittest import mock
+
+        from apps.comunicacao import push
+
+        self.client.force_authenticate(self.vendedor)
+        chave = self.client.get("/api/notificacoes/push/chave/").data["chave"]
+        self.assertEqual(len(chave), 87)   # ponto P-256 sem compressão, base64url
+        r = self.client.post("/api/notificacoes/push/assinar/", {
+            "endpoint": "https://fcm.googleapis.com/fcm/send/abc", "keys": {"p256dh": "x", "auth": "y"},
+        }, format="json")
+        self.assertEqual(r.status_code, 200)
+
+        class Imediato:   # roda a thread na hora, para o teste ver o envio
+            def __init__(self, target, args, daemon):
+                self.target, self.args = target, args
+
+            def start(self):
+                self.target(*self.args)
+
+        with mock.patch.object(push.threading, "Thread", Imediato), \
+                mock.patch("pywebpush.webpush") as webpush, self.captureOnCommitCallbacks(execute=True):
+            self.finalizada()
+        cargas = [c.kwargs["data"] for c in webpush.call_args_list]
+        self.assertTrue(any("finalizada" in c for c in cargas), cargas)

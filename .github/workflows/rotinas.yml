@@ -1,0 +1,27 @@
+# Avisos de horário do sistema (agenda do dia, serviço não iniciado, vencidos).
+#
+# O Render gratuito dorme quando ninguém usa, então o servidor não tem relógio
+# próprio: este workflow chama /api/rotinas/ nos horários de Belém. A chamada
+# também acorda o servidor. Rodar duas vezes não repete aviso (cada um tem chave).
+# O sistema roda as mesmas rotinas de carona quando alguém está com ele aberto.
+name: Rotinas de avisos
+
+on:
+  schedule:
+    - cron: "5 9 * * 1-6"     # 06:05 em Belém — agenda do dia
+    - cron: "20 13 * * 1-6"   # 10:20 — serviço da manhã não iniciado
+    - cron: "20 18 * * 1-6"   # 15:20 — serviço da tarde não iniciado
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rotinas:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Chama as rotinas (espera o servidor acordar)
+        run: |
+          curl -fsS --retry 6 --retry-delay 20 --retry-all-errors --max-time 90 \
+            -X POST https://rei-do-forro.onrender.com/api/rotinas/

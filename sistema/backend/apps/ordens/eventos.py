@@ -1,12 +1,14 @@
 """
 O que acontece em volta da O.S. quando ela muda: lançamentos no Financeiro
-e avisos para o vendedor. Concentrado aqui para as views não repetirem regra.
+e avisos para o vendedor e a diretoria. Concentrado aqui para as views não
+repetirem regra. Os avisos de horário (agenda do dia, serviço não iniciado,
+vencidos) estão em rotinas.py.
 """
 from collections import defaultdict
 from decimal import Decimal
 
 from apps.comunicacao.models import TipoNotificacao
-from apps.comunicacao.servicos import notificar
+from apps.comunicacao.servicos import notificar, notificar_gestao
 from apps.financeiro import servicos as caixa
 from apps.financeiro.servicos import brl
 
@@ -51,3 +53,59 @@ def comissoes_pagas(ordens, usuario):
 
 def comissao_estornada(os_):
     caixa.desfazer_comissao(os_)
+
+
+def _nome(u):
+    return u.get_full_name() or u.username
+
+
+def orcamento_novo(orc, usuario):
+    notificar_gestao(
+        TipoNotificacao.ORCAMENTO_NOVO, f"Novo orçamento {orc.numero}",
+        f"{_nome(orc.vendedor)} · {orc.get_tipo_display()} {orc.area_m2} m² · R$ {brl(orc.total_vista)} à vista"
+        + (f" · {orc.cliente.nome}" if orc.cliente_id else ""),
+        "/orcamentos", exceto=usuario,
+    )
+
+
+def os_gerada(os_, usuario):
+    """Diretoria: orçamento virou serviço, com quem vendeu. Vendedor: serviço gerado no nome dele."""
+    origem = f"O orçamento {os_.orcamento.numero} virou serviço" if os_.orcamento_id else "Serviço gerado"
+    notificar_gestao(
+        TipoNotificacao.OS_GERADA, f"{origem}: {os_.numero}",
+        f"Venda de {_nome(os_.vendedor)} · {os_.cliente.nome} · R$ {brl(os_.valor_total)}",
+        f"/ordens?abrir={os_.id}", exceto=usuario,
+    )
+    if os_.vendedor_id != usuario.id:
+        notificar(
+            os_.vendedor, TipoNotificacao.OS_GERADA, f"Serviço gerado no seu nome: {os_.numero}",
+            f"{_nome(usuario)} gerou o serviço de {os_.cliente.nome}.", f"/ordens?abrir={os_.id}",
+        )
+    # orçamento feito numa visita técnica: quem agendou a visita fica sabendo que ela fechou
+    visita = getattr(os_.orcamento, "visita", None) if os_.orcamento_id else None
+    if visita and visita.vendedor_id != usuario.id:
+        notificar(
+            visita.vendedor, TipoNotificacao.VISITA_CONVERTIDA, f"Visita {visita.numero} virou serviço",
+            f"{os_.cliente.nome} fechou: {os_.numero} · R$ {brl(os_.valor_total)} · gerado por {_nome(usuario)}.",
+            f"/visitas?abrir={visita.id}",
+        )
+
+
+def os_cancelada(os_, usuario):
+    if os_.vendedor_id and os_.vendedor_id != usuario.id:
+        notificar(
+            os_.vendedor, TipoNotificacao.OS_CANCELADA, f"{os_.numero} cancelada",
+            f"O serviço de {os_.cliente.nome} foi cancelado"
+            + (f": {os_.motivo_cancelamento}" if os_.motivo_cancelamento else "."),
+            f"/ordens?abrir={os_.id}",
+        )
+
+
+def visita_nova(v, usuario):
+    notificar_gestao(
+        TipoNotificacao.VISITA_NOVA, f"Visita técnica {v.numero}",
+        f"{v.cliente.nome} · {v.endereco.bairro} · {v.data:%d/%m} ({v.get_turno_display().lower()}) "
+        f"· agendou: {_nome(v.vendedor)}",
+        f"/visitas?abrir={v.id}", exceto=usuario,
+    )
+

@@ -86,8 +86,9 @@ class OrdemServicoViewSet(viewsets.ModelViewSet):
         from apps.financeiro.models import Lancamento
 
         Lancamento.objects.filter(Q(ordem=instance) | Q(pagamento__ordem=instance)).delete()
+        # avisos da O.S.: os que levam o número no título ou abrem a própria O.S.
         Notificacao.objects.filter(
-            titulo__in=[f"{instance.numero} finalizada", f"Comissão paga — {instance.numero}"]
+            Q(titulo__contains=instance.numero) | Q(link=f"/ordens?abrir={instance.id}")
         ).delete()
         if instance.orcamento_id:
             Orcamento.objects.filter(pk=instance.orcamento_id).update(status=StatusOrcamento.ABERTO)
@@ -108,6 +109,7 @@ class OrdemServicoViewSet(viewsets.ModelViewSet):
         if os_.orcamento_id:
             Orcamento.objects.filter(pk=os_.orcamento_id).update(status=StatusOrcamento.CONVERTIDO)
             VisitaTecnica.objects.filter(orcamento_id=os_.orcamento_id).update(status=StatusVisita.CONVERTIDA)
+        eventos.os_gerada(os_, usuario)
 
     # ------------------------------------------------------------------ ações
     # Quem executa o serviço não é necessariamente quem o lançou: qualquer um
@@ -290,7 +292,8 @@ class VisitaTecnicaViewSet(viewsets.ModelViewSet):
         vendedor = serializer.validated_data.get("vendedor")
         if not vendedor or not usuario.pode_trocar_vendedor:
             vendedor = usuario
-        serializer.save(criado_por=usuario, vendedor=vendedor)
+        visita = serializer.save(criado_por=usuario, vendedor=vendedor)
+        eventos.visita_nova(visita, usuario)
 
     @action(detail=True, methods=["post"])
     def perder(self, request, pk=None):

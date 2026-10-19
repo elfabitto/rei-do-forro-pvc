@@ -28,4 +28,7 @@ class OrcamentoViewSet(viewsets.ModelViewSet):
         vendedor = serializer.validated_data.get("vendedor")
         if not vendedor or not usuario.pode_trocar_vendedor:
             vendedor = usuario
-        serializer.save(criado_por=usuario, vendedor=vendedor)
+        orc = serializer.save(criado_por=usuario, vendedor=vendedor)
+        from apps.ordens.eventos import orcamento_novo
+
+        orcamento_novo(orc, usuario)

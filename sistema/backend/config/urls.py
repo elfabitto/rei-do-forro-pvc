@@ -5,7 +5,10 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 from apps.catalogo.views import AcabamentoViewSet, ForroViewSet, MaterialViewSet
 from apps.clientes.views import ClienteViewSet, EnderecoViewSet
-from apps.comunicacao.views import ChamadoViewSet, ler_notificacao, ler_todas, notificacoes
+from apps.comunicacao.views import (
+    ChamadoViewSet, ler_notificacao, ler_todas, notificacoes, preferencias, push_assinar, push_cancelar,
+    push_chave, rotinas,
+)
 from apps.contas.views import UsuarioViewSet, eu
 from apps.core.views import app_react, saude
 from apps.financeiro.views import LancamentoViewSet
@@ -45,6 +48,11 @@ urlpatterns = [
     path("api/notificacoes/", notificacoes, name="notificacoes"),
     path("api/notificacoes/ler-todas/", ler_todas, name="notificacoes-ler-todas"),
     path("api/notificacoes/<int:pk>/ler/", ler_notificacao, name="notificacao-ler"),
+    path("api/notificacoes/push/chave/", push_chave, name="push-chave"),
+    path("api/notificacoes/push/assinar/", push_assinar, name="push-assinar"),
+    path("api/notificacoes/push/cancelar/", push_cancelar, name="push-cancelar"),
+    path("api/notificacoes/preferencias/", preferencias, name="notificacoes-preferencias"),
+    path("api/rotinas/", rotinas, name="rotinas"),
     path("api/painel/", painel, name="painel"),
     path("api/painel/calendario/", painel_calendario, name="painel-calendario"),
     path("api/comissoes/", comissoes, name="comissoes"),

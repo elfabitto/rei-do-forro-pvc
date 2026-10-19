@@ -1,19 +1,82 @@
 /**
- * Sino do topo: avisos de quem está logado (O.S. finalizada, comissão paga,
- * chamado respondido). Busca de tempos em tempos e quando a aba volta ao foco;
- * aviso novo aparece num alerta no canto e, se a pessoa permitiu, também como
- * notificação do celular/computador.
+ * Sino do topo: avisos de quem está logado. Busca de tempos em tempos e quando
+ * a aba volta ao foco; aviso novo aparece num alerta no canto. Fora do sistema
+ * (app fechado), quem avisa é o Web Push — ver push.js e public/sw.js.
+ *
+ * A engrenagem abre os ajustes: ativar neste aparelho e ligar/desligar cada tipo
+ * de aviso. As opções mudam com o perfil (vendedor × diretoria; o TI vê tudo).
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, dataHora } from "./api";
 import Icone from "./icones";
-import { LOGO } from "./logo";
+import { ativar, situacao } from "./push";
 
 const INTERVALO = 45_000;
-const ICONE = { os_finalizada: "fechado", comissao_paga: "comissao", chamado: "chamado" };
+const ICONE = {
+  os_finalizada: "fechado", comissao_paga: "comissao", chamado: "chamado", orcamento_novo: "orcamento",
+  os_gerada: "ordem", os_cancelada: "fechar", os_nao_iniciada: "relogio", os_vencida: "relogio",
+  agenda_dia: "agenda", visita_nova: "visita", visita_convertida: "visita",
+};
 
-const suportaPush = () => typeof window !== "undefined" && "Notification" in window;
+const AVISO_APARELHO = {
+  ativo: "Ativas neste aparelho — chegam mesmo com o sistema fechado.",
+  desligado: "Desligadas neste aparelho.",
+  bloqueado: "Bloqueadas nas configurações do navegador/celular. Libere as notificações do site e volte aqui.",
+  instalar: "No iPhone, primeiro instale: Compartilhar → Adicionar à Tela de Início, e abra pelo ícone.",
+  "sem-suporte": "Este navegador não recebe notificações fora do sistema.",
+};
+
+/** Ajustes do sino: este aparelho + cada tipo de aviso com a chavinha. */
+function Ajustes({ aparelho, aoAtivar }) {
+  const [pref, setPref] = useState(null);
+  const [erro, setErro] = useState("");
+
+  useEffect(() => {
+    api.get("/notificacoes/preferencias/").then(setPref).catch((e) => setErro(e.message));
+  }, []);
+
+  async function trocar(item) {
+    const ligado = !item.ligado;
+    setPref((p) => ({ ...p, itens: p.itens.map((i) => (i.tipo === item.tipo ? { ...i, ligado } : i)) }));
+    try {
+      setPref(await api.put("/notificacoes/preferencias/", { ligadas: { [item.tipo]: ligado } }));
+    } catch (e) {
+      setErro(e.message);
+    }
+  }
+
+  return (
+    <div className="sinoAjustes">
+      <div className="aparelho">
+        <span className={`estado e-${aparelho}`} />
+        <div>
+          <b>Neste aparelho</b>
+          <small>{AVISO_APARELHO[aparelho] ?? "Verificando…"}</small>
+        </div>
+        {aparelho === "desligado" && (
+          <button type="button" className="btn p" onClick={aoAtivar}>Ativar</button>
+        )}
+      </div>
+      {erro && <div className="erro">{erro}</div>}
+      <div className="grupoTit">Quais avisos receber</div>
+      {!pref ? <div className="sinoVazio">Carregando…</div> : (
+        <ul className="prefs">
+          {pref.itens.map((i) => (
+            <li key={i.tipo}>
+              <span className={`ico t-${i.tipo}`}><Icone nome={ICONE[i.tipo] || "sino"} tamanho={15} /></span>
+              <span className="txt"><b>{i.rotulo}</b><span>{i.descricao}</span></span>
+              <button type="button" role="switch" aria-checked={i.ligado} aria-label={i.rotulo}
+                      className={`chave${i.ligado ? " on" : ""}`} onClick={() => trocar(i)}>
+                <i />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 function quandoTexto(s) {
   const min = Math.round((Date.now() - new Date(s)) / 60000);
@@ -27,7 +90,8 @@ export default function Sino() {
   const [dados, setDados] = useState({ nao_lidas: 0, itens: [] });
   const [aberto, setAberto] = useState(false);
   const [alerta, setAlerta] = useState(null);
-  const [permissao, setPermissao] = useState(() => (suportaPush() ? Notification.permission : "denied"));
+  const [vista, setVista] = useState("lista");          // "lista" | "ajustes"
+  const [aparelho, setAparelho] = useState(null);       // situação do push neste aparelho
   const vistos = useRef(null);            // ids já conhecidos — o resto é novidade
   const caixa = useRef(null);
   const ir = useNavigate();
@@ -42,10 +106,6 @@ export default function Sino() {
         const n = novos[0];
         setAlerta({ ...n, extra: novos.length - 1 });
         setTimeout(() => setAlerta(null), 7000);
-        if (suportaPush() && Notification.permission === "granted" && document.hidden) {
-          try { new Notification(n.titulo, { body: n.mensagem, icon: LOGO, tag: `rf-${n.id}` }); }
-          catch { /* alguns celulares só notificam via service worker */ }
-        }
       }
     } catch { /* sem rede: tenta de novo no próximo ciclo */ }
   }, []);
@@ -57,6 +117,11 @@ export default function Sino() {
     document.addEventListener("visibilitychange", foco);
     return () => { clearInterval(t); document.removeEventListener("visibilitychange", foco); };
   }, [buscar]);
+
+  useEffect(() => {
+    if (aberto) situacao().then(setAparelho).catch(() => setAparelho("sem-suporte"));
+    else setVista("lista");
+  }, [aberto]);
 
   useEffect(() => {
     if (!aberto) return undefined;
@@ -83,8 +148,8 @@ export default function Sino() {
   }
 
   async function ativarPush() {
-    if (!suportaPush()) return;
-    setPermissao(await Notification.requestPermission());
+    try { await ativar(); } catch { /* a situação abaixo explica o porquê */ }
+    setAparelho(await situacao());
   }
 
   const qtd = dados.nao_lidas;
@@ -99,10 +164,23 @@ export default function Sino() {
       {aberto && (
         <div className="sinoCaixa" role="dialog" aria-label="Notificações">
           <header>
-            <b>Notificações</b>
-            {qtd > 0 && <button type="button" className="link" onClick={lerTodas}>Marcar todas como lidas</button>}
+            {vista === "ajustes" ? (
+              <button type="button" className="voltarSino" onClick={() => setVista("lista")} aria-label="Voltar">←</button>
+            ) : null}
+            <b>{vista === "ajustes" ? "Ajustes das notificações" : "Notificações"}</b>
+            {vista === "lista" && qtd > 0 && (
+              <button type="button" className="link" onClick={lerTodas}>Marcar todas como lidas</button>
+            )}
+            {vista === "lista" && (
+              <button type="button" className="engrenagem" onClick={() => setVista("ajustes")}
+                      aria-label="Ajustes das notificações" title="Escolher os avisos">
+                <Icone nome="ajustes" tamanho={16} />
+              </button>
+            )}
           </header>
-          {dados.itens.length === 0 ? (
+          {vista === "ajustes" ? (
+            <Ajustes aparelho={aparelho} aoAtivar={ativarPush} />
+          ) : dados.itens.length === 0 ? (
             <div className="sinoVazio">Nenhuma notificação por enquanto.</div>
           ) : (
             <ul>
@@ -120,12 +198,15 @@ export default function Sino() {
               ))}
             </ul>
           )}
-          {suportaPush() && permissao === "default" && (
+          {vista === "lista" && aparelho === "desligado" && (
             <footer>
               <button type="button" className="btn" onClick={ativarPush}>
-                Avisar também fora do sistema (celular/computador)
+                Ativar notificações neste aparelho (celular/computador)
               </button>
             </footer>
+          )}
+          {vista === "lista" && aparelho === "instalar" && (
+            <footer><small className="dicaSino">{AVISO_APARELHO.instalar}</small></footer>
           )}
         </div>
       )}

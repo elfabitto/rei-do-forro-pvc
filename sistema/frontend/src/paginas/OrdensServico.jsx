@@ -123,18 +123,24 @@ function CardOS({ o, verFinanceiro, pode, aoAbrir, aoFinalizar, aoMudarStatus, a
 }
 
 export default function OrdensServico() {
-  const { pode } = useAuth();
+  const { pode, usuario } = useAuth();
   const navegar = useNavigate();
   const [params, setParams] = useSearchParams();
 
   const [status, setStatus] = useState("");
+  // vendedor abre nas próprias O.S.; a diretoria, em todas
+  const [dono, setDono] = useState(() => (pode("verTudo") ? "todas" : "minhas"));
   const [aberta, setAberta] = useState(null);
   const [finalizando, setFinalizando] = useState(null);
   const [cancelando, setCancelando] = useState(null);
   const [erroAcao, setErroAcao] = useState("");
 
+  const filtro = {
+    ...(status ? { status } : {}),
+    ...(dono === "minhas" ? { vendedor: usuario.id } : {}),
+  };
   const { dados, erro, carregando, recarregar } =
-    useApi("/ordens-servico/", status ? { status } : null, [status]);
+    useApi("/ordens-servico/", Object.keys(filtro).length ? filtro : null, [status, dono]);
   const lista = linhas(dados);
 
   // permite chegar aqui já com a gaveta aberta: /ordens?abrir=12
@@ -180,6 +186,14 @@ export default function OrdensServico() {
       </div>
 
       <div className="barraFiltros">
+        <div className="seg donoSeg">
+          <button type="button" className={dono === "minhas" ? "on" : ""} onClick={() => setDono("minhas")}>
+            Minhas O.S.
+          </button>
+          <button type="button" className={dono === "todas" ? "on" : ""} onClick={() => setDono("todas")}>
+            Todas
+          </button>
+        </div>
         {FILTROS.map(([k, r]) => (
           <button key={k} className={`chip${status === k ? " on" : ""}`} onClick={() => setStatus(k)}>
             {r}
@@ -198,7 +212,9 @@ export default function OrdensServico() {
       )}
 
       <Estado carregando={carregando} erro={erro}
-              vazio={lista.length === 0 ? "Nenhuma O.S. com esse filtro." : null}>
+              vazio={lista.length === 0
+                ? (dono === "minhas" ? "Você não tem O.S. com esse filtro." : "Nenhuma O.S. com esse filtro.")
+                : null}>
         <div className="cardGrid">
           {lista.map((o) => (
             <CardOS key={o.id} o={o} verFinanceiro={pode("verFinanceiro")} pode={pode}

@@ -343,6 +343,9 @@ class OrdemServico(models.Model):
         if novo == StatusOS.FINALIZADA:
             from .eventos import os_finalizada   # caixa e aviso ao vendedor
             os_finalizada(self, usuario)
+        elif novo == StatusOS.CANCELADA:
+            from .eventos import os_cancelada
+            os_cancelada(self, usuario)
         return self
 
 
