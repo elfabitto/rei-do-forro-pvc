@@ -183,3 +183,4 @@ th.ordenavel button:focus-visible{outline:2px solid var(--orange);outline-offset
 th.ordenavel .seta{font-size:9px;opacity:.35}
 th.ordenavel.on{color:var(--ink)}
 th.ordenavel.on .seta{opacity:1;color:var(--orange)}
+.gl0{stroke:#9aa0a8;stroke-width:1.3}

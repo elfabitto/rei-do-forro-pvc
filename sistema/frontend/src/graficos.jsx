@@ -38,6 +38,23 @@ function eixo(max, partes = 4) {
   return { topo: passo * partes, marcas: [...Array(partes + 1)].map((_, i) => i * passo) };
 }
 
+/**
+ * Eixo que também desce abaixo de zero (saldo negativo): fundo e topo "redondos"
+ * no mesmo passo, para a linha nunca sair da área do gráfico.
+ */
+function eixoFaixa(min, max, partes = 4) {
+  if (min >= 0) return { fundo: 0, ...eixo(max || 1, partes) };
+  const amplitude = Math.max(max, 0) - min;
+  const bruto = amplitude / partes;
+  const mag = 10 ** Math.floor(Math.log10(bruto));
+  const passo = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((p) => p >= bruto);
+  const fundo = Math.floor(min / passo) * passo;
+  const topo = Math.max(passo, Math.ceil(Math.max(max, 0) / passo) * passo);
+  const marcas = [];
+  for (let m = fundo; m <= topo + passo / 2; m += passo) marcas.push(Math.round(m * 100) / 100);
+  return { fundo, topo, marcas };
+}
+
 export function Legenda({ itens }) {
   return (
     <div className="legend">
@@ -115,10 +132,11 @@ export function Linhas({ categorias, series, altura = 230, formato = fmtCurto, f
   const [ref, W] = useLargura(680);
   const H = altura, esq = 44, dir = 12, base = H - 28, topoY = 12;
   const n = categorias.length;
-  const max = Math.max(0, ...series.flatMap((s) => s.valores));
-  const { topo, marcas } = eixo(max || 1);
+  const valores = series.flatMap((s) => s.valores);
+  const { fundo, topo, marcas } = eixoFaixa(Math.min(0, ...valores), Math.max(0, ...valores));
   const x = (i) => (n === 1 ? (esq + W - dir) / 2 : esq + (i / (n - 1)) * (W - esq - dir));
-  const y = (v) => base - (v / topo) * (base - topoY);
+  const y = (v) => base - ((v - fundo) / (topo - fundo)) * (base - topoY);
+  const zero = y(0);
   const salto = Math.max(1, Math.ceil((n * 52) / W));
 
   return (
@@ -126,7 +144,7 @@ export function Linhas({ categorias, series, altura = 230, formato = fmtCurto, f
       <svg viewBox={`0 0 ${W} ${H}`} className="graf" role="img" onMouseLeave={() => setSobre(-1)}>
         {marcas.map((m) => (
           <g key={m}>
-            <line x1={esq} x2={W - dir} y1={y(m)} y2={y(m)} className="gl2" />
+            <line x1={esq} x2={W - dir} y1={y(m)} y2={y(m)} className={m === 0 && fundo < 0 ? "gl0" : "gl2"} />
             <text x={esq - 6} y={y(m) + 4} className="eixoTx" textAnchor="end">{formato(m)}</text>
           </g>
         ))}
@@ -135,7 +153,7 @@ export function Linhas({ categorias, series, altura = 230, formato = fmtCurto, f
           return (
             <g key={s.rotulo}>
               {k === 0 && n > 1 && (
-                <polygon points={`${x(0)},${base} ${pts} ${x(n - 1)},${base}`} fill={s.cor} opacity=".12" />
+                <polygon points={`${x(0)},${zero} ${pts} ${x(n - 1)},${zero}`} fill={s.cor} opacity=".12" />
               )}
               <polyline points={pts} fill="none" stroke={s.cor} strokeWidth="2.6"
                         strokeLinejoin="round" strokeLinecap="round" strokeDasharray={s.tracejado ? "6 5" : undefined} />
