@@ -332,6 +332,9 @@ class OrdemServico(models.Model):
         agora = timezone.now()
         if novo == StatusOS.FINALIZADA:
             self.finalizada_por, self.finalizada_em = usuario, agora
+            liberadas = self.liberar_agenda_restante(agora)
+            if liberadas:
+                observacao = (f"{observacao} · " if observacao else "") + liberadas
         elif novo == StatusOS.CANCELADA:
             self.cancelada_por, self.cancelada_em = usuario, agora
             self.motivo_cancelamento = observacao
@@ -347,6 +350,47 @@ class OrdemServico(models.Model):
             from .eventos import os_cancelada
             os_cancelada(self, usuario)
         return self
+
+
+    def liberar_agenda_restante(self, quando):
+        """
+        Terminou antes do prazo: a instalação deixa de ocupar os turnos depois do
+        turno em que foi finalizada (antes do meio-dia = manhã; depois = tarde).
+        Esses turnos voltam a ser vaga na agenda. Devolve o texto para o histórico,
+        ou "" se não havia nada a liberar.
+
+        Grava direto (update) de propósito: o save() do Agendamento recalcularia
+        o período inteiro pela área.
+        """
+        from .agenda import ler_chave
+
+        local = timezone.localtime(quando)
+        hoje, turno_agora = local.date(), ("manha" if local.hour < 12 else "tarde")
+        ordem_turno = {"manha": 0, "tarde": 1}
+
+        def ja_passou(chave):
+            d, t = ler_chave(chave)
+            return d < hoje or (d == hoje and ordem_turno[t] <= ordem_turno[turno_agora])
+
+        textos = []
+        for ag in self.agendamentos.filter(tipo=TipoAgendamento.INSTALACAO):
+            ocupacao = ag.ocupacao or []
+            usados = [k for k in ocupacao if ja_passou(k)] or ocupacao[:1]   # no mínimo o 1º turno
+            sobra = ocupacao[len(usados):]
+            if not sobra:
+                continue
+            fim_d, fim_t = ler_chave(usados[-1])
+            Agendamento.objects.filter(pk=ag.pk).update(
+                ocupacao=usados, duracao_turnos=len(usados), data_fim=fim_d, turno_fim=fim_t,
+                concluido=True, concluido_em=quando,
+            )
+            de_d, de_t = ler_chave(sobra[0])
+            ate_d, ate_t = ler_chave(sobra[-1])
+            rot = dict(Turno.choices)
+            trecho = (f"{de_d:%d/%m} {rot[de_t].lower()}" if len(sobra) == 1 else
+                      f"{de_d:%d/%m} {rot[de_t].lower()} a {ate_d:%d/%m} {rot[ate_t].lower()}")
+            textos.append(f"terminou antes do prazo: {len(sobra)} turno(s) liberado(s) na agenda ({trecho})")
+        return "; ".join(textos)
 
 
 class Agendamento(models.Model):

@@ -377,3 +377,54 @@ class ComissaoTest(BaseOS):
 
         os_.comissao_paga = True
         self.assertFalse(os_.comissao_em_aberto)
+
+
+class TerminouAntesTest(BaseOS):
+    """Instalação finalizada antes do prazo libera os turnos que sobravam na agenda."""
+
+    def test_finalizar_cedo_libera_os_dias_seguintes(self):
+        from datetime import datetime
+        from unittest import mock
+        from zoneinfo import ZoneInfo
+
+        from .agenda import Grade
+
+        forro = Forro.objects.create(
+            nome="Branco Liso", preco_material_vista=D("33.80"), preco_material_cartao=D("36.50"),
+            preco_instalado_vista=D("64.00"), preco_instalado_cartao=D("69.00"),
+        )
+        orc = Orcamento.objects.create(tipo="instalado", area_m2=D("55"), forro=forro,
+                                       preco_m2_vista=D("64"), preco_m2_cartao=D("69"),
+                                       vendedor=self.vendedor, criado_por=self.vendedor)
+        os_ = self.nova_os(valor="1000.00")
+        os_.orcamento = orc
+        os_.save()
+        seg = proxima_segunda()
+        ag = Agendamento.objects.create(ordem=os_, tipo=TipoAgendamento.INSTALACAO, data=seg, turno=Turno.MANHA)
+        self.assertEqual(ag.duracao_turnos, 6)                      # 55 m² = 3 dias
+        self.assertEqual(Grade(seg, seg + timedelta(days=3)).instalacoes_livres(seg + timedelta(days=1), "manha"), 1)
+
+        os_.mudar_status(StatusOS.EM_EXECUCAO, self.vendedor)
+        Pagamento.objects.create(ordem=os_, forma="pix", valor=D("1000.00"), registrado_por=self.diretor)
+        tarde = datetime(seg.year, seg.month, seg.day, 15, 0, tzinfo=ZoneInfo("America/Belem"))
+        with mock.patch("apps.ordens.models.timezone.now", return_value=tarde):
+            os_.mudar_status(StatusOS.FINALIZADA, self.diretor)
+
+        ag.refresh_from_db()
+        self.assertEqual(ag.ocupacao, [f"{seg}:manha", f"{seg}:tarde"])   # ficou só o 1º dia
+        self.assertEqual((ag.data_fim, ag.turno_fim, ag.concluido), (seg, "tarde", True))
+        grade = Grade(seg, seg + timedelta(days=3))
+        self.assertEqual(grade.instalacoes_livres(seg + timedelta(days=1), "manha"), 2)   # vaga voltou
+        self.assertEqual(grade.instalacoes_livres(seg, "tarde"), 1)                       # o dia usado segue ocupado
+        hist = os_.historico.last()
+        self.assertIn("4 turno(s) liberado(s)", hist.observacao)
+
+    def test_finalizar_depois_do_prazo_nao_mexe(self):
+        os_ = self.nova_os(valor="500.00")
+        seg = proxima_segunda()
+        ag = Agendamento.objects.create(ordem=os_, tipo=TipoAgendamento.ENTREGA, data=seg, turno=Turno.MANHA)
+        os_.mudar_status(StatusOS.EM_EXECUCAO, self.vendedor)
+        Pagamento.objects.create(ordem=os_, forma="pix", valor=D("500.00"), registrado_por=self.diretor)
+        os_.mudar_status(StatusOS.FINALIZADA, self.diretor)
+        ag.refresh_from_db()
+        self.assertEqual(ag.ocupacao, [f"{seg}:manha"])
