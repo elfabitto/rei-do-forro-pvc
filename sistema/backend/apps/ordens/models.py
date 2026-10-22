@@ -561,6 +561,36 @@ class HistoricoOS(models.Model):
         return f"{self.ordem.numero}: {self.de_status} → {self.para_status}"
 
 
+class TipoExcecao(models.TextChoices):
+    ENTREGA = "entrega", "Entrega / visita"
+    INSTALACAO = "instalacao", "Instalação"
+
+
+class ExcecaoAgenda(models.Model):
+    """
+    Vaga a mais aberta pela gestão num dia lotado — o contrário do Bloqueio.
+
+    Entrega/visita: soma vagas de entrega no dia (vale para material, instalação
+    que começa no dia e visita técnica). Instalação: soma equipes nos dois turnos
+    do dia e, junto, a vaga de entrega que a instalação ocupa ao começar.
+    """
+
+    data = models.DateField()
+    tipo = models.CharField(max_length=12, choices=TipoExcecao.choices, default=TipoExcecao.ENTREGA)
+    vagas = models.PositiveSmallIntegerField(default=1)
+    motivo = models.CharField(max_length=160, blank=True)
+    criado_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["data", "id"]
+        verbose_name = "exceção de agenda"
+        verbose_name_plural = "exceções de agenda"
+
+    def __str__(self):
+        return f"{self.data:%d/%m} +{self.vagas} {self.get_tipo_display().lower()}"
+
+
 class Bloqueio(models.Model):
     """Feriado, folga ou indisponibilidade — some das vagas livres na agenda."""
 

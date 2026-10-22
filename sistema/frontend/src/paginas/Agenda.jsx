@@ -3,13 +3,18 @@
  * 2/3…); a entrega, no dia dela. Azul é entrega, laranja é instalação, roxo é
  * visita técnica (orçamento presencial, que ocupa uma vaga de entrega).
  *
+ * Exceção: a gestão (diretoria e TI) abre vaga a mais num dia lotado. O dia com
+ * exceção ganha uma bolinha vermelha no calendário.
+ *
  * No celular o mês vira uma grade compacta com marcações coloridas, e tocar
  * num dia abre a lista daquele dia logo abaixo — é o uso mais comum.
  */
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { inicial, textoDias } from "../agendaTexto";
-import { Estado, linhas, useApi } from "../componentes";
+import { api } from "../api";
+import { useAuth } from "../auth";
+import { BotaoAcao, Campo, Estado, Modal, linhas, useApi } from "../componentes";
 import Icone from "../icones";
 import OrdemDetalhe from "./OrdemDetalhe";
 
@@ -58,11 +63,76 @@ function espalhar(agendamentos) {
   return porDia;
 }
 
+/** Abrir vaga de exceção: dia, tipo, quantas vagas e o porquê. */
+function ExcecaoModal({ dataInicial, aoFechar, aoConcluir }) {
+  const hoje = iso(new Date());
+  const [f, setF] = useState({ data: dataInicial >= hoje ? dataInicial : hoje, tipo: "entrega", vagas: 1, motivo: "" });
+  const [erro, setErro] = useState("");
+  const mudar = (campo) => (e) => setF((s) => ({ ...s, [campo]: e.target.value }));
+
+  async function abrir() {
+    setErro("");
+    try {
+      await api.post("/excecoes-agenda/", { ...f, vagas: Number(f.vagas) });
+      aoConcluir();
+      return "exceção aberta";
+    } catch (e) {
+      setErro(e.message);
+      throw e;
+    }
+  }
+
+  return (
+    <Modal
+      titulo="Abrir exceção na agenda"
+      subtitulo="Vaga a mais num dia lotado. Só a gestão abre; o sistema passa a aceitar o agendamento nesse dia."
+      aoFechar={aoFechar}
+      largura={460}
+      rodape={
+        <div className="btnrow" style={{ padding: 0 }}>
+          <BotaoAcao classe="btn p" aoClicar={abrir}>Abrir exceção</BotaoAcao>
+          <button className="btn" onClick={aoFechar}>Cancelar</button>
+        </div>
+      }
+    >
+      {erro && <div className="erro">{erro}</div>}
+      <Campo rotulo="Data">
+        <input type="date" value={f.data} min={hoje} onChange={mudar("data")} />
+      </Campo>
+      <div className="lbl">Vaga para</div>
+      <div className="opts" style={{ marginBottom: 14 }}>
+        <label className={`opt${f.tipo === "entrega" ? " on" : ""}`}>
+          <input type="radio" name="tipoExc" checked={f.tipo === "entrega"}
+                 onChange={() => setF((s) => ({ ...s, tipo: "entrega" }))} />
+          <span className="t">Entrega / visita técnica
+            <small>Entrega de material, visita (orçamento presencial) ou o dia de início de uma instalação</small>
+          </span>
+        </label>
+        <label className={`opt${f.tipo === "instalacao" ? " on" : ""}`}>
+          <input type="radio" name="tipoExc" checked={f.tipo === "instalacao"}
+                 onChange={() => setF((s) => ({ ...s, tipo: "instalacao" }))} />
+          <span className="t">Instalação
+            <small>Uma equipe a mais na manhã e na tarde do dia (já inclui a vaga de entrega)</small>
+          </span>
+        </label>
+      </div>
+      <Campo rotulo="Quantas vagas a mais">
+        <input type="number" min={1} max={10} value={f.vagas} onChange={mudar("vagas")} style={{ maxWidth: 120 }} />
+      </Campo>
+      <Campo rotulo="Motivo (opcional)">
+        <input value={f.motivo} onChange={mudar("motivo")} maxLength={160} placeholder="Ex.: cliente antigo, entrega rápida" />
+      </Campo>
+    </Modal>
+  );
+}
+
 const turnoDoDia = (e) =>
   e.turnosDia.length === 2 ? "dia todo" : ROT_TURNO[e.turnosDia[0]];
 
 export default function Agenda() {
   const navegar = useNavigate();
+  const { pode } = useAuth();
+  const [abrindoExcecao, setAbrindoExcecao] = useState(false);
   const [offset, setOffset] = useState(0);
   const [aberta, setAberta] = useState(null);
   const [selecionado, setSelecionado] = useState(iso(new Date()));
@@ -83,6 +153,16 @@ export default function Agenda() {
   const disp = useApi("/agenda/disponibilidade/", { de: inicio, ate: fim }, [inicio, fim]);
   const ags = useApi("/agendamentos/", { de: inicio, ate: fim, page_size: 300 }, [inicio, fim]);
   const vis = useApi("/visitas/", { de: inicio, ate: fim, page_size: 300 }, [inicio, fim]);
+  const exc = useApi("/excecoes-agenda/", { de: inicio, ate: fim }, [inicio, fim]);
+  const excecoes = linhas(exc.dados);
+  const excecoesDo = (d) => excecoes.filter((e) => e.data === d);
+
+  async function retirarExcecao(e) {
+    await api.delete(`/excecoes-agenda/${e.id}/`);
+    exc.recarregar();
+    disp.recarregar();
+    return "retirada";
+  }
 
   // visita perdida não ocupa mais a agenda
   const visitas = linhas(vis.dados).filter((v) => v.status !== "perdida").map(comoCompromisso);
@@ -126,6 +206,12 @@ export default function Agenda() {
             <button className="btn ic" onClick={() => setOffset((o) => o + 1)} aria-label="Próximo mês">→</button>
           </div>
           <button className="btn" onClick={() => setOffset(0)}>Hoje</button>
+          {pode("abrirExcecao") && (
+            <button className="btn excBtn" onClick={() => setAbrindoExcecao(true)}
+                    title="Abrir vaga a mais num dia lotado">
+              <i className="excBola" aria-hidden="true" /> Abrir exceção
+            </button>
+          )}
           <div className="agcont">
             <span className="tag-ent"><i />{nEntregas} entrega(s)</span>
             <span className="tag-ins"><i />{nInstalacoes} instalação(ões)</span>
@@ -153,7 +239,13 @@ export default function Agenda() {
                        onClick={() => setSelecionado(dia.data)}
                        onKeyDown={(ev) => ev.key === "Enter" && setSelecionado(dia.data)}
                        aria-label={`${dia.data}: ${eventos.length} compromisso(s)`}>
-                    <div className="n">{Number(dia.data.slice(-2))}</div>
+                    <div className="n">
+                      {Number(dia.data.slice(-2))}
+                      {excecoesDo(dia.data).length > 0 && (
+                        <i className="excBola" title={`Exceção: ${excecoesDo(dia.data)
+                          .map((e) => `+${e.vagas} ${e.tipo_display.toLowerCase()}`).join(", ")}`} />
+                      )}
+                    </div>
 
                     {/* desktop: um bloco por compromisso */}
                     <div className="evs">
@@ -193,6 +285,7 @@ export default function Agenda() {
               <span><i style={{ background: "var(--s-entrega)" }} />Entrega</span>
               <span><i style={{ background: "var(--s-instalacao)" }} />Instalação</span>
               <span><i style={{ background: "var(--s-visita)" }} />Visita técnica</span>
+              <span><i className="excBola" style={{ position: "static" }} />Exceção (vaga extra)</span>
               <span className="leg-vagas">
                 Números no canto: vagas livres de <b className="ve">entrega</b> e de <b className="vi">instalação</b>
               </span>
@@ -212,6 +305,23 @@ export default function Agenda() {
             </span>
           )}
         </header>
+        {excecoesDo(selecionado).length > 0 && (
+          <div className="excLista">
+            {excecoesDo(selecionado).map((e) => (
+              <div className="excItem" key={e.id}>
+                <i className="excBola" style={{ position: "static" }} />
+                <span>
+                  <b>Exceção: +{e.vagas} {e.tipo_display.toLowerCase()}</b>
+                  {e.motivo ? ` — ${e.motivo}` : ""}
+                  <small> · aberta por {e.criado_por_nome}</small>
+                </span>
+                {pode("abrirExcecao") && (
+                  <BotaoAcao classe="btn mini-baixa" aoClicar={() => retirarExcecao(e)}>Retirar</BotaoAcao>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
         {!diaSel?.atende && diaSel ? (
           <p className="nada" style={{ padding: 18 }}>Sem atendimento neste dia.</p>
         ) : eventosSel.length === 0 ? (
@@ -245,6 +355,10 @@ export default function Agenda() {
         )}
       </div>
 
+      {abrindoExcecao && (
+        <ExcecaoModal dataInicial={selecionado} aoFechar={() => setAbrindoExcecao(false)}
+                      aoConcluir={() => { setAbrindoExcecao(false); exc.recarregar(); disp.recarregar(); }} />
+      )}
       {aberta && (
         <OrdemDetalhe id={aberta} aoFechar={() => setAberta(null)}
                       aoMudar={() => { disp.recarregar(); ags.recarregar(); vis.recarregar(); }} />

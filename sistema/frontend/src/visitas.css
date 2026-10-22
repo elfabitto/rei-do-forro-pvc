@@ -74,3 +74,17 @@
   .homeVisita .ico{width:44px;height:44px;border-radius:13px}
   .homeVisita b{font-size:14px}
 }
+
+/* exceção de agenda: vaga extra aberta pela gestão — bolinha vermelha no dia */
+.excBola{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--critical);
+         box-shadow:0 0 0 2px #fff;vertical-align:middle}
+.cal .dy .n{position:relative;display:flex;align-items:center;gap:5px}
+.cvd{position:relative}
+.cvd .excBola{position:absolute;top:4px;right:4px;width:8px;height:8px}
+.btn.excBtn{display:inline-flex;align-items:center;gap:7px}
+.excLista{display:grid;gap:6px;padding:12px 18px 0}
+.excItem{display:flex;align-items:center;gap:9px;padding:8px 11px;border:1px solid #f0c2c2;background:#fdf5f5;
+         border-radius:8px;font-size:13px}
+.excItem span{flex:1;min-width:0}
+.excItem small{color:var(--muted)}
+.calleg .lg i.excBola{border:0;border-radius:50%;width:9px;height:9px;position:static}

@@ -13,6 +13,7 @@ from .models import (
     FORMAS_ACEITAS,
     Agendamento,
     Bloqueio,
+    ExcecaoAgenda,
     FormaPagamento,
     HistoricoOS,
     Modalidade,
@@ -299,6 +300,28 @@ class ReagendarSerializer(serializers.Serializer):
 
     data = serializers.DateField()
     turno = serializers.ChoiceField(choices=Turno.choices)
+
+
+class ExcecaoAgendaSerializer(serializers.ModelSerializer):
+    tipo_display = serializers.CharField(source="get_tipo_display", read_only=True)
+    criado_por_nome = serializers.CharField(source="criado_por.get_full_name", read_only=True)
+
+    class Meta:
+        model = ExcecaoAgenda
+        fields = ["id", "data", "tipo", "tipo_display", "vagas", "motivo", "criado_por", "criado_por_nome", "criado_em"]
+        read_only_fields = ["criado_por", "criado_em"]
+
+    def validate_vagas(self, valor):
+        if not 1 <= valor <= 10:
+            raise serializers.ValidationError("De 1 a 10 vagas.")
+        return valor
+
+    def validate_data(self, valor):
+        from django.utils import timezone
+
+        if valor < timezone.localdate():
+            raise serializers.ValidationError("Escolha uma data de hoje em diante.")
+        return valor
 
 
 class BloqueioSerializer(serializers.ModelSerializer):

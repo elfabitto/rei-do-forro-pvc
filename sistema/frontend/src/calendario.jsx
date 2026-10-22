@@ -104,9 +104,12 @@ export default function CalendarioVagas({ valor, aoMudar, tipo = "entrega", titu
     if (livre >= Math.ceil(total / 2)) return " folga";
     return livre === 1 ? " aperto" : "";
   };
+  // vaga de exceção não conta para sugerir: ela é a última saída, não a primeira
+  const livreNormal = (d) => d.entregas.livre - (d.excecao?.entregas ?? 0);
+  const temExcecao = dias.some((d) => d.excecao?.entregas > 0 || d.excecao?.instalacoes > 0);
   const sugestoes = visita
-    ? dias.filter((d) => d.disponivel && d.data >= hoje)
-        .sort((a, b) => b.entregas.livre - a.entregas.livre || a.data.localeCompare(b.data))
+    ? dias.filter((d) => d.disponivel && d.data >= hoje && livreNormal(d) > 0)
+        .sort((a, b) => livreNormal(b) - livreNormal(a) || a.data.localeCompare(b.data))
         .slice(0, 4)
         .sort((a, b) => a.data.localeCompare(b.data))
     : [];
@@ -161,6 +164,9 @@ export default function CalendarioVagas({ valor, aoMudar, tipo = "entrega", titu
                   : instalacao ? `${livre} equipe(s) livre(s)` : `${livre} entrega(s) livre(s)`}
               >
                 <span className="n">{Number(dia.data.slice(-2))}</span>
+                {(dia.excecao?.entregas > 0 || dia.excecao?.instalacoes > 0) && (
+                  <i className="excBola" title="Exceção: vaga extra aberta pela gestão" />
+                )}
                 <span className="v">
                   {ehFim ? "fim" : !dia.atende ? "—" : passado ? "" : dia.disponivel || naFaixa || marcado ? livre : "lotado"}
                 </span>
@@ -173,12 +179,14 @@ export default function CalendarioVagas({ valor, aoMudar, tipo = "entrega", titu
             <span className="lg"><i style={{ background: "#d4f0dc", borderColor: "#5cbf75" }} />dia vazio</span>
             <span className="lg"><i style={{ background: "#e8f7ec", borderColor: "#9fd9ae" }} />com folga</span>
             Número = vagas livres no dia. A visita ocupa 1 das entregas do dia — prefira os dias em verde.
+            {temExcecao && <span className="lg" style={{ marginLeft: 8 }}><i className="excBola" /> exceção (vaga extra)</span>}
           </p>
         ) : (
           <p className="calleg">
             {instalacao
               ? "Número = equipes livres. Com o dia marcado, os dias do serviço ficam pintados e o número já mostra o que sobra."
               : "Número = entregas livres no dia (4 por dia, contando as instalações que começam nele e as visitas técnicas)."}
+            {temExcecao && <span className="lg" style={{ marginLeft: 8 }}><i className="excBola" /> exceção (vaga extra)</span>}
           </p>
         )}
 

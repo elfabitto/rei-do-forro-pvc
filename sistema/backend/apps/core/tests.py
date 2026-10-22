@@ -832,3 +832,59 @@ class NotificacoesTest(OSFinalizadaMixin, ApiBase):
             self.finalizada()
         cargas = [c.kwargs["data"] for c in webpush.call_args_list]
         self.assertTrue(any("finalizada" in c for c in cargas), cargas)
+
+
+class ExcecaoAgendaTest(ApiBase):
+    """Gestão abre vaga a mais num dia lotado; vendedor não abre."""
+
+    def setUp(self):
+        hoje = timezone.localdate()
+        self.dia = hoje + timedelta(days=(7 - hoje.weekday()) % 7 or 7)   # próxima segunda
+
+    def agendar_visita(self):
+        return self.client.post("/api/visitas/", {
+            "cliente": self.cliente.id, "endereco": self.endereco.id, "data": str(self.dia), "turno": "manha",
+        }, format="json")
+
+    def test_so_gestao_abre(self):
+        self.client.force_authenticate(self.vendedor)
+        r = self.client.post("/api/excecoes-agenda/", {"data": str(self.dia), "vagas": 1}, format="json")
+        self.assertEqual(r.status_code, 403)
+        self.assertEqual(self.client.get("/api/excecoes-agenda/").status_code, 200)   # ver, todos veem
+
+    def test_vaga_extra_de_entrega_no_dia_lotado(self):
+        self.client.force_authenticate(self.vendedor)
+        for _ in range(4):
+            self.assertEqual(self.agendar_visita().status_code, 201)
+        self.assertEqual(self.agendar_visita().status_code, 400)   # lotado
+
+        self.client.force_authenticate(self.diretor)
+        r = self.client.post("/api/excecoes-agenda/", {"data": str(self.dia), "tipo": "entrega", "vagas": 1,
+                                                        "motivo": "cliente antigo"}, format="json")
+        self.assertEqual(r.status_code, 201, r.data)
+        disp = self.client.get("/api/agenda/disponibilidade/",
+                               {"de": str(self.dia), "ate": str(self.dia), "tipo": "visita"}).data["dias"][0]
+        self.assertEqual((disp["entregas"]["total"], disp["entregas"]["livre"]), (5, 1))
+        self.assertEqual(disp["excecao"]["entregas"], 1)
+
+        self.client.force_authenticate(self.vendedor)
+        self.assertEqual(self.agendar_visita().status_code, 201)   # cabe na exceção
+        self.assertEqual(self.agendar_visita().status_code, 400)   # e só nela
+
+        self.client.force_authenticate(self.diretor)
+        self.assertEqual(self.client.delete(f"/api/excecoes-agenda/{r.data['id']}/").status_code, 204)
+
+    def test_excecao_de_instalacao_soma_equipe(self):
+        self.client.force_authenticate(self.diretor)
+        self.client.post("/api/excecoes-agenda/", {"data": str(self.dia), "tipo": "instalacao", "vagas": 1},
+                         format="json")
+        disp = self.client.get("/api/agenda/disponibilidade/", {"de": str(self.dia), "ate": str(self.dia)}).data
+        dia = disp["dias"][0]
+        self.assertEqual(dia["entregas"]["total"], 5)
+        self.assertEqual([t["instalacoes"]["total"] for t in dia["turnos"]], [3, 3])
+
+    def test_data_passada_recusa(self):
+        self.client.force_authenticate(self.diretor)
+        r = self.client.post("/api/excecoes-agenda/", {"data": str(timezone.localdate() - timedelta(days=1))},
+                             format="json")
+        self.assertEqual(r.status_code, 400)

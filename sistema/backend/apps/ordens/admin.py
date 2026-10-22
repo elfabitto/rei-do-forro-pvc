@@ -10,6 +10,7 @@ from .models import (
     OrdemServico,
     Pagamento,
     VisitaTecnica,
+    ExcecaoAgenda,
 )
 
 
@@ -116,3 +117,8 @@ class VisitaTecnicaAdmin(admin.ModelAdmin):
     search_fields = ["numero", "cliente__nome"]
     raw_id_fields = ["cliente", "endereco", "orcamento"]
 
+
+@admin.register(ExcecaoAgenda)
+class ExcecaoAgendaAdmin(admin.ModelAdmin):
+    list_display = ["data", "tipo", "vagas", "motivo", "criado_por"]
+    list_filter = ["tipo"]

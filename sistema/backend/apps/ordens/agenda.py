@@ -9,6 +9,8 @@ Regras de capacidade da agenda.
   material, então consome 1 dessas vagas no dia em que começa. O turno da
   entrega é informativo; o limite é do dia.
 - Visita técnica (orçamento presencial): também ocupa 1 vaga de entrega no dia.
+- Exceção: a gestão abre vagas a mais num dia lotado (ExcecaoAgenda) — somam
+  entregas no dia ou equipes nos turnos do dia.
 
 Tudo que a tela mostra como vaga sai daqui, e é a mesma conta que o modelo
 confere ao gravar.
@@ -69,7 +71,8 @@ class Grade:
 
     def __init__(self, de, ate, excluir=None, excluir_visita=None):
         from .models import (
-            Agendamento, Bloqueio, ConfiguracaoAgenda, StatusOS, StatusVisita, TipoAgendamento, VisitaTecnica,
+            Agendamento, Bloqueio, ConfiguracaoAgenda, ExcecaoAgenda, StatusOS, StatusVisita, TipoAgendamento,
+            TipoExcecao, VisitaTecnica,
         )
 
         self.cfg = ConfiguracaoAgenda.obter()
@@ -90,6 +93,13 @@ class Grade:
         )
         if excluir:
             qs = qs.exclude(pk=excluir)
+
+        # vagas de exceção abertas pela gestão: entregas por dia, equipes por dia
+        self.extra_entrega, self.extra_instalacao = {}, {}
+        for e in ExcecaoAgenda.objects.filter(data__range=(de - timedelta(days=self.FOLGA), fim_bloqueios)):
+            self.extra_entrega[e.data] = self.extra_entrega.get(e.data, 0) + e.vagas
+            if e.tipo == TipoExcecao.INSTALACAO:
+                self.extra_instalacao[e.data] = self.extra_instalacao.get(e.data, 0) + e.vagas
 
         self.instalacoes = {}     # (data, turno) -> nº de instalações ocupando
         self.entregas = {}        # data -> entregas + instalações que começam no dia + visitas
@@ -140,11 +150,17 @@ class Grade:
     def cap_entrega(self):
         return self.cfg.capacidade_entrega_dia
 
+    def cap_entrega_dia(self, dia):
+        return self.cap_entrega + self.extra_entrega.get(dia, 0)
+
+    def cap_instalacao_dia(self, dia):
+        return self.cap_instalacao + self.extra_instalacao.get(dia, 0)
+
     def entregas_livres(self, dia):
-        return max(0, self.cap_entrega - self.entregas.get(dia, 0))
+        return max(0, self.cap_entrega_dia(dia) - self.entregas.get(dia, 0))
 
     def instalacoes_livres(self, dia, turno):
-        return max(0, self.cap_instalacao - self.instalacoes.get((dia, turno), 0))
+        return max(0, self.cap_instalacao_dia(dia) - self.instalacoes.get((dia, turno), 0))
 
     def motivo_entrega(self, dia):
         """None se cabe uma entrega no dia; senão, o porquê."""
@@ -154,7 +170,7 @@ class Grade:
             return "Data bloqueada na agenda."
         if not self.entregas_livres(dia):
             usado = self.entregas.get(dia, 0)
-            return (f"Dia cheio: {usado} de {self.cap_entrega} entregas já marcadas "
+            return (f"Dia cheio: {usado} de {self.cap_entrega_dia(dia)} entregas já marcadas "
                     "(instalação e visita técnica contam como entrega).")
         return None
 
@@ -164,7 +180,7 @@ class Grade:
             return "Turno sem atendimento ou bloqueado na agenda."
         if not self.entregas_livres(dia):
             return (f"Sem vaga de entrega em {dia:%d/%m}: a instalação leva o material "
-                    f"e ocupa 1 das {self.cap_entrega} entregas do dia.")
+                    f"e ocupa 1 das {self.cap_entrega_dia(dia)} entregas do dia.")
         periodo = self.percorrer(dia, turno, n)
         if len(periodo) < n:
             return "Não há dias úteis suficientes para concluir a instalação."
@@ -172,5 +188,5 @@ class Grade:
             if not self.instalacoes_livres(d, t):
                 rotulo = "manhã" if t == "manha" else "tarde"
                 return (f"Equipes ocupadas em {d:%d/%m} ({rotulo}): já há "
-                        f"{self.cap_instalacao} instalações nesse turno.")
+                        f"{self.cap_instalacao_dia(d)} instalações nesse turno.")
         return None

@@ -37,6 +37,7 @@ class EuSerializer(UsuarioSerializer):
             "atenderChamados": obj.pode_atender_chamados,
             "cancelarOS": obj.e_diretor,
             "excluirOS": obj.e_diretor,
+            "abrirExcecao": obj.e_diretor,
             "trocarVendedor": obj.pode_trocar_vendedor,
             "verTudo": obj.pode_ver_tudo,
             "vender": obj.pode_vender,

@@ -25,6 +25,7 @@ from .models import (
     Agendamento,
     OrdemServico,
     Pagamento,
+    ExcecaoAgenda,
     StatusOS,
     StatusVisita,
     TipoAgendamento,
@@ -35,6 +36,7 @@ from . import eventos
 from .agenda import Grade, chave, turnos_instalacao
 from .serializers import (
     AgendamentoSerializer,
+    ExcecaoAgendaSerializer,
     FinalizarSerializer,
     MudarStatusSerializer,
     OrdemServicoListaSerializer,
@@ -256,6 +258,34 @@ class PagamentoViewSet(viewsets.ModelViewSet):
         eventos.pagamento_lancado(pg, self.request.user)
 
 
+# ------------------------------------------------------------ exceções da agenda
+class ExcecaoAgendaViewSet(viewsets.ModelViewSet):
+    """
+    Vaga a mais num dia lotado. Todos veem (a agenda mostra); abrir e retirar,
+    só a gestão (diretoria e TI).
+    """
+
+    queryset = ExcecaoAgenda.objects.select_related("criado_por")
+    serializer_class = ExcecaoAgendaSerializer
+    http_method_names = ["get", "post", "delete", "head", "options"]
+    pagination_class = None
+
+    def get_permissions(self):
+        return [IsAuthenticated()] if self.action in ("list", "retrieve") else [SomenteDiretor()]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        p = self.request.query_params
+        if p.get("de"):
+            qs = qs.filter(data__gte=p["de"])
+        if p.get("ate"):
+            qs = qs.filter(data__lte=p["ate"])
+        return qs
+
+    def perform_create(self, serializer):
+        serializer.save(criado_por=self.request.user)
+
+
 # ------------------------------------------------------------ visitas técnicas
 class VisitaTecnicaViewSet(viewsets.ModelViewSet):
     """
@@ -350,10 +380,12 @@ def agenda_disponibilidade(request):
             "atende": atende,
             "entregas": {
                 "usado": grade.entregas.get(d, 0),
-                "total": grade.cap_entrega,
+                "total": grade.cap_entrega_dia(d),
                 "livre": grade.entregas_livres(d) if atende else 0,
                 "visitas": grade.visitas.get(d, 0),
             },
+            # vagas de exceção abertas pela gestão neste dia
+            "excecao": {"entregas": grade.extra_entrega.get(d, 0), "instalacoes": grade.extra_instalacao.get(d, 0)},
             "turnos": [],
         }
         for turno, rotulo in Turno.choices:
@@ -364,7 +396,7 @@ def agenda_disponibilidade(request):
                 "trabalha": trabalha,
                 "instalacoes": {
                     "usado": grade.instalacoes.get((d, turno), 0),
-                    "total": grade.cap_instalacao,
+                    "total": grade.cap_instalacao_dia(d),
                     "livre": grade.instalacoes_livres(d, turno) if trabalha else 0,
                 },
             }
