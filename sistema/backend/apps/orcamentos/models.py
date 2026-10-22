@@ -110,7 +110,7 @@ class Orcamento(models.Model):
         """
         Refaz os totais a partir do m² e dos itens. O acabamento só entra no
         Instalado; no Material as peças são cobradas por unidade na lista de itens.
-        Instalado abaixo de 20 m² soma a taxa de logística.
+        Abaixo de 20 m² soma a taxa de logística (frete), no Instalado e no Material.
         """
         if self.tipo == TipoOrcamento.MATERIAL:
             self.acabamento = None
@@ -118,7 +118,7 @@ class Orcamento(models.Model):
         self.preco_m2_vista, self.preco_m2_cartao = self.precos_vigentes()
         self.taxa_logistica = (
             TAXA_LOGISTICA
-            if self.tipo == TipoOrcamento.INSTALADO and self.area_m2 < AREA_MINIMA_SEM_TAXA
+            if self.area_m2 < AREA_MINIMA_SEM_TAXA
             else Decimal("0")
         )
 

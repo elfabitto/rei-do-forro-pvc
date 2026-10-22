@@ -19,11 +19,11 @@ export const ehExtra = (i) => i.unidade === VERBA;
 /** Nota de rodapé dos dois tipos de orçamento, na imagem e no texto. */
 const OBS_CARTAO = "Valor no cartão considerando parcelamento até 5x.";
 
-/** Instalado abaixo de 20 m² paga logística/frete — espelha o backend (Orcamento.recalcular). */
+/** Abaixo de 20 m² paga logística/frete, nos dois tipos — espelha o backend (Orcamento.recalcular). */
 export const AREA_MINIMA_SEM_TAXA = 20;
 export const TAXA_LOGISTICA = 80;
 export const taxaLogistica = (tipo, area) =>
-  tipo === "instalado" && area > 0 && area < AREA_MINIMA_SEM_TAXA ? TAXA_LOGISTICA : 0;
+  area > 0 && area < AREA_MINIMA_SEM_TAXA ? TAXA_LOGISTICA : 0;
 
 /**
  * Serviço opcional do orçamento de Material. O sistema sugere área × R$ 25,00,
@@ -95,11 +95,6 @@ function montarSemDesconto({ tipo, area, forro, acabamento, itens, extras, servi
   doc.resumo = [["Área", `${m2(area)} m²`], ["Forro", forro.nome]];
   if (instalado && acabamento) doc.resumo.push(["Acabamento", acabamento.nome]);
 
-  /* Bloco de texto dos itens "Outro", usado nos dois tipos. */
-  const textoExtras = linhasExtras.length
-    ? "\n\n*OUTROS*\n" + extras.map((e) => `• ${e.descricao} = R$ ${brl(cent(e.valor))}`).join("\n")
-    : "";
-
   if (instalado) {
     const taxa = taxaLogistica(tipo, area);
     const linhasOutros = [
@@ -152,6 +147,14 @@ _${doc.obs}_`;
     const materiais = itens.reduce((s, i) => s + cent(i.quantidade * i.preco), 0);
     const valorServico = cent(servico);
     const linhaSrv = valorServico ? [[linhaServico(area), `R$ ${brl(valorServico)}`]] : [];
+    const taxa = taxaLogistica(tipo, area);
+    const linhasOutros = [
+      ...(taxa ? [["Logística", `R$ ${brl(taxa)}`]] : []),
+      ...linhasExtras,
+    ];
+    const textoOutros = linhasOutros.length
+      ? "\n\n*OUTROS*\n" + linhasOutros.map(([k, v]) => `• ${k} = ${v}`).join("\n")
+      : "";
 
     doc.secoes = [{
       titulo: "Itens do orçamento",
@@ -161,11 +164,11 @@ _${doc.obs}_`;
         ...linhaSrv,
       ],
     }];
-    if (linhasExtras.length) doc.secoes.push({ titulo: "Outros", linhas: linhasExtras });
+    if (linhasOutros.length) doc.secoes.push({ titulo: "Outros", linhas: linhasOutros });
 
     doc.obs = OBS_CARTAO;
-    doc.totalVista = cent(forroVista + materiais + valorServico + somaExtras);
-    doc.totalCartao = cent(forroCartao + materiais + valorServico + somaExtras);
+    doc.totalVista = cent(forroVista + materiais + valorServico + taxa + somaExtras);
+    doc.totalCartao = cent(forroCartao + materiais + valorServico + taxa + somaExtras);
 
     const lista = [
       `• Forro ${m2(area)}m² × R$ ${brl(precoVista)}/m² = R$ ${brl(forroVista)}`,
@@ -179,7 +182,7 @@ _${doc.obs}_`;
 *Forro:* ${forro.nome}
 
 *ITENS*
-${lista}${textoExtras}
+${lista}${textoOutros}
 ----------
 *VALOR TOTAL*
 💵 *À vista*: R$ ${brl(doc.totalVista)}
