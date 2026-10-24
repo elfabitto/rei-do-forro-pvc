@@ -27,8 +27,8 @@ def entrada_do_pagamento(pg, usuario):
     obs = f"Cliente pagou {brl(pg.valor)} (taxa da maquininha {brl(pg.acrescimo)})" if pg.acrescimo else ""
     return Lancamento.objects.create(
         tipo=Tipo.ENTRADA, categoria=Categoria.VENDA, origem=Origem.VENDA,
-        descricao=f"{os_.numero} — {os_.cliente.nome}", valor=liquido,
-        data=pg.data, forma=_forma(pg), observacao=obs[:240],
+        descricao=f"{os_.numero} — {os_.cliente.nome}"[:200], valor=liquido,
+        data=pg.data, forma=_forma(pg)[:40], observacao=obs[:240],
         ordem=os_, pagamento=pg, criado_por=usuario,
     )
 
@@ -42,7 +42,7 @@ def saida_da_comissao(os_, usuario):
     nome = os_.vendedor.get_full_name() or os_.vendedor.username
     return Lancamento.objects.create(
         tipo=Tipo.SAIDA, categoria=Categoria.COMISSAO, origem=Origem.COMISSAO,
-        descricao=f"Comissão {nome} — {os_.numero}", valor=valor, data=quando,
+        descricao=f"Comissão {nome} — {os_.numero}"[:200], valor=valor, data=quando,
         ordem=os_, favorecido=os_.vendedor, criado_por=usuario,
     )
 

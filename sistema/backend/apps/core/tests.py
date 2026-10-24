@@ -892,3 +892,38 @@ class ExcecaoAgendaTest(ApiBase):
         r = self.client.post("/api/excecoes-agenda/", {"data": str(timezone.localdate() - timedelta(days=1))},
                              format="json")
         self.assertEqual(r.status_code, 400)
+
+
+class FinalizarCartaoTest(ApiBase):
+    """Erro 500 relatado: finalizar com cartão de crédito parcelado."""
+
+    def test_finaliza_no_credito_5x(self):
+        self.client.force_authenticate(self.vendedor)
+        orc = self.client.post("/api/orcamentos/", {
+            "cliente": self.cliente.id, "tipo": "instalado", "area_m2": "55",
+            "forro": self.forro.id, "acabamento": self.sanca.id,
+        }, format="json").data
+        hoje = timezone.localdate()
+        seg = hoje + timedelta(days=(7 - hoje.weekday()) % 7 or 7)
+        os_ = self.client.post("/api/ordens-servico/", {
+            "orcamento": orc["id"], "endereco": self.endereco.id, "modalidade": "cartao",
+            "agendar_instalacao": {"data": str(seg), "turno": "manha"},
+        }, format="json")
+        self.assertEqual(os_.status_code, 201, os_.data)
+        os_ = os_.data
+
+        self.client.force_authenticate(self.diretor)
+        r = self.client.post(f"/api/ordens-servico/{os_['id']}/finalizar/", {
+            "pagamentos": [{"forma": "credito", "valor": os_["valor_vista"], "parcelas": 5}],
+        }, format="json")
+        self.assertEqual(r.status_code, 200, getattr(r, "data", r))
+        self.assertEqual(r.data["status"], "finalizada")
+
+        # o SQLite dos testes não barra texto comprido; o Postgres do site barra (era o erro 500)
+        from apps.financeiro.models import Lancamento
+
+        lanc = Lancamento.objects.get(ordem_id=os_["id"], origem="venda")
+        self.assertEqual(lanc.forma, "Cartão de crédito 5x")
+        lanc.full_clean()   # valida o tamanho de cada campo, como o Postgres faria
+        for parcelas in (10, 12):
+            self.assertLessEqual(len(f"Cartão de crédito {parcelas}x"), Lancamento._meta.get_field("forma").max_length)

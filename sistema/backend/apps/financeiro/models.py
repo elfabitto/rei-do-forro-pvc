@@ -52,7 +52,8 @@ class Lancamento(models.Model):
     descricao = models.CharField("descrição", max_length=200)
     valor = models.DecimalField(max_digits=11, decimal_places=2, validators=[MinValueValidator(Decimal("0.01"))])
     data = models.DateField(default=timezone.localdate)
-    forma = models.CharField("forma de pagamento", max_length=16, blank=True)
+    # "Cartão de crédito 12x" tem 21 letras: o campo antigo (16) quebrava no Postgres
+    forma = models.CharField("forma de pagamento", max_length=40, blank=True)
     observacao = models.CharField("observação", max_length=240, blank=True)
 
     origem = models.CharField(max_length=10, choices=Origem.choices, default=Origem.MANUAL)
