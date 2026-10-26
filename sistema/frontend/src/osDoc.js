@@ -8,6 +8,7 @@
 import { LOGO } from "./logo";
 import { periodoTexto } from "./agendaTexto";
 import { VERBA, ehServico, quantidadeTexto } from "./orcamentoDoc";
+import { bloco, montarTexto } from "./textoGestao";
 
 const brl = (n) =>
   Number(n ?? 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -21,21 +22,15 @@ const logoPronta = new Promise((ok) => {
 });
 const FF = '"Segoe UI", Arial, Helvetica, sans-serif';
 
-/** O que foi lançado de ripão, somando os itens do orçamento de Material. */
-export function resumoRipao(itens = []) {
-  const ripoes = itens.filter((i) => /rip[ãa]o/i.test(i.descricao ?? ""));
-  if (!ripoes.length) return "";
-  return ripoes
-    .map((i) => `${quantidadeTexto(i.quantidade, i.unidade)} — `
-      + String(i.descricao).replace(/^Ripão 4 m\s*/i, ""))
-    .join(" · ");
-}
-
-/** Plastilon lançado no orçamento de Material (por unidade), para a ficha do pedido. */
-export function resumoPlastilon(itens = []) {
-  const q = itens.filter((i) => /pl?astilon/i.test(i.descricao ?? ""))
-    .reduce((s, i) => s + Number(i.quantidade || 0), 0);
-  return q ? quantidadeTexto(q, "und") : "";
+/**
+ * Peças do orçamento de Material (perfil, moldura, sanca, ripão, plastilon,
+ * pregos…), cada uma com a quantidade: [descrição, "10 und"]. Fica de fora o
+ * serviço e os itens "Outro", que a ficha mostra pelo valor.
+ */
+export function pecasDoPedido(itens = []) {
+  return itens
+    .filter((i) => i.unidade !== VERBA && !ehServico(i))
+    .map((i) => [i.descricao, quantidadeTexto(i.quantidade, i.unidade)]);
 }
 
 /** Itens "Outro" do orçamento: descrição e valor fechado. */
@@ -95,10 +90,8 @@ export function montarOS(os, { verFinanceiro = true } = {}) {
     d.pedido.push(["Forro", orc.forro_nome ?? "—"]);
     if (orc.acabamento_nome) d.pedido.push(["Acabamento", orc.acabamento_nome]);
     if (orc.estrutura_nome) d.pedido.push(["Estrutura", orc.estrutura_nome]);
-    const ripao = resumoRipao(orc.itens);
-    if (ripao) d.pedido.push(["Ripão", ripao]);
-    const plastilon = resumoPlastilon(orc.itens);
-    if (plastilon) d.pedido.push(["Plastilon", plastilon]);
+    // todas as peças lançadas, com a quantidade — quem separa e entrega precisa da lista inteira
+    d.pedido.push(...pecasDoPedido(orc.itens));
     const servico = orc.itens?.find(ehServico);
     if (servico) d.pedido.push(["Serviço", `${m2(orc.area_m2)} m² — R$ ${brl(servico.total)}`]);
     if (Number(orc.taxa_logistica) > 0) {
@@ -119,23 +112,31 @@ export function montarOS(os, { verFinanceiro = true } = {}) {
   if (d.instalacao) d.agenda.push(["Instalação", d.instalacao]);
   if (!d.agenda.length) d.agenda.push(["Agendamento", "—"]);
 
-  /* ---- texto do WhatsApp ---- */
-  const bloco = (titulo, pares) =>
-    pares.length ? `\n*${titulo}*\n` + pares.map(([k, v]) => `${k}: ${v || "—"}`).join("\n") : "";
-
-  d.texto = `*ORDEM DE SERVIÇO ${d.numero}*
-_${d.tipo.toUpperCase()}${d.atrasado ? " · ATRASADA" : ""}_
-Situação: ${d.status}
-----------${bloco("INFORMAÇÕES DO CLIENTE", d.cliente_linhas)}${bloco("INFORMAÇÕES DO PEDIDO", d.pedido)}${bloco("AGENDAMENTO", d.agenda)}${
-    d.m2Vista
-      ? `\n*VALOR DO M²*\nÀ vista: R$ ${brl(d.m2Vista)}/m²\nNo cartão: R$ ${brl(d.m2Cartao)}/m²`
-      : ""
-  }
-*INFORMAÇÕES DE PAGAMENTO*
-Tipo: ${d.modalidade || "a definir"}
-Total: R$ ${brl(d.valor)}${
-    verFinanceiro && Number(d.saldo) > 0 ? `\nPago: R$ ${brl(d.pago)}\nSaldo: R$ ${brl(d.saldo)}` : ""
-  }${d.observacoes ? `\n----------\n_${d.observacoes}_` : ""}`;
+  /* ---- texto do WhatsApp (modelo da gestão, com emojis — textoGestao.js) ---- */
+  const material = os.tipo === "material";
+  // pago/saldo só quando já entrou algum pagamento e quem envia vê o financeiro
+  const parcial = verFinanceiro && Number(d.pago) > 0 && Number(d.saldo) > 0;
+  d.texto = montarTexto(
+    `📋 *ORDEM DE SERVIÇO ${d.numero}*\n`
+      + `${material ? "📦" : "🔧"} *${d.tipo.toUpperCase()}*${d.atrasado ? " · ⏰ ATRASADA" : ""}\n`
+      + `📌 Situação: ${d.status}`,
+    [
+      bloco("👤", "INFORMAÇÕES DO CLIENTE", d.cliente_linhas),
+      bloco("📦", "INFORMAÇÕES DO PEDIDO", d.pedido),
+      bloco("🗓️", "AGENDAMENTO", d.agenda),
+      d.m2Vista ? bloco("💰", "VALOR DO M²", [
+        ["À vista", `R$ ${brl(d.m2Vista)}/m²`],
+        ["No cartão", `R$ ${brl(d.m2Cartao)}/m²`],
+      ]) : "",
+      bloco("🧾", "INFORMAÇÕES DE PAGAMENTO", [
+        ["Tipo", d.modalidade || "a definir"],
+        ["Total", `R$ ${brl(d.valor)}`],
+        parcial && ["Pago", `R$ ${brl(d.pago)}`],
+        parcial && ["Saldo", `R$ ${brl(d.saldo)}`],
+      ]),
+    ],
+    d.observacoes,
+  );
 
   return d;
 }

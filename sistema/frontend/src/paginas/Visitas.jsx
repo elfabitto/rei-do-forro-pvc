@@ -17,6 +17,7 @@ import Icone from "../icones";
 import { digitos } from "../mascaras";
 import { copiarTexto } from "../orcamentoDoc";
 import { abrirWhatsApp } from "../osDoc";
+import { bloco, montarTexto } from "../textoGestao";
 
 const FILTROS = [
   ["", "Todas"],
@@ -34,18 +35,21 @@ export function textoVisita(v) {
   const endereco = e
     ? [e.logradouro, e.numero].filter(Boolean).join(", ") + (e.complemento ? ` — ${e.complemento}` : "")
     : v.endereco_resumo;
-  const linhas = (pares) => pares.filter(([, val]) => val).map(([k, val]) => `${k}: ${val}`).join("\n");
-  return `*VISITA TÉCNICA ${v.numero}*
-_ORÇAMENTO PRESENCIAL_
-Situação: ${v.status_display}
-----------
-*INFORMAÇÕES DO CLIENTE*
-${linhas([["Cliente", v.cliente_detalhe?.nome], ["Telefone", v.cliente_detalhe?.telefone],
-          ["Endereço", endereco], ["Bairro", e?.bairro ?? v.bairro], ["Cidade", e?.cidade]])}
-*AGENDAMENTO*
-${linhas([["Visita", quandoTexto(v)], ["Agendado por", v.vendedor_nome],
-          ["Orçamento", v.orcamento_numero], ["Serviço", v.os_numero]])}${
-    v.observacoes ? `\n----------\n_${v.observacoes}_` : ""}`;
+  const so = (pares) => pares.filter(([, val]) => val);   // linha vazia não vai
+  return montarTexto(
+    `📋 *VISITA TÉCNICA ${v.numero}*\n📐 *ORÇAMENTO PRESENCIAL*\n📌 Situação: ${v.status_display}`,
+    [
+      bloco("👤", "INFORMAÇÕES DO CLIENTE", so([
+        ["Cliente", v.cliente_detalhe?.nome], ["Telefone", v.cliente_detalhe?.telefone],
+        ["Endereço", endereco], ["Bairro", e?.bairro ?? v.bairro], ["Cidade", e?.cidade],
+      ])),
+      bloco("🗓️", "AGENDAMENTO", so([
+        ["Visita", quandoTexto(v)], ["Agendado por", v.vendedor_nome],
+        ["Orçamento", v.orcamento_numero], ["Serviço", v.os_numero],
+      ])),
+    ],
+    v.observacoes,
+  );
 }
 
 /** Gerar Serviço: faz o orçamento da visita; se ele já existe, segue para a O.S. */
