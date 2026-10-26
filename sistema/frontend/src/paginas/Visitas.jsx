@@ -14,7 +14,7 @@ import { useAuth } from "../auth";
 import CalendarioVagas from "../calendario";
 import { BotaoAcao, Campo, Confirmacao, Estado, Etiqueta, Gaveta, Modal, linhas, useApi } from "../componentes";
 import Icone from "../icones";
-import { digitos } from "../mascaras";
+import Telefone from "../Telefone";
 import { copiarTexto } from "../orcamentoDoc";
 import { abrirWhatsApp } from "../osDoc";
 import { bloco, montarTexto } from "../textoGestao";
@@ -27,7 +27,6 @@ const FILTROS = [
 ];
 
 const quandoTexto = (v) => `${diaCurto(v.data)} · ${v.turno_display}`;
-const zap = (tel) => `https://wa.me/55${digitos(tel)}`;
 
 /** Texto para o grupo de gestão no WhatsApp — no mesmo modelo do texto da O.S. */
 export function textoVisita(v) {
@@ -122,7 +121,7 @@ function CardVisita({ v, ...acoes }) {
         </div>
         <div className="sublinha">
           <Icone nome="local" tamanho={13} /> {v.bairro}
-          {v.cliente_detalhe?.telefone ? ` · ${v.cliente_detalhe.telefone}` : ""}
+          {v.cliente_detalhe?.telefone && <> · <Telefone numero={v.cliente_detalhe.telefone} /></>}
         </div>
         <span className="tipoServico visita">Visita técnica — orçamento presencial</span>
 
@@ -219,14 +218,7 @@ function VisitaDetalhe({ id, aoFechar, ...acoes }) {
               <dl className="kv">
                 <dt>Cliente</dt><dd>{v.cliente_detalhe?.nome}</dd>
                 <dt>Telefone</dt>
-                <dd className="wk">
-                  {v.cliente_detalhe?.telefone}{" "}
-                  {v.cliente_detalhe?.telefone && (
-                    <a className="lnk" href={zap(v.cliente_detalhe.telefone)} target="_blank" rel="noopener noreferrer">
-                      WhatsApp
-                    </a>
-                  )}
-                </dd>
+                <dd className="wk"><Telefone numero={v.cliente_detalhe?.telefone} /></dd>
                 <dt>Endereço</dt>
                 <dd className="wk">{e?.logradouro}{e?.numero ? `, ${e.numero}` : ""}</dd>
                 {e?.complemento && <><dt>Complemento</dt><dd className="wk">{e.complemento}</dd></>}

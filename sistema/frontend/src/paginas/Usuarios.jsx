@@ -9,6 +9,7 @@ import { api, dataHora } from "../api";
 import { useAuth } from "../auth";
 import { BotaoAcao, Campo, Estado, Gaveta, useApi } from "../componentes";
 import Icone from "../icones";
+import Telefone from "../Telefone";
 import { erroEmail, erroTelefone, nomeProprio, telefone } from "../mascaras";
 
 const PAPEIS = [
@@ -201,7 +202,7 @@ export default function Usuarios() {
                     </td>
                     <td className="mono">{u.username}</td>
                     <td><span className={`papelTag ${u.papel}`}>{u.papel_display || ROTULO[u.papel] || u.papel}</span></td>
-                    <td>{u.telefone || "—"}{u.email && <div className="sub2">{u.email}</div>}</td>
+                    <td>{u.telefone ? <Telefone numero={u.telefone} /> : "—"}{u.email && <div className="sub2">{u.email}</div>}</td>
                     <td>{u.last_login ? dataHora(u.last_login) : <span style={{ color: "var(--muted)" }}>nunca entrou</span>}</td>
                     <td>{u.is_active ? <span className="tag t-finalizada">Ativo</span> : <span className="tag t-perdido">Inativo</span>}</td>
                   </tr>

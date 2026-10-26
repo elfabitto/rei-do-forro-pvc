@@ -2,6 +2,7 @@ import { useState } from "react";
 import { api } from "../api";
 import { BotaoAcao, Campo, Estado, Gaveta, linhas, useApi } from "../componentes";
 import Icone from "../icones";
+import Telefone from "../Telefone";
 import {
   CLIENTE_VAZIO, CamposCliente, CamposEndereco, ENDERECO_VAZIO,
   corpoCliente, corpoEndereco, errosDaApi, paramsBusca, validarCliente, validarEndereco,
@@ -162,7 +163,7 @@ export default function Clientes() {
                       <td>
                         <b>{c.nome}</b>
                       </td>
-                      <td>{c.telefone}</td>
+                      <td><Telefone numero={c.telefone} /></td>
                       <td>
                         {e ? `${e.logradouro}${e.numero ? ", " + e.numero : ""}` :
                           <span style={{ color: "var(--muted)" }}>sem endereço</span>}

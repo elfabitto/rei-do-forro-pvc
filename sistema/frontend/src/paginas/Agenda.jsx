@@ -16,6 +16,7 @@ import { api } from "../api";
 import { useAuth } from "../auth";
 import { BotaoAcao, Campo, Estado, Modal, linhas, useApi } from "../componentes";
 import Icone from "../icones";
+import Telefone from "../Telefone";
 import OrdemDetalhe from "./OrdemDetalhe";
 
 const DIAS = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
@@ -347,7 +348,7 @@ export default function Agenda() {
                 <div className="rodape">
                   <span>{e.os_numero}</span>
                   {e.tipo === "instalacao" && e.dias > 0 && <span>{textoDias(e.dias)} de serviço</span>}
-                  {e.cliente_telefone && <span>{e.cliente_telefone}</span>}
+                  {e.cliente_telefone && <Telefone numero={e.cliente_telefone} dentroDeBotao />}
                 </div>
               </button>
             ))}

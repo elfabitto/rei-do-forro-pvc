@@ -12,6 +12,7 @@ import {
   BotaoAcao, Confirmacao, Estado, Etiqueta, Gaveta, Pilula, Selecao, linhas, useApi,
 } from "../componentes";
 import Icone from "../icones";
+import Telefone from "../Telefone";
 import {
   baixarImagemOS, compartilharOS, copiarImagemOS, itensExtras, montarOS, pecasDoPedido,
 } from "../osDoc";
@@ -167,7 +168,7 @@ export default function OrdemDetalhe({ id, aoFechar, aoMudar }) {
                 <h4>Cliente e obra</h4>
                 <dl className="kv">
                   <dt>Cliente</dt><dd>{os.cliente_detalhe?.nome}</dd>
-                  <dt>Telefone</dt><dd className="wk">{os.cliente_detalhe?.telefone}</dd>
+                  <dt>Telefone</dt><dd className="wk"><Telefone numero={os.cliente_detalhe?.telefone} /></dd>
                   <dt>Endereço</dt>
                   <dd className="wk">
                     {os.endereco_detalhe?.logradouro}
