@@ -25,9 +25,13 @@ const REGRAS = [
   [/sanca/, "sanca_8cm"],
   [/moldura/, "moldura_4cm"],
   [/perfil/, "perfil"],
+  // estruturas do Instalado (ripão)
+  [/cutiuba/, "cutiuba"],
+  [/cupiuba/, "cupiuba"],
+  [/plastilon|pastilon/, "plastilon"],
 ];
 
-/** Foto do item pelo nome (forro, acabamento ou material); null se não houver. */
+/** Foto do item pelo nome (forro, acabamento, estrutura ou material); null se não houver. */
 export function imagemDe(nome) {
   const t = sem(nome);
   const regra = REGRAS.find(([re]) => re.test(t));

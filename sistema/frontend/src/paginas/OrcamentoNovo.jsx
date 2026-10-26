@@ -433,6 +433,7 @@ export default function OrcamentoNovo() {
                       <label key={e.id} className={`opt${String(estrutura?.id) === String(e.id) ? " on" : ""}`}>
                         <input type="radio" name="estr" checked={String(estrutura?.id) === String(e.id)}
                                onChange={() => alterou(setEstruturaId)(String(e.id))} />
+                        <Miniatura nome={e.nome} tamanho={58} className="acab" />
                         <span className="t">{e.nome}</span>
                         <span className={`v${Number(e.acrescimo_m2) ? "" : " z"}`}>
                           {Number(e.acrescimo_m2) ? `+ R$ ${brl(e.acrescimo_m2)}/m²` : "Incluso"}
