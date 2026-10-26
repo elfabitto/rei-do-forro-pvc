@@ -73,6 +73,32 @@ class OrcamentoApiTest(ApiBase):
         # vendedor é o próprio usuário logado
         self.assertEqual(r.data["vendedor"], self.vendedor.id)
 
+    def test_estrutura_soma_no_m2_do_instalado(self):
+        from apps.catalogo.models import Estrutura
+
+        padrao = Estrutura.objects.get(nome="Ripão Cutiuba (padrão)")   # cadastrada pela migration
+        cupiuba = Estrutura.objects.get(nome="Ripão Cupiuba")
+        self.assertEqual((padrao.acrescimo_m2, cupiuba.acrescimo_m2), (D("0.00"), D("5.00")))
+        self.assertEqual(Estrutura.objects.get(nome="Plastilon").acrescimo_m2, D("15.00"))
+
+        self.client.force_authenticate(self.vendedor)
+        base = {"cliente": self.cliente.id, "tipo": "instalado", "area_m2": "23",
+                "forro": self.forro.id, "acabamento": self.sanca.id}
+        r = self.client.post("/api/orcamentos/", {**base, "estrutura": padrao.id}, format="json")
+        self.assertEqual(r.data["total_vista"], "1656.00")              # padrão: preço de sempre
+        r = self.client.post("/api/orcamentos/", {**base, "estrutura": cupiuba.id}, format="json")
+        self.assertEqual(r.status_code, 201, r.data)
+        self.assertEqual(r.data["preco_m2_vista"], "77.00")             # 64 + 8 sanca + 5 cupiuba
+        self.assertEqual((r.data["total_vista"], r.data["total_cartao"]), ("1771.00", "1886.00"))
+        self.assertEqual(r.data["estrutura_nome"], "Ripão Cupiuba")
+
+        r = self.client.post("/api/orcamentos/", {
+            "cliente": self.cliente.id, "tipo": "material", "area_m2": "23", "forro": self.forro.id,
+            "estrutura": cupiuba.id,
+        }, format="json")
+        self.assertEqual(r.status_code, 400)   # no Material o ripão é peça
+        self.assertIn("estrutura", r.data)
+
     def test_desconto_abate_dos_dois_totais_e_vai_para_a_os(self):
         self.client.force_authenticate(self.vendedor)
         r = self.client.post("/api/orcamentos/", {

@@ -2,8 +2,8 @@ from rest_framework import viewsets
 
 from apps.core.permissions import LeituraOuDiretor
 
-from .models import Acabamento, Forro, Material
-from .serializers import AcabamentoSerializer, ForroSerializer, MaterialSerializer
+from .models import Acabamento, Estrutura, Forro, Material
+from .serializers import AcabamentoSerializer, EstruturaSerializer, ForroSerializer, MaterialSerializer
 
 
 class ForroViewSet(viewsets.ModelViewSet):
@@ -23,5 +23,12 @@ class MaterialViewSet(viewsets.ModelViewSet):
 class AcabamentoViewSet(viewsets.ModelViewSet):
     queryset = Acabamento.objects.all()
     serializer_class = AcabamentoSerializer
+    permission_classes = [LeituraOuDiretor]
+    filterset_fields = ["ativo"]
+
+
+class EstruturaViewSet(viewsets.ModelViewSet):
+    queryset = Estrutura.objects.all()
+    serializer_class = EstruturaSerializer
     permission_classes = [LeituraOuDiretor]
     filterset_fields = ["ativo"]

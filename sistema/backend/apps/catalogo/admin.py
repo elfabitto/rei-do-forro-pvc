@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Acabamento, Forro, Material
+from .models import Acabamento, Estrutura, Forro, Material
 
 
 @admin.register(Forro)
@@ -22,5 +22,11 @@ class MaterialAdmin(admin.ModelAdmin):
 
 @admin.register(Acabamento)
 class AcabamentoAdmin(admin.ModelAdmin):
+    list_display = ["nome", "acrescimo_m2", "ativo"]
+    list_editable = ["acrescimo_m2", "ativo"]
+
+
+@admin.register(Estrutura)
+class EstruturaAdmin(admin.ModelAdmin):
     list_display = ["nome", "acrescimo_m2", "ativo"]
     list_editable = ["acrescimo_m2", "ativo"]

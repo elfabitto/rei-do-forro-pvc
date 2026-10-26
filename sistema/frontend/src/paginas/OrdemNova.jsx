@@ -266,6 +266,10 @@ export default function OrdemNova() {
                   <span className="v">{comInstalacao ? "Instalação Completa" : "Fornecimento de Material"}</span></div>
                 <div className="row"><span className="k">Área</span><span className="v">{num(orc.area_m2)} m²</span></div>
                 <div className="row"><span className="k">Forro</span><span className="v">{orc.forro_nome}</span></div>
+                {orc.estrutura_nome && (
+                  <div className="row"><span className="k">Estrutura</span>
+                    <span className="v">{orc.estrutura_nome}</span></div>
+                )}
                 {orc.acabamento_nome && (
                   <div className="row"><span className="k">Acabamento</span>
                     <span className="v">{orc.acabamento_nome}</span></div>

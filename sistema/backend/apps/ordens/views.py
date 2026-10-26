@@ -60,7 +60,7 @@ class OrdemServicoViewSet(viewsets.ModelViewSet):
     """
 
     queryset = OrdemServico.objects.select_related(
-        "cliente", "endereco", "vendedor", "orcamento__forro", "orcamento__acabamento", "criado_por"
+        "cliente", "endereco", "vendedor", "orcamento__forro", "orcamento__acabamento", "orcamento__estrutura", "criado_por"
     ).prefetch_related("agendamentos", "pagamentos", "historico__usuario", "orcamento__itens")
     permission_classes = [DonoOuSuperior]
     filterset_fields = ["status", "vendedor", "cliente", "tipo"]

@@ -42,6 +42,7 @@ export default function Catalogo() {
   const forros = useApi("/forros/");
   const materiais = useApi("/materiais/");
   const acabamentos = useApi("/acabamentos/");
+  const estruturas = useApi("/estruturas/");
 
   return (
     <div className="pagina">
@@ -168,6 +169,35 @@ export default function Catalogo() {
           <p className="obs">
             No orçamento de Material não há acabamento por m² — perfil, moldura e sanca
             entram como peças, por unidade.
+          </p>
+        </div>
+
+        <div className="card">
+          <header>
+            <h2>Estruturas (ripão)</h2>
+            <span className="hint">só no orçamento Instalado</span>
+          </header>
+          <Estado carregando={estruturas.carregando} erro={estruturas.erro}>
+            <div className="tw">
+              <table>
+                <thead><tr><th>Estrutura</th><th className="num">Acréscimo por m²</th></tr></thead>
+                <tbody>
+                  {linhas(estruturas.dados).map((e) => (
+                    <tr key={e.id}>
+                      <td><b>{e.nome}</b></td>
+                      <td className="num">
+                        <Preco registro={e} campo="acrescimo_m2" recurso="estruturas"
+                               editavel={editavel} aoSalvar={estruturas.recarregar} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Estado>
+          <p className="obs">
+            A padrão (acréscimo zero) já está no preço do m². No orçamento de Material o ripão
+            continua entrando como peça, por dúzia.
           </p>
         </div>
       </div>

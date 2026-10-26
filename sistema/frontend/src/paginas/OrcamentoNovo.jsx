@@ -1,6 +1,6 @@
 /**
  * Gerador de orçamento — mesma estrutura do gerador estático em docs/:
- * medida → tipo de forro → tipo de orçamento → acabamento (Instalado) ou materiais (Material).
+ * medida → tipo de forro → tipo de orçamento → acabamento e estrutura (Instalado) ou materiais (Material).
  *
  * A diferença é que aqui o catálogo vem da API e o orçamento é salvo, podendo
  * virar Ordem de Serviço. Enviar ao cliente só aparece depois de gravar: o que
@@ -47,6 +47,7 @@ export default function OrcamentoNovo() {
   const forros = useApi("/forros/", { ativo: true });
   const materiais = useApi("/materiais/", { ativo: true });
   const acabamentos = useApi("/acabamentos/", { ativo: true });
+  const estruturas = useApi("/estruturas/", { ativo: true });
   const original = useApi(editando ? `/orcamentos/${id}/` : null, null, [id]);
 
   // 1. medida
@@ -61,6 +62,7 @@ export default function OrcamentoNovo() {
   const [forroId, setForroId] = useState("");
   const [tipo, setTipo] = useState("");
   const [acabamentoId, setAcabamentoId] = useState("");
+  const [estruturaId, setEstruturaId] = useState("");
   const [quantidades, setQuantidades] = useState({});
   // serviço, só no orçamento de Material: o sistema sugere área × R$ 25,00/m²,
   // mas o total é negociado. Campo vazio = usa o sugerido (e acompanha a área).
@@ -83,6 +85,7 @@ export default function OrcamentoNovo() {
   const listaForros = linhas(forros.dados);
   const listaMateriais = linhas(materiais.dados);
   const listaAcabamentos = linhas(acabamentos.dados);
+  const listaEstruturas = linhas(estruturas.dados);
 
   /* preenche os campos com o orçamento que está sendo editado */
   useEffect(() => {
@@ -91,6 +94,7 @@ export default function OrcamentoNovo() {
     setTipo(o.tipo);
     setForroId(String(o.forro));
     setAcabamentoId(o.acabamento ? String(o.acabamento) : "");
+    setEstruturaId(o.estrutura ? String(o.estrutura) : "");
     setObservacoes(o.observacoes ?? "");
     setDesconto(Number(o.desconto) > 0 ? String(Number(o.desconto)).replace(".", ",") : "");
     if (o.tamanho_folha && o.quantidade_folhas) {
@@ -138,6 +142,10 @@ export default function OrcamentoNovo() {
 
   const forro = listaForros.find((f) => String(f.id) === String(forroId));
   const acabamento = listaAcabamentos.find((a) => String(a.id) === String(acabamentoId));
+  // orçamento antigo sem estrutura = a padrão (acréscimo zero), como no backend
+  const estruturaPadrao = listaEstruturas.find((e) => Number(e.acrescimo_m2) === 0);
+  const estrutura = listaEstruturas.find((e) => String(e.id) === String(estruturaId))
+    ?? (tipo === "instalado" ? estruturaPadrao : undefined);
 
   // itens escolhidos no cardápio (quantidade > 0)
   const itens = useMemo(
@@ -158,7 +166,8 @@ export default function OrcamentoNovo() {
     setTipo(t);
     setSalvo(null);
     if (t === "instalado" && !acabamentoId && acabamentoPadrao) setAcabamentoId(String(acabamentoPadrao.id));
-    if (t === "material") setAcabamentoId("");
+    if (t === "instalado" && !estruturaId && estruturaPadrao) setEstruturaId(String(estruturaPadrao.id));
+    if (t === "material") { setAcabamentoId(""); setEstruturaId(""); }
   }
 
   // só entram no documento os "Outros" que já têm descrição e valor
@@ -172,7 +181,7 @@ export default function OrcamentoNovo() {
   const valorDesconto = paraNumero(desconto);
   const completo = areaFinal > 0 && forro && tipo && (tipo === "material" || acabamento);
   const doc = completo
-    ? montarDocumento({ tipo, area: areaFinal, forro, acabamento, itens, extras: extrasValidos,
+    ? montarDocumento({ tipo, area: areaFinal, forro, acabamento, estrutura, itens, extras: extrasValidos,
                         servico: valorServico, desconto: valorDesconto })
     : null;
   const descontoDemais = doc && valorDesconto > (doc.subtotalVista ?? doc.totalVista);
@@ -188,6 +197,7 @@ export default function OrcamentoNovo() {
       quantidade_folhas: modo === "folhas" ? folhas : null,
       forro: forro.id,
       acabamento: tipo === "instalado" ? acabamento.id : null,
+      estrutura: tipo === "instalado" && estrutura ? estrutura.id : null,
       observacoes,
       desconto: valorDesconto.toFixed(2),
       // só na criação: liga o orçamento à visita e traz o cliente dela
@@ -307,7 +317,7 @@ export default function OrcamentoNovo() {
       )}
 
       <Estado carregando={forros.carregando || original.carregando || visita.carregando}
-              erro={forros.erro || materiais.erro || acabamentos.erro || original.erro || visita.erro}>
+              erro={forros.erro || materiais.erro || acabamentos.erro || estruturas.erro || original.erro || visita.erro}>
         <div className="cols c-2">
           {/* ------------------------------------------------ entrada */}
           <section className="card">
@@ -415,6 +425,24 @@ export default function OrcamentoNovo() {
                 </div>
               )}
 
+              {tipo === "instalado" && listaEstruturas.length > 0 && (
+                <div className="step">
+                  {passo(5, "Estrutura")}
+                  <div className="opts">
+                    {listaEstruturas.map((e) => (
+                      <label key={e.id} className={`opt${String(estrutura?.id) === String(e.id) ? " on" : ""}`}>
+                        <input type="radio" name="estr" checked={String(estrutura?.id) === String(e.id)}
+                               onChange={() => alterou(setEstruturaId)(String(e.id))} />
+                        <span className="t">{e.nome}</span>
+                        <span className={`v${Number(e.acrescimo_m2) ? "" : " z"}`}>
+                          {Number(e.acrescimo_m2) ? `+ R$ ${brl(e.acrescimo_m2)}/m²` : "Incluso"}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {tipo === "material" && (
                 <div className="step">
                   {passo(4, "Materiais")}
@@ -483,7 +511,7 @@ export default function OrcamentoNovo() {
 
               {tipo && (
                 <div className="step">
-                  {passo(5, "Outros")}
+                  {passo(tipo === "instalado" ? 6 : 5, "Outros")}
                   <p className="nota" style={{ marginTop: 0 }}>
                     Para o que não está na tabela: taxa de deslocamento, retirada de forro
                     antigo, andaime. Entra no total dos dois tipos de orçamento.
@@ -511,7 +539,7 @@ export default function OrcamentoNovo() {
 
               {tipo && (
                 <div className="step">
-                  {passo(6, "Desconto")}
+                  {passo(tipo === "instalado" ? 7 : 6, "Desconto")}
                   <Campo rotulo="Desconto (R$)" erro={descontoDemais ? "Maior que o valor à vista do orçamento." : ""}
                          dica={doc && valorDesconto > 0
                            ? `Abate dos dois totais: à vista R$ ${brl(doc.subtotalVista)} → R$ ${brl(doc.totalVista)}.`
@@ -526,7 +554,7 @@ export default function OrcamentoNovo() {
               )}
 
               <div className="step">
-                {passo(tipo ? 7 : 6, "Observações")}
+                {passo(tipo === "instalado" ? 8 : tipo ? 7 : 6, "Observações")}
                 <Campo rotulo="Observações"
                        dica={v ? `Cliente da visita: ${v.cliente_detalhe?.nome}.`
                          : "Os dados do cliente são pedidos só na hora de fechar o negócio."}>

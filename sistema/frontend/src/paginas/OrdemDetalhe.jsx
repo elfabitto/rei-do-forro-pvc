@@ -195,6 +195,9 @@ export default function OrdemDetalhe({ id, aoFechar, aoMudar }) {
                       {orc.acabamento_nome && (
                         <><dt>Acabamento</dt><dd className="wk">{orc.acabamento_nome}</dd></>
                       )}
+                      {orc.estrutura_nome && (
+                        <><dt>Estrutura</dt><dd className="wk">{orc.estrutura_nome}</dd></>
+                      )}
                       {ripao && <><dt>Ripão</dt><dd className="wk">{ripao}</dd></>}
                       {extras.map((e) => (
                         <Fragment key={e.id}>

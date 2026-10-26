@@ -39,6 +39,10 @@ class Orcamento(models.Model):
     area_m2 = models.DecimalField("área (m²)", max_digits=9, decimal_places=2, validators=[MinValueValidator(Decimal("0.01"))])
 
     forro = models.ForeignKey("catalogo.Forro", on_delete=models.PROTECT, related_name="orcamentos")
+    # estrutura (ripão) do Instalado; vazio = a padrão, sem acréscimo (orçamentos antigos)
+    estrutura = models.ForeignKey(
+        "catalogo.Estrutura", on_delete=models.PROTECT, related_name="orcamentos", null=True, blank=True,
+    )
     acabamento = models.ForeignKey(
         "catalogo.Acabamento",
         on_delete=models.PROTECT,
@@ -97,11 +101,12 @@ class Orcamento(models.Model):
 
     # ------------------------------------------------------------------ cálculo
     def precos_vigentes(self):
-        """Preço do m² a aplicar, já com o acréscimo do acabamento quando Instalado."""
+        """Preço do m² a aplicar, já com os acréscimos de acabamento e estrutura quando Instalado."""
         vista = self.forro.preco_m2(self.tipo, "vista")
         cartao = self.forro.preco_m2(self.tipo, "cartao")
-        if self.tipo == TipoOrcamento.INSTALADO and self.acabamento_id:
-            acrescimo = self.acabamento.acrescimo_m2
+        if self.tipo == TipoOrcamento.INSTALADO:
+            acrescimo = (self.acabamento.acrescimo_m2 if self.acabamento_id else 0) \
+                + (self.estrutura.acrescimo_m2 if self.estrutura_id else 0)
             vista += acrescimo
             cartao += acrescimo
         return vista, cartao
@@ -114,6 +119,7 @@ class Orcamento(models.Model):
         """
         if self.tipo == TipoOrcamento.MATERIAL:
             self.acabamento = None
+            self.estrutura = None   # no Material o ripão entra como peça, por dúzia
 
         self.preco_m2_vista, self.preco_m2_cartao = self.precos_vigentes()
         self.taxa_logistica = (

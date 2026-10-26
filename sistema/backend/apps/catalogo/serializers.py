@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import Acabamento, Forro, Material
+from .models import Acabamento, Estrutura, Forro, Material
 
 
 class ForroSerializer(serializers.ModelSerializer):
@@ -20,4 +20,10 @@ class MaterialSerializer(serializers.ModelSerializer):
 class AcabamentoSerializer(serializers.ModelSerializer):
     class Meta:
         model = Acabamento
+        fields = "__all__"
+
+
+class EstruturaSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Estrutura
         fields = "__all__"

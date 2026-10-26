@@ -21,9 +21,11 @@ const FILTROS = [
 function VerOrcamento({ orcamento, aoFechar }) {
   const forros = useApi("/forros/");
   const acabamentos = useApi("/acabamentos/");
+  const estruturas = useApi("/estruturas/");
 
   const forro = linhas(forros.dados).find((f) => f.id === orcamento.forro);
   const acabamento = linhas(acabamentos.dados).find((a) => a.id === orcamento.acabamento);
+  const estrutura = linhas(estruturas.dados).find((e) => e.id === orcamento.estrutura);
 
   // os itens gravados voltam separados: material de catálogo de um lado,
   // "Outro" (verba) do outro — é como o documento os apresenta
@@ -33,6 +35,8 @@ function VerOrcamento({ orcamento, aoFechar }) {
     area: Number(orcamento.area_m2),
     forro,
     acabamento,
+    estrutura,
+    desconto: Number(orcamento.desconto ?? 0),   // reenviar sai com o mesmo desconto do salvo
     itens: gravados.filter((i) => i.unidade !== VERBA && !ehServico(i)).map((i) => ({
       rotulo: i.descricao,
       unidade: i.unidade,
@@ -120,6 +124,13 @@ function CardOrcamento({ o, aoVer, aoGerarOS, aoPerder, aoReabrir, aoEditar }) {
             <span className="rot">Forro</span>
             <span className="val">{o.forro_nome}</span>
           </div>
+          {o.estrutura_nome && (
+            <div className="li">
+              <Icone nome="precos" tamanho={15} />
+              <span className="rot">Estrutura</span>
+              <span className="val">{o.estrutura_nome}</span>
+            </div>
+          )}
           {o.acabamento_nome && (
             <div className="li">
               <Icone nome="precos" tamanho={15} />

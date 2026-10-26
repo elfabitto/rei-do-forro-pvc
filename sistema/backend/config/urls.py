@@ -3,7 +3,7 @@ from django.urls import include, path, re_path
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
-from apps.catalogo.views import AcabamentoViewSet, ForroViewSet, MaterialViewSet
+from apps.catalogo.views import AcabamentoViewSet, EstruturaViewSet, ForroViewSet, MaterialViewSet
 from apps.clientes.views import ClienteViewSet, EnderecoViewSet
 from apps.comunicacao.views import (
     ChamadoViewSet, ler_notificacao, ler_todas, notificacoes, preferencias, push_assinar, push_cancelar,
@@ -34,6 +34,7 @@ router.register("enderecos", EnderecoViewSet)
 router.register("forros", ForroViewSet)
 router.register("materiais", MaterialViewSet)
 router.register("acabamentos", AcabamentoViewSet)
+router.register("estruturas", EstruturaViewSet)
 router.register("orcamentos", OrcamentoViewSet)
 router.register("ordens-servico", OrdemServicoViewSet)
 router.register("agendamentos", AgendamentoViewSet)

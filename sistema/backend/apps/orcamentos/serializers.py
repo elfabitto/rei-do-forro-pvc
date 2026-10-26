@@ -23,13 +23,14 @@ class OrcamentoResumoSerializer(serializers.ModelSerializer):
     tipo_display = serializers.CharField(source="get_tipo_display", read_only=True)
     forro_nome = serializers.CharField(source="forro.nome", read_only=True)
     acabamento_nome = serializers.CharField(source="acabamento.nome", read_only=True, default=None)
+    estrutura_nome = serializers.CharField(source="estrutura.nome", read_only=True, default=None)
     itens = OrcamentoItemSerializer(many=True, read_only=True)
 
     class Meta:
         model = Orcamento
         fields = ["id", "numero", "tipo", "tipo_display", "area_m2", "largura", "comprimento",
                   "tamanho_folha", "quantidade_folhas",
-                  "forro_nome", "acabamento_nome", "preco_m2_vista", "preco_m2_cartao",
+                  "forro_nome", "acabamento_nome", "estrutura_nome", "preco_m2_vista", "preco_m2_cartao",
                   "taxa_logistica", "desconto", "total_vista", "total_cartao", "observacoes", "itens"]
 
 
@@ -46,6 +47,7 @@ class OrcamentoSerializer(serializers.ModelSerializer):
     cliente_detalhe = ClienteResumoSerializer(source="cliente", read_only=True)
     forro_nome = serializers.CharField(source="forro.nome", read_only=True)
     acabamento_nome = serializers.CharField(source="acabamento.nome", read_only=True, default=None)
+    estrutura_nome = serializers.CharField(source="estrutura.nome", read_only=True, default=None)
     vendedor_nome = serializers.CharField(source="vendedor.get_full_name", read_only=True)
     status_display = serializers.CharField(source="get_status_display", read_only=True)
     tipo_display = serializers.CharField(source="get_tipo_display", read_only=True)
@@ -62,7 +64,7 @@ class OrcamentoSerializer(serializers.ModelSerializer):
                   "visita", "visita_numero",
                   "largura", "comprimento", "tamanho_folha", "quantidade_folhas",
                   "area_m2", "forro", "forro_nome",
-                  "acabamento", "acabamento_nome", "preco_m2_vista", "preco_m2_cartao",
+                  "acabamento", "acabamento_nome", "estrutura", "estrutura_nome", "preco_m2_vista", "preco_m2_cartao",
                   "taxa_logistica", "desconto", "total_vista", "total_cartao", "status", "status_display",
                   "validade_dias",
                   "observacoes", "vendedor", "vendedor_nome", "criado_por", "criado_em",
@@ -95,6 +97,11 @@ class OrcamentoSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         tipo = attrs.get("tipo", getattr(self.instance, "tipo", None))
+        if tipo == TipoOrcamento.MATERIAL and attrs.get("estrutura"):
+            raise serializers.ValidationError(
+                {"estrutura": "A estrutura por m² só existe no orçamento Instalado; "
+                              "no Material o ripão entra como peça."}
+            )
         if tipo == TipoOrcamento.MATERIAL and attrs.get("acabamento"):
             raise serializers.ValidationError(
                 {"acabamento": "Acabamento só existe no orçamento Instalado; "

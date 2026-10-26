@@ -7,7 +7,7 @@ from decimal import Decimal
 
 from django.core.management.base import BaseCommand
 
-from apps.catalogo.models import Acabamento, Forro, Material
+from apps.catalogo.models import Acabamento, Estrutura, Forro, Material
 
 D = Decimal
 
@@ -45,6 +45,13 @@ ACABAMENTOS = [
     ("Acabamento normal (Perfil)", "0.00"),
     ("Moldura (4 cm)", "4.00"),
     ("Sanca (8 cm)", "8.00"),
+]
+
+# estrutura do forro no Instalado: a padrão já está no preço do m²
+ESTRUTURAS = [
+    ("Ripão Cutiuba (padrão)", "0.00"),
+    ("Ripão Cupiuba", "5.00"),
+    ("Plastilon", "15.00"),
 ]
 
 
@@ -88,3 +95,9 @@ class Command(BaseCommand):
                 nome=nome, defaults={"acrescimo_m2": D(acr), "ordem": i, "ativo": True}
             )
         self.stdout.write(self.style.SUCCESS(f"{len(ACABAMENTOS)} acabamentos"))
+
+        for i, (nome, acr) in enumerate(ESTRUTURAS):
+            Estrutura.objects.update_or_create(
+                nome=nome, defaults={"acrescimo_m2": D(acr), "ordem": i, "ativo": True}
+            )
+        self.stdout.write(self.style.SUCCESS(f"{len(ESTRUTURAS)} estruturas"))

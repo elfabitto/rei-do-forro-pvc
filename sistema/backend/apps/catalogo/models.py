@@ -87,3 +87,24 @@ class Acabamento(models.Model):
         if self.acrescimo_m2:
             return f"{self.nome} (+ R$ {self.acrescimo_m2}/m²)"
         return self.nome
+
+
+class Estrutura(models.Model):
+    """
+    Estrutura que segura o forro (ripão), no orçamento Instalado — como o
+    acabamento: a padrão vem com acréscimo zero (já inclusa no preço do m²) e
+    as outras somam um valor por m².
+    """
+
+    nome = models.CharField(max_length=60, unique=True)
+    acrescimo_m2 = models.DecimalField("acréscimo por m²", max_digits=7, decimal_places=2, default=Decimal("0"))
+    ordem = models.PositiveSmallIntegerField(default=0)
+    ativo = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["ordem", "nome"]
+
+    def __str__(self):
+        if self.acrescimo_m2:
+            return f"{self.nome} (+ R$ {self.acrescimo_m2}/m²)"
+        return self.nome

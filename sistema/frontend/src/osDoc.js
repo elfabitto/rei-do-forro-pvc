@@ -87,6 +87,7 @@ export function montarOS(os, { verFinanceiro = true } = {}) {
     }
     d.pedido.push(["Forro", orc.forro_nome ?? "—"]);
     if (orc.acabamento_nome) d.pedido.push(["Acabamento", orc.acabamento_nome]);
+    if (orc.estrutura_nome) d.pedido.push(["Estrutura", orc.estrutura_nome]);
     const ripao = resumoRipao(orc.itens);
     if (ripao) d.pedido.push(["Ripão", ripao]);
     const servico = orc.itens?.find(ehServico);

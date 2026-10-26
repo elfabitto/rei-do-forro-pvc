@@ -53,8 +53,9 @@ export const descricaoItem = (i) =>
  * fechado do serviço, só no orçamento de Material (0 = sem serviço). `desconto`
  * é em R$ e abate dos dois totais — a mesma conta do backend.
  */
-export function montarDocumento({ tipo, area, forro, acabamento, itens = [], extras = [], servico = 0, desconto = 0 }) {
-  const doc = montarSemDesconto({ tipo, area, forro, acabamento, itens, extras, servico });
+export function montarDocumento({ tipo, area, forro, acabamento, estrutura, itens = [], extras = [], servico = 0,
+                                  desconto = 0 }) {
+  const doc = montarSemDesconto({ tipo, area, forro, acabamento, estrutura, itens, extras, servico });
   const d = cent(desconto);
   if (d > 0) {
     doc.desconto = d;
@@ -70,14 +71,17 @@ export function montarDocumento({ tipo, area, forro, acabamento, itens = [], ext
   return doc;
 }
 
-function montarSemDesconto({ tipo, area, forro, acabamento, itens, extras, servico }) {
+function montarSemDesconto({ tipo, area, forro, acabamento, estrutura, itens, extras, servico }) {
   const instalado = tipo === "instalado";
   const somaExtras = extras.reduce((s, e) => s + cent(e.valor), 0);
   const linhasExtras = extras.map((e) => [e.descricao, `R$ ${brl(cent(e.valor))}`]);
 
   const precoVista = Number(instalado ? forro.preco_instalado_vista : forro.preco_material_vista);
   const precoCartao = Number(instalado ? forro.preco_instalado_cartao : forro.preco_material_cartao);
-  const acrescimo = instalado && acabamento ? Number(acabamento.acrescimo_m2) : 0;
+  // no Instalado o m² leva os acréscimos do acabamento e da estrutura (ripão)
+  const acrescimo = instalado
+    ? Number(acabamento?.acrescimo_m2 ?? 0) + Number(estrutura?.acrescimo_m2 ?? 0)
+    : 0;
 
   const m2Vista = precoVista + acrescimo;
   const m2Cartao = precoCartao + acrescimo;
@@ -94,6 +98,7 @@ function montarSemDesconto({ tipo, area, forro, acabamento, itens, extras, servi
 
   doc.resumo = [["Área", `${m2(area)} m²`], ["Forro", forro.nome]];
   if (instalado && acabamento) doc.resumo.push(["Acabamento", acabamento.nome]);
+  if (instalado && estrutura) doc.resumo.push(["Estrutura", estrutura.nome]);
 
   if (instalado) {
     const taxa = taxaLogistica(tipo, area);
@@ -129,7 +134,7 @@ function montarSemDesconto({ tipo, area, forro, acabamento, itens, extras, servi
 ----------
 *Área:* ${m2(area)}m²
 *Forro:* ${forro.nome}
-*Acabamento:* ${acabamento?.nome ?? "—"}
+*Acabamento:* ${acabamento?.nome ?? "—"}${estrutura ? `\n*Estrutura:* ${estrutura.nome}` : ""}
 
 *INSTALAÇÃO COMPLETA*
 _valor do metro quadrado_
