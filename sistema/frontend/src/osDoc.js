@@ -31,6 +31,13 @@ export function resumoRipao(itens = []) {
     .join(" · ");
 }
 
+/** Plastilon lançado no orçamento de Material (por unidade), para a ficha do pedido. */
+export function resumoPlastilon(itens = []) {
+  const q = itens.filter((i) => /pl?astilon/i.test(i.descricao ?? ""))
+    .reduce((s, i) => s + Number(i.quantidade || 0), 0);
+  return q ? quantidadeTexto(q, "und") : "";
+}
+
 /** Itens "Outro" do orçamento: descrição e valor fechado. */
 export const itensExtras = (itens = []) => itens.filter((i) => i.unidade === VERBA);
 
@@ -90,6 +97,8 @@ export function montarOS(os, { verFinanceiro = true } = {}) {
     if (orc.estrutura_nome) d.pedido.push(["Estrutura", orc.estrutura_nome]);
     const ripao = resumoRipao(orc.itens);
     if (ripao) d.pedido.push(["Ripão", ripao]);
+    const plastilon = resumoPlastilon(orc.itens);
+    if (plastilon) d.pedido.push(["Plastilon", plastilon]);
     const servico = orc.itens?.find(ehServico);
     if (servico) d.pedido.push(["Serviço", `${m2(orc.area_m2)} m² — R$ ${brl(servico.total)}`]);
     if (Number(orc.taxa_logistica) > 0) {

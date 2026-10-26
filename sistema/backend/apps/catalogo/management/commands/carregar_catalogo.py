@@ -35,6 +35,7 @@ MATERIAIS = [
     ("Perfil 6 m",   "Perfil 6 m",          "",           "und",   D("25.00"),  None,    D("1.00")),
     ("Moldura 6 m",  "Moldura 6 m",         "",           "und",   D("40.00"),  None,    D("1.00")),
     ("Sanca 6 m",    "Sanca 6 m",           "",           "und",   D("50.00"),  None,    D("1.00")),
+    ("Plastilon",    "Plastilon",           "",           "und",   D("27.00"),  None,    D("0")),
     ("Cutiuba",      "Ripão 4 m Cutiuba",   "Ripão 4 m",  "dúzia", D("150.00"), None,    D("5.00")),
     ("Cupiuba",      "Ripão 4 m Cupiuba",   "Ripão 4 m",  "dúzia", D("180.00"), None,    D("5.00")),
     ("Prego 2 × 12", "Prego 2 × 12",        "Pregos",     "kg",    D("30.00"),  None,    D("0")),

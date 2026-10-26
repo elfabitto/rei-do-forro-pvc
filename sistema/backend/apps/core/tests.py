@@ -99,6 +99,21 @@ class OrcamentoApiTest(ApiBase):
         self.assertEqual(r.status_code, 400)   # no Material o ripão é peça
         self.assertIn("estrutura", r.data)
 
+    def test_plastilon_no_material_por_unidade(self):
+        from apps.catalogo.models import Material
+
+        plastilon = Material.objects.get(rotulo="Plastilon")   # cadastrado pela migration
+        self.assertEqual((plastilon.unidade, plastilon.preco), ("und", D("27.0000")))
+
+        self.client.force_authenticate(self.vendedor)
+        r = self.client.post("/api/orcamentos/", {
+            "cliente": self.cliente.id, "tipo": "material", "area_m2": "23", "forro": self.forro.id,
+            "itens": [{"material": plastilon.id, "descricao": "Plastilon", "unidade": "und",
+                       "quantidade": "10", "preco_unitario": "27.00"}],
+        }, format="json")
+        self.assertEqual(r.status_code, 201, r.data)
+        self.assertEqual(r.data["total_vista"], "1047.40")   # 23 × 33,80 = 777,40 + 10 × 27,00
+
     def test_desconto_abate_dos_dois_totais_e_vai_para_a_os(self):
         self.client.force_authenticate(self.vendedor)
         r = self.client.post("/api/orcamentos/", {

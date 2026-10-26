@@ -13,7 +13,7 @@ import {
 } from "../componentes";
 import Icone from "../icones";
 import {
-  baixarImagemOS, compartilharOS, copiarImagemOS, itensExtras, montarOS, resumoRipao,
+  baixarImagemOS, compartilharOS, copiarImagemOS, itensExtras, montarOS, resumoPlastilon, resumoRipao,
 } from "../osDoc";
 import FinalizarModal from "./FinalizarModal";
 import ReciboModal from "./ReciboModal";
@@ -80,6 +80,7 @@ export default function OrdemDetalhe({ id, aoFechar, aoMudar }) {
   const doc = os && montarOS(os, { verFinanceiro: pode("verFinanceiro") });
   const orc = os?.orcamento_detalhe;
   const ripao = orc ? resumoRipao(orc.itens) : "";
+  const plastilon = orc ? resumoPlastilon(orc.itens) : "";
   const extras = orc ? itensExtras(orc.itens) : [];
 
   return (
@@ -199,6 +200,7 @@ export default function OrdemDetalhe({ id, aoFechar, aoMudar }) {
                         <><dt>Estrutura</dt><dd className="wk">{orc.estrutura_nome}</dd></>
                       )}
                       {ripao && <><dt>Ripão</dt><dd className="wk">{ripao}</dd></>}
+                      {plastilon && <><dt>Plastilon</dt><dd className="wk">{plastilon}</dd></>}
                       {extras.map((e) => (
                         <Fragment key={e.id}>
                           <dt>{e.descricao}</dt><dd className="wk">{brl(e.total)}</dd>
