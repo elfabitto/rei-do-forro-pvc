@@ -179,6 +179,7 @@ function TaxasMaquininha({ editavel }) {
         Valores iniciais: tabela pública do PagBank (Visa/Master, faturamento de R$ 20 a 50 mil/mês,
         recebimento no mesmo dia). <b>Troque pelas taxas da sua conta</b> — no app PagBank, em taxas
         da maquininha. A loja recebe o valor à vista; o cliente paga valor ÷ (1 − taxa).
+        A taxa de <b>5x</b> também define o valor &quot;no cartão&quot; dos orçamentos novos.
       </p>
     </div>
   );

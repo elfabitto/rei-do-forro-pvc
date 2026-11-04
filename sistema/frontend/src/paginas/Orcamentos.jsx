@@ -22,6 +22,7 @@ function VerOrcamento({ orcamento, aoFechar }) {
   const forros = useApi("/forros/");
   const acabamentos = useApi("/acabamentos/");
   const estruturas = useApi("/estruturas/");
+  const taxas = useApi("/taxas-cartao/");
 
   const forro = linhas(forros.dados).find((f) => f.id === orcamento.forro);
   const acabamento = linhas(acabamentos.dados).find((a) => a.id === orcamento.acabamento);
@@ -30,13 +31,14 @@ function VerOrcamento({ orcamento, aoFechar }) {
   // os itens gravados voltam separados: material de catálogo de um lado,
   // "Outro" (verba) do outro — é como o documento os apresenta
   const gravados = orcamento.itens ?? [];
-  const doc = forro && montarDocumento({
+  const doc = forro && taxas.dados && montarDocumento({
     tipo: orcamento.tipo,
     area: Number(orcamento.area_m2),
     forro,
     acabamento,
     estrutura,
     desconto: Number(orcamento.desconto ?? 0),   // reenviar sai com o mesmo desconto do salvo
+    taxas: taxas.dados,
     itens: gravados.filter((i) => i.unidade !== VERBA && !ehServico(i)).map((i) => ({
       rotulo: i.descricao,
       unidade: i.unidade,
@@ -53,7 +55,7 @@ function VerOrcamento({ orcamento, aoFechar }) {
   return (
     <Gaveta titulo={orcamento.numero} aoFechar={aoFechar}
             extra={<Etiqueta status={orcamento.status} rotulo={orcamento.status_display} />}>
-      <Estado carregando={forros.carregando} erro={forros.erro}>
+      <Estado carregando={forros.carregando || taxas.carregando} erro={forros.erro || taxas.erro}>
         {doc && (
           <div style={{ padding: 20 }}>
             <DocumentoOrcamento doc={doc} />

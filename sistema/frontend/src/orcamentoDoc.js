@@ -4,6 +4,7 @@
  * É a mesma estrutura e o mesmo desenho do gerador estático em docs/index.html —
  * o que muda é a origem dos dados, que aqui vêm da API em vez de um array fixo.
  */
+import { valorNoCartao } from "./cartao";
 import { LOGO } from "./logo";
 
 const brl = (n) =>
@@ -51,18 +52,19 @@ export const descricaoItem = (i) =>
  * `extras` são os itens "Outro": descrição livre e valor fechado, que existem
  * nos dois tipos de orçamento para o que não cabe na tabela. `servico` é o valor
  * fechado do serviço, só no orçamento de Material (0 = sem serviço). `desconto`
- * é em R$ e abate dos dois totais — a mesma conta do backend.
+ * é em R$ e abate do à vista. `taxas` é a tabela da maquininha: o valor no cartão
+ * é o à vista em 5x com a taxa cadastrada — a mesma conta do backend.
  */
 export function montarDocumento({ tipo, area, forro, acabamento, estrutura, itens = [], extras = [], servico = 0,
-                                  desconto = 0 }) {
-  const doc = montarSemDesconto({ tipo, area, forro, acabamento, estrutura, itens, extras, servico });
+                                  desconto = 0, taxas }) {
+  const doc = montarSemDesconto({ tipo, area, forro, acabamento, estrutura, itens, extras, servico, taxas });
   const d = cent(desconto);
   if (d > 0) {
     doc.desconto = d;
     doc.subtotalVista = doc.totalVista;
     doc.secoes.push({ titulo: "Desconto", linhas: [["Desconto", `− R$ ${brl(d)}`]] });
     doc.totalVista = Math.max(0, cent(doc.totalVista - d));
-    doc.totalCartao = Math.max(0, cent(doc.totalCartao - d));
+    doc.totalCartao = valorNoCartao(taxas, doc.totalVista);
     doc.texto = doc.texto
       .replace("----------\n*VALOR TOTAL*", `\n*DESCONTO*: − R$ ${brl(d)}\n----------\n*VALOR TOTAL*`)
       .replace(/💵 \*À vista\*: R\$ [\d.,]+/, `💵 *À vista*: R$ ${brl(doc.totalVista)}`)
@@ -71,20 +73,19 @@ export function montarDocumento({ tipo, area, forro, acabamento, estrutura, iten
   return doc;
 }
 
-function montarSemDesconto({ tipo, area, forro, acabamento, estrutura, itens, extras, servico }) {
+function montarSemDesconto({ tipo, area, forro, acabamento, estrutura, itens, extras, servico, taxas }) {
   const instalado = tipo === "instalado";
   const somaExtras = extras.reduce((s, e) => s + cent(e.valor), 0);
   const linhasExtras = extras.map((e) => [e.descricao, `R$ ${brl(cent(e.valor))}`]);
 
   const precoVista = Number(instalado ? forro.preco_instalado_vista : forro.preco_material_vista);
-  const precoCartao = Number(instalado ? forro.preco_instalado_cartao : forro.preco_material_cartao);
   // no Instalado o m² leva os acréscimos do acabamento e da estrutura (ripão)
   const acrescimo = instalado
     ? Number(acabamento?.acrescimo_m2 ?? 0) + Number(estrutura?.acrescimo_m2 ?? 0)
     : 0;
 
   const m2Vista = precoVista + acrescimo;
-  const m2Cartao = precoCartao + acrescimo;
+  const m2Cartao = valorNoCartao(taxas, m2Vista);
 
   const doc = {
     tipo,
@@ -128,7 +129,7 @@ function montarSemDesconto({ tipo, area, forro, acabamento, estrutura, itens, ex
     }
     doc.obs = OBS_CARTAO;
     doc.totalVista = cent(area * m2Vista + taxa + somaExtras);
-    doc.totalCartao = cent(area * m2Cartao + taxa + somaExtras);
+    doc.totalCartao = valorNoCartao(taxas, doc.totalVista);
 
     doc.texto = `*ORÇAMENTO — REI DO FORRO*
 ----------
@@ -148,7 +149,6 @@ _valor do metro quadrado_
 _${doc.obs}_`;
   } else {
     const forroVista = cent(area * precoVista);
-    const forroCartao = cent(area * precoCartao);
     const materiais = itens.reduce((s, i) => s + cent(i.quantidade * i.preco), 0);
     const valorServico = cent(servico);
     const linhaSrv = valorServico ? [[linhaServico(area), `R$ ${brl(valorServico)}`]] : [];
@@ -173,7 +173,7 @@ _${doc.obs}_`;
 
     doc.obs = OBS_CARTAO;
     doc.totalVista = cent(forroVista + materiais + valorServico + taxa + somaExtras);
-    doc.totalCartao = cent(forroCartao + materiais + valorServico + taxa + somaExtras);
+    doc.totalCartao = valorNoCartao(taxas, doc.totalVista);
 
     const lista = [
       `• Forro ${m2(area)}m² × R$ ${brl(precoVista)}/m² = R$ ${brl(forroVista)}`,

@@ -14,6 +14,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api, num } from "../api";
+import { valorNoCartao } from "../cartao";
 import {
   BotaoAcao, Campo, DocumentoOrcamento, Estado, linhas, useApi,
 } from "../componentes";
@@ -48,6 +49,7 @@ export default function OrcamentoNovo() {
   const materiais = useApi("/materiais/", { ativo: true });
   const acabamentos = useApi("/acabamentos/", { ativo: true });
   const estruturas = useApi("/estruturas/", { ativo: true });
+  const taxas = useApi("/taxas-cartao/");   // o valor no cartão sai da taxa de 5x
   const original = useApi(editando ? `/orcamentos/${id}/` : null, null, [id]);
 
   // 1. medida
@@ -71,7 +73,7 @@ export default function OrcamentoNovo() {
   // itens "Outro": descrição livre e valor fechado, nos dois tipos de orçamento
   const [extras, setExtras] = useState([]);
   const [observacoes, setObservacoes] = useState("");
-  // desconto em R$, dado já no orçamento: abate do total à vista e do cartão
+  // desconto em R$, dado já no orçamento: abate do à vista, e o cartão sai do valor já com desconto
   const [desconto, setDesconto] = useState("");
   const [erro, setErro] = useState("");
 
@@ -182,7 +184,7 @@ export default function OrcamentoNovo() {
   const completo = areaFinal > 0 && forro && tipo && (tipo === "material" || acabamento);
   const doc = completo
     ? montarDocumento({ tipo, area: areaFinal, forro, acabamento, estrutura, itens, extras: extrasValidos,
-                        servico: valorServico, desconto: valorDesconto })
+                        servico: valorServico, desconto: valorDesconto, taxas: taxas.dados })
     : null;
   const descontoDemais = doc && valorDesconto > (doc.subtotalVista ?? doc.totalVista);
 
@@ -316,8 +318,8 @@ export default function OrcamentoNovo() {
         </div>
       )}
 
-      <Estado carregando={forros.carregando || original.carregando || visita.carregando}
-              erro={forros.erro || materiais.erro || acabamentos.erro || estruturas.erro || original.erro || visita.erro}>
+      <Estado carregando={forros.carregando || taxas.carregando || original.carregando || visita.carregando}
+              erro={forros.erro || materiais.erro || acabamentos.erro || estruturas.erro || taxas.erro || original.erro || visita.erro}>
         <div className="cols c-2">
           {/* ------------------------------------------------ entrada */}
           <section className="card">
@@ -384,7 +386,7 @@ export default function OrcamentoNovo() {
                   <div className="ref">
                     <Miniatura nome={forro.nome} cor={forro.cor_amostra} tamanho={64} className="grande" />
                     <div className="tx">Preço do m² — só o forro
-                      <b>R$ {brl(forro.preco_material_vista)} à vista · R$ {brl(forro.preco_material_cartao)} cartão</b>
+                      <b>R$ {brl(forro.preco_material_vista)} à vista · R$ {brl(valorNoCartao(taxas.dados, forro.preco_material_vista))} cartão</b>
                     </div>
                   </div>
                 )}
@@ -543,8 +545,8 @@ export default function OrcamentoNovo() {
                   {passo(tipo === "instalado" ? 7 : 6, "Desconto")}
                   <Campo rotulo="Desconto (R$)" erro={descontoDemais ? "Maior que o valor à vista do orçamento." : ""}
                          dica={doc && valorDesconto > 0
-                           ? `Abate dos dois totais: à vista R$ ${brl(doc.subtotalVista)} → R$ ${brl(doc.totalVista)}.`
-                           : "Opcional. Abate do total à vista e do total no cartão."}>
+                           ? `À vista R$ ${brl(doc.subtotalVista)} → R$ ${brl(doc.totalVista)}; o cartão é calculado sobre o valor com desconto.`
+                           : "Opcional. Abate do total à vista; o cartão é calculado sobre o valor com desconto."}>
                     <div className="campoReais">
                       <span className="cifrao">R$</span>
                       <input value={desconto} placeholder="0,00" inputMode="decimal"

@@ -69,7 +69,7 @@ class OrcamentoApiTest(ApiBase):
         }, format="json")
         self.assertEqual(r.status_code, 201, r.data)
         self.assertEqual(r.data["total_vista"], "1656.00")
-        self.assertEqual(r.data["total_cartao"], "1771.00")
+        self.assertEqual(r.data["total_cartao"], "1791.43")   # 1656 ÷ (1 − 7,56%), a taxa de 5x
         # vendedor é o próprio usuário logado
         self.assertEqual(r.data["vendedor"], self.vendedor.id)
 
@@ -89,7 +89,7 @@ class OrcamentoApiTest(ApiBase):
         r = self.client.post("/api/orcamentos/", {**base, "estrutura": cupiuba.id}, format="json")
         self.assertEqual(r.status_code, 201, r.data)
         self.assertEqual(r.data["preco_m2_vista"], "77.00")             # 64 + 8 sanca + 5 cupiuba
-        self.assertEqual((r.data["total_vista"], r.data["total_cartao"]), ("1771.00", "1886.00"))
+        self.assertEqual((r.data["total_vista"], r.data["total_cartao"]), ("1771.00", "1915.84"))
         self.assertEqual(r.data["estrutura_nome"], "Ripão Cupiuba")
 
         r = self.client.post("/api/orcamentos/", {
@@ -114,14 +114,47 @@ class OrcamentoApiTest(ApiBase):
         self.assertEqual(r.status_code, 201, r.data)
         self.assertEqual(r.data["total_vista"], "1047.40")   # 23 × 33,80 = 777,40 + 10 × 27,00
 
-    def test_desconto_abate_dos_dois_totais_e_vai_para_a_os(self):
+    def test_cartao_do_orcamento_e_o_mesmo_valor_de_5x_na_finalizacao(self):
+        """O caso do print: R$ 3.626,60 à vista, 5x a 10,38% na maquininha = R$ 4.046,64."""
+        from apps.catalogo.models import Forro
+        from apps.ordens.models import Pagamento
+
+        taxas = TaxasCartao.obter()
+        taxas.credito["5"] = "10.38"
+        taxas.save()
+        forro = Forro.objects.create(nome="Teste", preco_material_vista=D("10"), preco_material_cartao=D("11"),
+                                     preco_instalado_vista=D("10"), preco_instalado_cartao=D("11"))
+
+        self.client.force_authenticate(self.vendedor)
+        orc = self.client.post("/api/orcamentos/", {
+            "cliente": self.cliente.id, "tipo": "material", "area_m2": "362.66", "forro": forro.id,
+        }, format="json").data
+        self.assertEqual((orc["total_vista"], orc["total_cartao"]), ("3626.60", "4046.64"))
+        self.assertEqual(orc["preco_m2_cartao"], "11.16")   # 10 ÷ (1 − 10,38%)
+
+        hoje = timezone.localdate()
+        seg = hoje + timedelta(days=(7 - hoje.weekday()) % 7 or 7)
+        os_ = self.client.post("/api/ordens-servico/", {
+            "orcamento": orc["id"], "endereco": self.endereco.id, "modalidade": "cartao",
+            "agendar_entrega": {"data": str(seg), "turno": "manha"},
+        }, format="json").data
+        self.assertEqual(os_["valor_total"], "4046.64")
+
+        self.client.force_authenticate(self.diretor)
+        r = self.client.post(f"/api/ordens-servico/{os_['id']}/finalizar/", {
+            "pagamentos": [{"forma": "credito", "valor": "3626.60", "parcelas": 5}],
+        }, format="json")
+        self.assertEqual(r.status_code, 200, r.data)
+        self.assertEqual(Pagamento.objects.get(ordem_id=os_["id"]).valor, D("4046.64"))
+
+    def test_desconto_abate_do_avista_e_o_cartao_sai_do_valor_com_desconto(self):
         self.client.force_authenticate(self.vendedor)
         r = self.client.post("/api/orcamentos/", {
             "cliente": self.cliente.id, "tipo": "instalado", "area_m2": "23",
             "forro": self.forro.id, "acabamento": self.sanca.id, "desconto": "56.00",
         }, format="json")
         self.assertEqual(r.status_code, 201, r.data)
-        self.assertEqual((r.data["total_vista"], r.data["total_cartao"]), ("1600.00", "1715.00"))
+        self.assertEqual((r.data["total_vista"], r.data["total_cartao"]), ("1600.00", "1730.85"))
 
         os_ = self.client.post("/api/ordens-servico/", {
             "orcamento": r.data["id"], "endereco": self.endereco.id, "modalidade": "vista",
@@ -171,7 +204,7 @@ class OrcamentoApiTest(ApiBase):
         self.assertEqual(r.status_code, 201, r.data)
         self.assertEqual(r.data["taxa_logistica"], "80.00")
         self.assertEqual(r.data["total_vista"], "1359.36")   # 19,99 × 64,00 + 80,00
-        self.assertEqual(r.data["total_cartao"], "1459.31")  # 19,99 × 69,00 + 80,00
+        self.assertEqual(r.data["total_cartao"], "1470.53")  # 1359,36 ÷ (1 − 7,56%)
 
         r = self.client.post("/api/orcamentos/", {**base, "area_m2": "20"}, format="json")
         self.assertEqual(r.data["taxa_logistica"], "0.00")
@@ -183,7 +216,7 @@ class OrcamentoApiTest(ApiBase):
         r = self.client.post("/api/orcamentos/", {**base, "area_m2": "10"}, format="json")
         self.assertEqual(r.data["taxa_logistica"], "80.00")
         self.assertEqual(r.data["total_vista"], "418.00")    # 10 × 33,80 + 80,00
-        self.assertEqual(r.data["total_cartao"], "445.00")   # 10 × 36,50 + 80,00
+        self.assertEqual(r.data["total_cartao"], "452.19")   # 418,00 ÷ (1 − 7,56%)
 
         r = self.client.post("/api/orcamentos/", {**base, "area_m2": "20"}, format="json")
         self.assertEqual(r.data["taxa_logistica"], "0.00")
@@ -430,7 +463,7 @@ class GerarOSDoOrcamentoTest(ApiBase):
         self.assertEqual(r.status_code, 201, r.data)
         self.assertEqual(r.data["modalidade"], "cartao")
         self.assertEqual(r.data["valor_total"], r.data["valor_cartao"])
-        self.assertEqual(r.data["valor_total"], "1771.00")
+        self.assertEqual(r.data["valor_total"], "1791.43")
 
     def test_tipo_e_numero_vem_do_orcamento(self):
         orc = self.orcamento()

@@ -2,9 +2,10 @@
  * Tabela de preços. Leitura liberada a todos; alteração só pela diretoria —
  * a API recusa a escrita de quem não é diretor (LeituraOuDiretor).
  */
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { api } from "../api";
 import { useAuth } from "../auth";
+import { PARCELAS_ORCAMENTO, taxaDe, valorNoCartao } from "../cartao";
 import { BotaoAcao, Estado, linhas, useApi } from "../componentes";
 import { brl } from "../orcamentoDoc";
 
@@ -43,6 +44,8 @@ export default function Catalogo() {
   const materiais = useApi("/materiais/");
   const acabamentos = useApi("/acabamentos/");
   const estruturas = useApi("/estruturas/");
+  const taxas = useApi("/taxas-cartao/");
+  const taxa5x = taxaDe(taxas.dados, "credito", PARCELAS_ORCAMENTO);
 
   return (
     <div className="pagina">
@@ -63,7 +66,10 @@ export default function Catalogo() {
       <div className="card mb">
         <header>
           <h2>Forros</h2>
-          <span className="hint">R$ por m²</span>
+          <span className="hint">
+            R$ por m² · cartão = à vista em {PARCELAS_ORCAMENTO}x
+            {taxa5x ? ` (taxa de ${String(taxa5x).replace(".", ",")}%, definida em Parâmetros)` : ""}
+          </span>
         </header>
         <Estado carregando={forros.carregando} erro={forros.erro}>
           <div className="tw">
@@ -85,12 +91,15 @@ export default function Catalogo() {
                         <b>{f.nome}</b>
                       </div>
                     </td>
-                    {["preco_material_vista", "preco_material_cartao",
-                      "preco_instalado_vista", "preco_instalado_cartao"].map((campo) => (
-                      <td className="num" key={campo}>
-                        <Preco registro={f} campo={campo} recurso="forros"
-                               editavel={editavel} aoSalvar={forros.recarregar} />
-                      </td>
+                    {["preco_material_vista", "preco_instalado_vista"].map((campo) => (
+                      <Fragment key={campo}>
+                        <td className="num">
+                          <Preco registro={f} campo={campo} recurso="forros"
+                                 editavel={editavel} aoSalvar={forros.recarregar} />
+                        </td>
+                        {/* calculado, não se edita: muda com o preço à vista e a taxa de 5x */}
+                        <td className="num">{taxas.dados ? brl(valorNoCartao(taxas.dados, f[campo])) : "…"}</td>
+                      </Fragment>
                     ))}
                     <td>{f.ativo ? "sim" : "não"}</td>
                   </tr>

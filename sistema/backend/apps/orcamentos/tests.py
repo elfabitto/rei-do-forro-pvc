@@ -37,16 +37,16 @@ class OrcamentoInstaladoTest(BaseCatalogo):
                                      vendedor=self.user, criado_por=self.user)
         self.assertEqual(o.preco_m2_vista, D("64.00"))
         self.assertEqual(o.total_vista, D("1472.00"))
-        self.assertEqual(o.total_cartao, D("1587.00"))
+        self.assertEqual(o.total_cartao, D("1592.38"))   # 1472 ÷ (1 − 7,56%), a taxa de 5x
 
-    def test_sanca_soma_8_reais_no_m2_nas_duas_formas(self):
+    def test_sanca_soma_8_reais_no_m2_e_o_cartao_sai_da_taxa(self):
         o = Orcamento.objects.create(tipo=TipoOrcamento.INSTALADO, area_m2=D("23"),
                                      forro=self.forro, acabamento=self.sanca,
                                      vendedor=self.user, criado_por=self.user)
         self.assertEqual(o.preco_m2_vista, D("72.00"))
-        self.assertEqual(o.preco_m2_cartao, D("77.00"))
+        self.assertEqual(o.preco_m2_cartao, D("77.89"))   # 72 ÷ (1 − 7,56%)
         self.assertEqual(o.total_vista, D("1656.00"))
-        self.assertEqual(o.total_cartao, D("1771.00"))
+        self.assertEqual(o.total_cartao, D("1791.43"))
 
     def test_numero_sequencial_por_ano(self):
         a = Orcamento.objects.create(tipo=TipoOrcamento.INSTALADO, area_m2=D("10"), forro=self.forro,
@@ -66,8 +66,8 @@ class OrcamentoMaterialTest(BaseCatalogo):
         o.save()
         # 23 × 33,80 = 777,40 de forro + 250,00 de perfil
         self.assertEqual(o.total_vista, D("1027.40"))
-        # no cartão só o forro muda: 23 × 36,50 = 839,50 + 250,00
-        self.assertEqual(o.total_cartao, D("1089.50"))
+        # no cartão, o total inteiro em 5x: 1027,40 ÷ (1 − 7,56%)
+        self.assertEqual(o.total_cartao, D("1111.42"))
 
     def test_ripao_e_proporcional_a_duzia(self):
         """12 unidades têm de fechar exatamente o valor da dúzia."""
@@ -117,7 +117,7 @@ class ItemOutroTest(TestCase):
         o.save()
         # 23 m² × (64 + 8) = 1656, mais a verba de 250
         self.assertEqual(o.total_vista, D("1906.00"))
-        self.assertEqual(o.total_cartao, D("2021.00"))                 # 23 × 77 + 250
+        self.assertEqual(o.total_cartao, D("2061.88"))                 # 1906 ÷ (1 − 7,56%)
 
     def test_entra_no_total_do_material(self):
         o = self.orcamento(TipoOrcamento.MATERIAL)
@@ -126,11 +126,11 @@ class ItemOutroTest(TestCase):
         o.save()
         self.assertEqual(o.total_vista, D("777.40") + D("100.00"))
 
-    def test_nao_tem_acrescimo_de_cartao(self):
-        """A verba é valor fechado: só o forro muda entre à vista e cartão."""
+    def test_entra_no_valor_passado_no_cartao(self):
+        """A taxa da maquininha incide sobre o total, com a verba junto — como na finalização."""
         o = self.orcamento(TipoOrcamento.MATERIAL)
         OrcamentoItem.objects.create(orcamento=o, descricao="Frete", unidade="verba",
                                      quantidade=D("1"), preco_unitario=D("100.00"))
         o.save()
-        self.assertEqual(o.total_cartao - o.total_vista,
-                         (D("36.50") - D("33.80")) * D("23"))
+        self.assertEqual(o.total_vista, D("877.40"))
+        self.assertEqual(o.total_cartao, D("949.16"))                  # 877,40 ÷ (1 − 7,56%)

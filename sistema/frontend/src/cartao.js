@@ -5,6 +5,9 @@
  */
 export const PARCELAS_MAX = 12;
 
+/** O valor "no cartão" do orçamento é o crédito nessas parcelas (PARCELAS_ORCAMENTO no backend). */
+export const PARCELAS_ORCAMENTO = 5;
+
 const cent = (n) => Math.round(n * 100) / 100;
 
 /** Taxa (%) da forma e parcelas; 0 fora do cartão ou sem tabela carregada. */
@@ -21,3 +24,7 @@ export function acrescimoCartao(taxas, base, forma, parcelas = 1) {
   if (!(base > 0) || t <= 0 || t >= 1) return 0;
   return cent(base / (1 - t) - base);
 }
+
+/** O valor à vista passado no crédito em 5x, com a taxa cadastrada. */
+export const valorNoCartao = (taxas, valor) =>
+  cent(Number(valor) + acrescimoCartao(taxas, Number(valor), "credito", PARCELAS_ORCAMENTO));

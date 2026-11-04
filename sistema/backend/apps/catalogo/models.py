@@ -4,7 +4,10 @@ from django.db import models
 
 
 class Forro(models.Model):
-    """Uma linha da grade de catálogo, com os quatro preços por m²."""
+    """
+    Uma linha da grade de catálogo. Os preços à vista mandam; os dois de cartão
+    não entram mais na conta (o orçamento calcula pela taxa de 5x em Parâmetros).
+    """
 
     nome = models.CharField(max_length=80, unique=True)
     ordem = models.PositiveSmallIntegerField(default=0)

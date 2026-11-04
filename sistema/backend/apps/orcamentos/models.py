@@ -11,6 +11,10 @@ CENTAVO = Decimal("0.01")
 AREA_MINIMA_SEM_TAXA = Decimal("20")
 TAXA_LOGISTICA = Decimal("80.00")
 
+# O valor "no cartão" do orçamento é o crédito nesse número de parcelas, com a
+# taxa cadastrada em Parâmetros (TaxasCartao): o mesmo que sai na finalização.
+PARCELAS_ORCAMENTO = 5
+
 
 class TipoOrcamento(models.TextChoices):
     MATERIAL = "material", "Material (só o forro)"
@@ -57,7 +61,7 @@ class Orcamento(models.Model):
     preco_m2_vista = models.DecimalField(max_digits=9, decimal_places=2)
     preco_m2_cartao = models.DecimalField(max_digits=9, decimal_places=2)
     taxa_logistica = models.DecimalField("taxa de logística", max_digits=9, decimal_places=2, default=0)
-    # desconto em R$ dado já no orçamento: abate dos dois totais (à vista e cartão)
+    # desconto em R$ dado já no orçamento: abate do à vista, e o cartão sai do valor já com desconto
     desconto = models.DecimalField(max_digits=11, decimal_places=2, default=0)
     total_vista = models.DecimalField(max_digits=11, decimal_places=2, default=0)
     total_cartao = models.DecimalField(max_digits=11, decimal_places=2, default=0)
@@ -100,22 +104,27 @@ class Orcamento(models.Model):
         return f"{prefixo}{seq:04d}"
 
     # ------------------------------------------------------------------ cálculo
+    @staticmethod
+    def no_cartao(valor):
+        """O valor à vista passado no crédito em 5x: valor ÷ (1 − taxa cadastrada)."""
+        from apps.ordens.models import FormaPagamento, TaxasCartao
+
+        return valor + TaxasCartao.obter().acrescimo(valor, FormaPagamento.CREDITO, PARCELAS_ORCAMENTO)
+
     def precos_vigentes(self):
         """Preço do m² a aplicar, já com os acréscimos de acabamento e estrutura quando Instalado."""
         vista = self.forro.preco_m2(self.tipo, "vista")
-        cartao = self.forro.preco_m2(self.tipo, "cartao")
         if self.tipo == TipoOrcamento.INSTALADO:
-            acrescimo = (self.acabamento.acrescimo_m2 if self.acabamento_id else 0) \
+            vista += (self.acabamento.acrescimo_m2 if self.acabamento_id else 0) \
                 + (self.estrutura.acrescimo_m2 if self.estrutura_id else 0)
-            vista += acrescimo
-            cartao += acrescimo
-        return vista, cartao
+        return vista, self.no_cartao(vista)
 
     def recalcular(self):
         """
         Refaz os totais a partir do m² e dos itens. O acabamento só entra no
         Instalado; no Material as peças são cobradas por unidade na lista de itens.
         Abaixo de 20 m² soma a taxa de logística (frete), no Instalado e no Material.
+        O total no cartão é o total à vista (já com desconto) em 5x na maquininha.
         """
         if self.tipo == TipoOrcamento.MATERIAL:
             self.acabamento = None
@@ -129,7 +138,6 @@ class Orcamento(models.Model):
         )
 
         forro_vista = (self.area_m2 * self.preco_m2_vista).quantize(CENTAVO)
-        forro_cartao = (self.area_m2 * self.preco_m2_cartao).quantize(CENTAVO)
 
         # Antes do primeiro save não há PK, logo não há itens para somar — o
         # serializer cria os itens e chama save() de novo para fechar o total.
@@ -140,7 +148,7 @@ class Orcamento(models.Model):
         desconto = self.desconto or Decimal("0")
         self.subtotal_vista = forro_vista + itens + self.taxa_logistica   # antes do desconto
         self.total_vista = max(Decimal("0"), self.subtotal_vista - desconto)
-        self.total_cartao = max(Decimal("0"), forro_cartao + itens + self.taxa_logistica - desconto)
+        self.total_cartao = self.no_cartao(self.total_vista)
         return self
 
     def save(self, *args, **kwargs):

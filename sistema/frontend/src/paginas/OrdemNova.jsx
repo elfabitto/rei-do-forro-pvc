@@ -207,7 +207,7 @@ export default function OrdemNova() {
                   <label className={`opt${modalidade === "cartao" ? " on" : ""}`}>
                     <input type="radio" name="mod" checked={modalidade === "cartao"}
                            onChange={() => setModalidade("cartao")} />
-                    <span className="t">No cartão<small>Crédito, valor da tabela de cartão</small></span>
+                    <span className="t">No cartão<small>Crédito em até 5x, com a taxa da maquininha</small></span>
                     <span className="v">{brl(orc.total_cartao)}</span>
                   </label>
                 </div>
