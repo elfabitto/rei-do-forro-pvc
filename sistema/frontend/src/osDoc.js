@@ -23,6 +23,33 @@ const logoPronta = new Promise((ok) => {
 const FF = '"Segoe UI", Arial, Helvetica, sans-serif';
 
 /**
+ * Como a área foi tirada: uma linha por compartimento ("Sala: 5 m × 4 m = 20 m²"),
+ * ou a contagem de folhas. Vai no texto, na imagem e na tela da O.S.
+ */
+export function medidasDoPedido(orc) {
+  const medida = (l, c) => `${m2(l)} m × ${m2(c)} m`;
+  // em centímetros inteiros, para fechar com a área do orçamento (3,33 × 2,5 = 8,33)
+  const areaDe = (c) => Math.round((Math.round(c.largura * 100) * Math.round(c.comprimento * 100)) / 100) / 100;
+  const lista = orc.compartimentos ?? [];
+  if (lista.length > 1) {
+    return lista.map((c, i) => [
+      c.nome || `Compartimento ${i + 1}`,
+      `${medida(c.largura, c.comprimento)} = ${m2(areaDe(c))} m²`,
+      "📏",
+    ]);
+  }
+  if (lista.length === 1) return [[lista[0].nome || "Medidas", medida(lista[0].largura, lista[0].comprimento), "📏"]];
+  if (Number(orc.largura) > 0 && Number(orc.comprimento) > 0) {
+    return [["Medidas", medida(orc.largura, orc.comprimento)]];   // orçamento de antes dos compartimentos
+  }
+  if (Number(orc.tamanho_folha) > 0 && Number(orc.quantidade_folhas) > 0) {
+    const q = Number(orc.quantidade_folhas);
+    return [["Folhas", `${q} folha${q > 1 ? "s" : ""} de ${m2(orc.tamanho_folha)} m`]];
+  }
+  return [];
+}
+
+/**
  * Peças do orçamento de Material (perfil, moldura, sanca, ripão, plastilon,
  * pregos…), cada uma com a quantidade: [descrição, "10 und"]. Fica de fora o
  * serviço e os itens "Outro", que a ficha mostra pelo valor.
@@ -80,13 +107,7 @@ export function montarOS(os, { verFinanceiro = true } = {}) {
   d.pedido = [];
   if (orc) {
     d.pedido.push(["Área", `${m2(orc.area_m2)} m²`]);
-    // como a área foi tirada: medidas do cômodo ou contagem de folhas
-    if (Number(orc.largura) > 0 && Number(orc.comprimento) > 0) {
-      d.pedido.push(["Medidas", `${m2(orc.largura)} m × ${m2(orc.comprimento)} m`]);
-    } else if (Number(orc.tamanho_folha) > 0 && Number(orc.quantidade_folhas) > 0) {
-      const q = Number(orc.quantidade_folhas);
-      d.pedido.push(["Folhas", `${q} folha${q > 1 ? "s" : ""} de ${m2(orc.tamanho_folha)} m`]);
-    }
+    d.pedido.push(...medidasDoPedido(orc));
     d.pedido.push(["Forro", orc.forro_nome ?? "—"]);
     if (orc.acabamento_nome) d.pedido.push(["Acabamento", orc.acabamento_nome]);
     if (orc.estrutura_nome) d.pedido.push(["Estrutura", orc.estrutura_nome]);

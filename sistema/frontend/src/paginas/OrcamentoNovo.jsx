@@ -35,6 +35,12 @@ const paraNumero = (v) => {
   return isFinite(n) && n > 0 ? n : 0;
 };
 
+const COMPARTIMENTO_VAZIO = { nome: "", largura: "", comprimento: "" };
+
+/* Em centímetros inteiros, para arredondar igual ao backend (área_dos_compartimentos). */
+const emCm = (v) => Math.round(paraNumero(v) * 100);
+const areaDe = (c) => Math.round((emCm(c.largura) * emCm(c.comprimento)) / 100) / 100;
+
 export default function OrcamentoNovo() {
   const navegar = useNavigate();
   const { id } = useParams();
@@ -53,10 +59,10 @@ export default function OrcamentoNovo() {
   const original = useApi(editando ? `/orcamentos/${id}/` : null, null, [id]);
 
   // 1. medida
-  const [modo, setModo] = useState("area");
+  // abre pedindo as medidas ao cliente; sem elas, é só trocar para Área em m²
+  const [modo, setModo] = useState("medidas");
   const [area, setArea] = useState("");
-  const [largura, setLargura] = useState("");
-  const [comprimento, setComprimento] = useState("");
+  const [compartimentos, setCompartimentos] = useState([{ ...COMPARTIMENTO_VAZIO }]);
   const [tamanhoFolha, setTamanhoFolha] = useState("");
   const [qtdFolhas, setQtdFolhas] = useState("");
 
@@ -103,10 +109,20 @@ export default function OrcamentoNovo() {
       setModo("folhas");
       setTamanhoFolha(String(o.tamanho_folha).replace(".", ","));
       setQtdFolhas(String(o.quantidade_folhas));
-    } else if (o.largura && o.comprimento) {
+    } else if (o.compartimentos?.length) {
       setModo("medidas");
-      setLargura(String(o.largura));
-      setComprimento(String(o.comprimento));
+      setCompartimentos(o.compartimentos.map((c) => ({
+        nome: c.nome ?? "",
+        largura: String(Number(c.largura)).replace(".", ","),
+        comprimento: String(Number(c.comprimento)).replace(".", ","),
+      })));
+    } else if (o.largura && o.comprimento) {   // orçamento de antes dos compartimentos
+      setModo("medidas");
+      setCompartimentos([{
+        nome: "",
+        largura: String(Number(o.largura)).replace(".", ","),
+        comprimento: String(Number(o.comprimento)).replace(".", ","),
+      }]);
     } else {
       setModo("area");
       setArea(String(o.area_m2));
@@ -139,8 +155,21 @@ export default function OrcamentoNovo() {
   const areaFinal = useMemo(() => {
     if (modo === "area") return paraNumero(area);
     if (modo === "folhas") return Math.round(paraNumero(tamanhoFolha) * LARGURA_FOLHA * folhas * 100) / 100;
-    return Math.round(paraNumero(largura) * paraNumero(comprimento) * 100) / 100;
-  }, [modo, area, largura, comprimento, tamanhoFolha, folhas]);
+    return Math.round(compartimentos.reduce((s, c) => s + areaDe(c), 0) * 100) / 100;
+  }, [modo, area, compartimentos, tamanhoFolha, folhas]);
+
+  const mudarCompartimento = (i, campo, valor) => {
+    setSalvo(null);
+    setCompartimentos((s) => s.map((c, k) => (k === i ? { ...c, [campo]: valor } : c)));
+  };
+  const novoCompartimento = () => {
+    setSalvo(null);
+    setCompartimentos((s) => [...s, { ...COMPARTIMENTO_VAZIO }]);
+  };
+  const removerCompartimento = (i) => {
+    setSalvo(null);
+    setCompartimentos((s) => s.filter((_, k) => k !== i));
+  };
 
   const forro = listaForros.find((f) => String(f.id) === String(forroId));
   const acabamento = listaAcabamentos.find((a) => String(a.id) === String(acabamentoId));
@@ -193,8 +222,16 @@ export default function OrcamentoNovo() {
     const corpo = {
       tipo,
       area_m2: areaFinal.toFixed(2),
-      largura: modo === "medidas" ? paraNumero(largura).toFixed(2) : null,
-      comprimento: modo === "medidas" ? paraNumero(comprimento).toFixed(2) : null,
+      // só os preenchidos; o backend refaz a área e guarda largura/comprimento quando é um só
+      compartimentos: modo === "medidas"
+        ? compartimentos.filter((c) => areaDe(c) > 0).map((c) => ({
+            nome: c.nome.trim(),
+            largura: paraNumero(c.largura).toFixed(2),
+            comprimento: paraNumero(c.comprimento).toFixed(2),
+          }))
+        : [],
+      largura: null,
+      comprimento: null,
       tamanho_folha: modo === "folhas" ? paraNumero(tamanhoFolha).toFixed(2) : null,
       quantidade_folhas: modo === "folhas" ? folhas : null,
       forro: forro.id,
@@ -338,7 +375,8 @@ export default function OrcamentoNovo() {
                 </div>
 
                 {modo === "area" ? (
-                  <Campo rotulo="Área do compartimento (m²)">
+                  <Campo rotulo="Área total (m²)"
+                         dica="Se o cliente tiver as medidas, prefira Largura × Comprimento: elas vão para a O.S.">
                     <input value={area} onChange={(e) => alterou(setArea)(decimal(e.target.value))}
                            inputMode="decimal" placeholder="Ex.: 23" />
                   </Campo>
@@ -361,18 +399,38 @@ export default function OrcamentoNovo() {
                   </>
                 ) : (
                   <>
-                    <div className="two">
-                      <Campo rotulo="Largura (m)">
-                        <input value={largura} onChange={(e) => alterou(setLargura)(decimal(e.target.value))}
-                               inputMode="decimal" placeholder="Ex.: 4,60" />
-                      </Campo>
-                      <Campo rotulo="Comprimento (m)">
-                        <input value={comprimento} onChange={(e) => alterou(setComprimento)(decimal(e.target.value))}
-                               inputMode="decimal" placeholder="Ex.: 5" />
-                      </Campo>
-                    </div>
+                    <p className="nota" style={{ marginTop: 0 }}>
+                      Peça as medidas ao cliente, se ele tiver. Não é obrigatório: sem elas, use Área em m².
+                    </p>
+                    {compartimentos.map((c, i) => (
+                      <div className="compartimento" key={i}>
+                        <div className="topo">
+                          <input value={c.nome} maxLength={40} placeholder={`Compartimento ${i + 1} (ex.: Sala)`}
+                                 aria-label={`Nome do compartimento ${i + 1} (opcional)`}
+                                 onChange={(e) => mudarCompartimento(i, "nome", e.target.value)} />
+                          <b>{areaDe(c) ? `${num(areaDe(c))} m²` : "—"}</b>
+                          {compartimentos.length > 1 && (
+                            <button type="button" className="x" aria-label={`Remover compartimento ${i + 1}`}
+                                    onClick={() => removerCompartimento(i)}>×</button>
+                          )}
+                        </div>
+                        <div className="two">
+                          <Campo rotulo="Largura (m)">
+                            <input value={c.largura} inputMode="decimal" placeholder="Ex.: 4,60"
+                                   onChange={(e) => mudarCompartimento(i, "largura", decimal(e.target.value))} />
+                          </Campo>
+                          <Campo rotulo="Comprimento (m)">
+                            <input value={c.comprimento} inputMode="decimal" placeholder="Ex.: 5"
+                                   onChange={(e) => mudarCompartimento(i, "comprimento", decimal(e.target.value))} />
+                          </Campo>
+                        </div>
+                      </div>
+                    ))}
+                    <button type="button" className="btn mb" onClick={novoCompartimento}>
+                      <Icone nome="mais" tamanho={14} /> Novo compartimento
+                    </button>
                     <div className="calc">
-                      <span>Área calculada</span>
+                      <span>Área total</span>
                       <b>{areaFinal ? `${num(areaFinal)} m²` : "—"}</b>
                     </div>
                   </>

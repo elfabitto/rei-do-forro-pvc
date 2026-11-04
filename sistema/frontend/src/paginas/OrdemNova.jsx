@@ -17,6 +17,7 @@ import { useAuth } from "../auth";
 import CalendarioVagas from "../calendario";
 import { BotaoAcao, Campo, Estado, Selecao, linhas, useApi } from "../componentes";
 import { VERBA, ehServico, linhaServico, quantidadeTexto } from "../orcamentoDoc";
+import { medidasDoPedido } from "../osDoc";
 import Icone from "../icones";
 import ClienteModal from "./ClienteModal";
 
@@ -265,6 +266,9 @@ export default function OrdemNova() {
                 <div className="row"><span className="k">Tipo</span>
                   <span className="v">{comInstalacao ? "Instalação Completa" : "Fornecimento de Material"}</span></div>
                 <div className="row"><span className="k">Área</span><span className="v">{num(orc.area_m2)} m²</span></div>
+                {medidasDoPedido(orc).map(([nome, valor], i) => (
+                  <div className="row sm item" key={i}><span className="k">{nome}</span><span className="v">{valor}</span></div>
+                ))}
                 <div className="row"><span className="k">Forro</span><span className="v">{orc.forro_nome}</span></div>
                 {orc.estrutura_nome && (
                   <div className="row"><span className="k">Estrutura</span>

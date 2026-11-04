@@ -15,7 +15,8 @@ const EMOJI = {
   "À vista": "💵", "No cartão": "💳", Tipo: "🏷️", Total: "✅", Pago: "💰", Saldo: "⏳",
 };
 
-export const linha = ([rotulo, valor]) => `${EMOJI[rotulo] ?? "▫️"} ${rotulo}: ${valor || "—"}`;
+/** `emoji` opcional: para rótulos livres, como o nome de um compartimento. */
+export const linha = ([rotulo, valor, emoji]) => `${emoji ?? EMOJI[rotulo] ?? "▫️"} ${rotulo}: ${valor || "—"}`;
 
 /** Bloco com título (emoji + *TÍTULO*) e as linhas; vazio se não há linhas. */
 export function bloco(emoji, titulo, pares) {

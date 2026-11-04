@@ -1,3 +1,5 @@
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
+
 from django.db import transaction
 from rest_framework import serializers
 
@@ -5,6 +7,18 @@ from apps.clientes.serializers import ClienteResumoSerializer
 from apps.core.permissions import pode_editar_registro
 
 from .models import Orcamento, OrcamentoItem, TipoOrcamento
+
+
+CENTAVO = Decimal("0.01")
+MEDIDA_MAXIMA = Decimal("9999")    # metros: barra erro de digitação, cabe em largura/comprimento
+
+
+def area_dos_compartimentos(compartimentos):
+    """Soma de largura × comprimento, cada um arredondado — a mesma conta da tela."""
+    return sum(
+        ((Decimal(c["largura"]) * Decimal(c["comprimento"])).quantize(CENTAVO, ROUND_HALF_UP) for c in compartimentos),
+        Decimal("0"),
+    )
 
 
 class OrcamentoItemSerializer(serializers.ModelSerializer):
@@ -28,7 +42,7 @@ class OrcamentoResumoSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Orcamento
-        fields = ["id", "numero", "tipo", "tipo_display", "area_m2", "largura", "comprimento",
+        fields = ["id", "numero", "tipo", "tipo_display", "area_m2", "largura", "comprimento", "compartimentos",
                   "tamanho_folha", "quantidade_folhas",
                   "forro_nome", "acabamento_nome", "estrutura_nome", "preco_m2_vista", "preco_m2_cartao",
                   "taxa_logistica", "desconto", "total_vista", "total_cartao", "observacoes", "itens"]
@@ -62,7 +76,7 @@ class OrcamentoSerializer(serializers.ModelSerializer):
         model = Orcamento
         fields = ["id", "numero", "cliente", "cliente_detalhe", "tipo", "tipo_display",
                   "visita", "visita_numero",
-                  "largura", "comprimento", "tamanho_folha", "quantidade_folhas",
+                  "largura", "comprimento", "compartimentos", "tamanho_folha", "quantidade_folhas",
                   "area_m2", "forro", "forro_nome",
                   "acabamento", "acabamento_nome", "estrutura", "estrutura_nome", "preco_m2_vista", "preco_m2_cartao",
                   "taxa_logistica", "desconto", "total_vista", "total_cartao", "status", "status_display",
@@ -90,12 +104,38 @@ class OrcamentoSerializer(serializers.ModelSerializer):
         pedido = self.context.get("request")
         return bool(pedido and pode_editar_registro(pedido.user, obj))
 
+    def validate_compartimentos(self, valor):
+        if not isinstance(valor, list):
+            raise serializers.ValidationError("Lista de compartimentos inválida.")
+        limpos = []
+        for i, c in enumerate(valor, 1):
+            try:
+                largura, comprimento = Decimal(str(c["largura"])), Decimal(str(c["comprimento"]))
+                valido = 0 < largura <= MEDIDA_MAXIMA and 0 < comprimento <= MEDIDA_MAXIMA
+            except (KeyError, TypeError, InvalidOperation):
+                valido = False
+            if not valido:
+                raise serializers.ValidationError(f"Compartimento {i}: informe largura e comprimento.")
+            limpos.append({
+                "nome": str(c.get("nome") or "").strip()[:40],
+                "largura": str(largura.quantize(CENTAVO, ROUND_HALF_UP)),
+                "comprimento": str(comprimento.quantize(CENTAVO, ROUND_HALF_UP)),
+            })
+        return limpos
+
     def validate_desconto(self, valor):
         if valor is not None and valor < 0:
             raise serializers.ValidationError("O desconto não pode ser negativo.")
         return valor
 
     def validate(self, attrs):
+        # com compartimentos, a área sai deles — não do que a tela mandou
+        compartimentos = attrs.get("compartimentos")
+        if compartimentos:
+            attrs["area_m2"] = area_dos_compartimentos(compartimentos)
+            um = compartimentos[0] if len(compartimentos) == 1 else None
+            attrs["largura"] = Decimal(um["largura"]) if um else None
+            attrs["comprimento"] = Decimal(um["comprimento"]) if um else None
         tipo = attrs.get("tipo", getattr(self.instance, "tipo", None))
         if tipo == TipoOrcamento.MATERIAL and attrs.get("estrutura"):
             raise serializers.ValidationError(

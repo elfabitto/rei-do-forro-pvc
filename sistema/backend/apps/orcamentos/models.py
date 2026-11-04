@@ -35,7 +35,9 @@ class Orcamento(models.Model):
     )
     tipo = models.CharField(max_length=12, choices=TipoOrcamento.choices)
 
-    # medida: área direta, largura × comprimento ou por folha (folha de 20 cm de largura)
+    # medida: área direta, compartimentos (largura × comprimento de cada um) ou por folha
+    # (folha de 20 cm de largura). Lista de {nome, largura, comprimento}; a área é a soma.
+    compartimentos = models.JSONField(default=list, blank=True)
     largura = models.DecimalField(max_digits=7, decimal_places=2, null=True, blank=True)
     comprimento = models.DecimalField(max_digits=7, decimal_places=2, null=True, blank=True)
     tamanho_folha = models.DecimalField("tamanho da folha (m)", max_digits=7, decimal_places=2, null=True, blank=True)

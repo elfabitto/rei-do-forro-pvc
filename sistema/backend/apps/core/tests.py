@@ -147,6 +147,51 @@ class OrcamentoApiTest(ApiBase):
         self.assertEqual(r.status_code, 200, r.data)
         self.assertEqual(Pagamento.objects.get(ordem_id=os_["id"]).valor, D("4046.64"))
 
+    def test_compartimentos_somam_a_area_e_vao_para_a_os(self):
+        self.client.force_authenticate(self.vendedor)
+        base = {"cliente": self.cliente.id, "tipo": "instalado", "forro": self.forro.id,
+                "acabamento": self.sanca.id, "area_m2": "1"}   # a tela manda, mas quem vale é a soma
+        r = self.client.post("/api/orcamentos/", {**base, "compartimentos": [
+            {"nome": " Sala ", "largura": "5", "comprimento": "4"},
+            {"nome": "", "largura": "3.33", "comprimento": "2.5"},   # 8,325 → 8,33
+        ]}, format="json")
+        self.assertEqual(r.status_code, 201, r.data)
+        self.assertEqual(r.data["area_m2"], "28.33")
+        self.assertEqual(r.data["total_vista"], "2039.76")           # 28,33 × 72
+        self.assertEqual(r.data["compartimentos"][0],
+                         {"nome": "Sala", "largura": "5.00", "comprimento": "4.00"})
+        self.assertIsNone(r.data["largura"])
+
+        hoje = timezone.localdate()
+        seg = hoje + timedelta(days=(7 - hoje.weekday()) % 7 or 7)
+        os_ = self.client.post("/api/ordens-servico/", {
+            "orcamento": r.data["id"], "endereco": self.endereco.id, "modalidade": "vista",
+            "agendar_instalacao": {"data": str(seg), "turno": "manha"},
+        }, format="json")
+        self.assertEqual(os_.status_code, 201, os_.data)
+        self.assertEqual(len(os_.data["orcamento_detalhe"]["compartimentos"]), 2)
+
+        # um só compartimento preenche largura e comprimento
+        r = self.client.post("/api/orcamentos/", {**base, "compartimentos": [
+            {"largura": "4.6", "comprimento": "5"},
+        ]}, format="json")
+        self.assertEqual((r.data["area_m2"], r.data["largura"], r.data["comprimento"]), ("23.00", "4.60", "5.00"))
+
+        # voltar para Área em m²: limpa os compartimentos e vale a área digitada
+        r = self.client.patch(f"/api/orcamentos/{r.data['id']}/",
+                              {"compartimentos": [], "largura": None, "comprimento": None, "area_m2": "30"},
+                              format="json")
+        self.assertEqual((r.data["area_m2"], r.data["compartimentos"]), ("30.00", []))
+
+    def test_compartimento_sem_medida_recusa(self):
+        self.client.force_authenticate(self.vendedor)
+        base = {"cliente": self.cliente.id, "tipo": "instalado", "forro": self.forro.id, "area_m2": "10"}
+        for ruim in ([{"largura": "5"}], [{"largura": "0", "comprimento": "4"}], [{"largura": "x", "comprimento": "4"}],
+                     [{"largura": "100000", "comprimento": "4"}], ["sala"], {"largura": "5"}):
+            r = self.client.post("/api/orcamentos/", {**base, "compartimentos": ruim}, format="json")
+            self.assertEqual(r.status_code, 400, ruim)
+            self.assertIn("compartimentos", r.data)
+
     def test_desconto_abate_do_avista_e_o_cartao_sai_do_valor_com_desconto(self):
         self.client.force_authenticate(self.vendedor)
         r = self.client.post("/api/orcamentos/", {
