@@ -311,12 +311,14 @@ export default function Visitas() {
   const navegar = useNavigate();
   const [params, setParams] = useSearchParams();
   const [status, setStatus] = useState("");
+  const [hoje, setHoje] = useState(false);   // só as visitas de hoje; soma com o status
   const [aberta, setAberta] = useState(null);
   const [remarcando, setRemarcando] = useState(null);
   const [perdendo, setPerdendo] = useState(null);
 
   const { dados, erro, carregando, recarregar } =
-    useApi("/visitas/", { ordering: "-data", ...(status ? { status } : {}) }, [status]);
+    useApi("/visitas/", { ordering: "-data", ...(status ? { status } : {}), ...(hoje ? { hoje: 1 } : {}) },
+           [status, hoje]);
   const lista = linhas(dados);
 
   // chega aqui já com a gaveta aberta: /visitas?abrir=3 (depois de agendar, ou vindo da agenda)
@@ -347,6 +349,10 @@ export default function Visitas() {
       </div>
 
       <div className="barraFiltros">
+        <button type="button" className={`chip hoje${hoje ? " on" : ""}`} aria-pressed={hoje}
+                title="Visitas marcadas para hoje" onClick={() => setHoje((h) => !h)}>
+          <Icone nome="calendario" tamanho={14} /> Hoje
+        </button>
         {FILTROS.map(([k, r]) => (
           <button key={k} className={`chip${status === k ? " on" : ""}`} onClick={() => setStatus(k)}>
             {r}
@@ -364,7 +370,9 @@ export default function Visitas() {
       )}
 
       <Estado carregando={carregando} erro={erro}
-              vazio={lista.length === 0 ? "Nenhuma visita com esse filtro." : null}>
+              vazio={lista.length === 0
+                ? (hoje ? "Nenhuma visita para hoje com esse filtro." : "Nenhuma visita com esse filtro.")
+                : null}>
         <div className="cardGrid">
           {lista.map((v) => <CardVisita key={v.id} v={v} aoAbrir={setAberta} {...acoes} />)}
         </div>

@@ -70,6 +70,19 @@ class OrdemServicoViewSet(viewsets.ModelViewSet):
     def get_serializer_class(self):
         return OrdemServicoListaSerializer if self.action == "list" else OrdemServicoSerializer
 
+    def get_queryset(self):
+        """`hoje=1`: o que é executado hoje, inclusive a instalação de vários dias em obra."""
+        qs = super().get_queryset()
+        p = self.request.query_params
+        if p.get("hoje"):
+            dia = timezone.localdate()
+            qs = qs.filter(
+                Q(agendamentos__data__lte=dia, agendamentos__data_fim__gte=dia) | Q(agendamentos__data=dia)
+            ).distinct()
+            if not p.get("status"):   # cancelada não é executada; só aparece se pedir esse status
+                qs = qs.exclude(status=StatusOS.CANCELADA)
+        return qs
+
     def get_permissions(self):
         # apagar some com a O.S. e com o rastro dela no caixa: só a diretoria
         if self.action == "destroy":
@@ -315,6 +328,10 @@ class VisitaTecnicaViewSet(viewsets.ModelViewSet):
             qs = qs.filter(data__gte=p["de"])
         if p.get("ate"):
             qs = qs.filter(data__lte=p["ate"])
+        if p.get("hoje"):
+            qs = qs.filter(data=timezone.localdate())
+            if not p.get("status"):   # perdida não acontece mais; só aparece se pedir esse status
+                qs = qs.exclude(status=StatusVisita.PERDIDA)
         return qs
 
     def perform_create(self, serializer):

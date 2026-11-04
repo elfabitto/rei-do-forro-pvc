@@ -130,6 +130,7 @@ export default function OrdensServico() {
   const [status, setStatus] = useState("");
   // vendedor abre nas próprias O.S.; a diretoria, em todas
   const [dono, setDono] = useState(() => (pode("verTudo") ? "todas" : "minhas"));
+  const [hoje, setHoje] = useState(false);   // só o que é executado hoje; soma com os outros filtros
   const [aberta, setAberta] = useState(null);
   const [finalizando, setFinalizando] = useState(null);
   const [cancelando, setCancelando] = useState(null);
@@ -138,9 +139,10 @@ export default function OrdensServico() {
   const filtro = {
     ...(status ? { status } : {}),
     ...(dono === "minhas" ? { vendedor: usuario.id } : {}),
+    ...(hoje ? { hoje: 1 } : {}),
   };
   const { dados, erro, carregando, recarregar } =
-    useApi("/ordens-servico/", Object.keys(filtro).length ? filtro : null, [status, dono]);
+    useApi("/ordens-servico/", Object.keys(filtro).length ? filtro : null, [status, dono, hoje]);
   const lista = linhas(dados);
 
   // permite chegar aqui já com a gaveta aberta: /ordens?abrir=12
@@ -194,6 +196,10 @@ export default function OrdensServico() {
             Todas
           </button>
         </div>
+        <button type="button" className={`chip hoje${hoje ? " on" : ""}`} aria-pressed={hoje}
+                title="Serviços com execução marcada para hoje" onClick={() => setHoje((h) => !h)}>
+          <Icone nome="calendario" tamanho={14} /> Hoje
+        </button>
         {FILTROS.map(([k, r]) => (
           <button key={k} className={`chip${status === k ? " on" : ""}`} onClick={() => setStatus(k)}>
             {r}
@@ -213,7 +219,9 @@ export default function OrdensServico() {
 
       <Estado carregando={carregando} erro={erro}
               vazio={lista.length === 0
-                ? (dono === "minhas" ? "Você não tem O.S. com esse filtro." : "Nenhuma O.S. com esse filtro.")
+                ? (hoje
+                    ? (dono === "minhas" ? "Você não tem serviço para hoje com esse filtro." : "Nenhum serviço para hoje com esse filtro.")
+                    : dono === "minhas" ? "Você não tem O.S. com esse filtro." : "Nenhuma O.S. com esse filtro.")
                 : null}>
         <div className="cardGrid">
           {lista.map((o) => (

@@ -1001,3 +1001,68 @@ class FinalizarCartaoTest(ApiBase):
         lanc.full_clean()   # valida o tamanho de cada campo, como o Postgres faria
         for parcelas in (10, 12):
             self.assertLessEqual(len(f"Cartão de crédito {parcelas}x"), Lancamento._meta.get_field("forma").max_length)
+
+
+class FiltroHojeTest(ApiBase):
+    """Botão Hoje: O.S. e visitas pela data de execução."""
+
+    def setUp(self):
+        hoje = timezone.localdate()
+        self.seg = hoje + timedelta(days=(7 - hoje.weekday()) % 7 or 7)
+        self.client.force_authenticate(self.diretor)
+
+    def os_material(self, dia):
+        orc = self.client.post("/api/orcamentos/", {
+            "cliente": self.cliente.id, "tipo": "material", "area_m2": "30", "forro": self.forro.id,
+        }, format="json").data
+        return self.client.post("/api/ordens-servico/", {
+            "orcamento": orc["id"], "endereco": self.endereco.id, "modalidade": "vista",
+            "agendar_entrega": {"data": str(dia), "turno": "manha"},
+        }, format="json").data
+
+    def ids(self, caminho, **filtros):
+        from unittest import mock
+
+        dia = filtros.pop("dia")
+        with mock.patch("apps.ordens.views.timezone.localdate", return_value=dia):
+            return {o["id"] for o in self.client.get(caminho, {"hoje": 1, **filtros}).data["results"]}
+
+    def test_os_de_hoje_inclui_instalacao_em_obra_e_tira_cancelada(self):
+        orc = self.client.post("/api/orcamentos/", {
+            "cliente": self.cliente.id, "tipo": "instalado", "area_m2": "55",   # 3 dias
+            "forro": self.forro.id, "acabamento": self.sanca.id,
+        }, format="json").data
+        obra = self.client.post("/api/ordens-servico/", {
+            "orcamento": orc["id"], "endereco": self.endereco.id, "modalidade": "vista",
+            "agendar_instalacao": {"data": str(self.seg), "turno": "manha"},
+        }, format="json").data
+        entrega = self.os_material(self.seg)
+        outro_dia = self.os_material(self.seg + timedelta(days=1))
+
+        self.assertEqual(self.ids("/api/ordens-servico/", dia=self.seg), {obra["id"], entrega["id"]})
+        # no 2º dia a instalação segue em obra, mesmo tendo começado ontem
+        self.assertEqual(self.ids("/api/ordens-servico/", dia=self.seg + timedelta(days=1)),
+                         {obra["id"], outro_dia["id"]})
+        self.assertEqual(self.ids("/api/ordens-servico/", dia=self.seg + timedelta(days=3)), set())
+
+        # sem o Hoje, a lista continua inteira
+        self.assertEqual(self.client.get("/api/ordens-servico/").data["count"], 3)
+
+        OrdemServico.objects.get(pk=entrega["id"]).mudar_status(StatusOS.CANCELADA, self.diretor, "desistiu")
+        self.assertEqual(self.ids("/api/ordens-servico/", dia=self.seg), {obra["id"]})
+        self.assertEqual(self.ids("/api/ordens-servico/", dia=self.seg, status="cancelada"), {entrega["id"]})
+
+    def test_visitas_de_hoje_tira_perdida(self):
+        def agendar(dia):
+            return self.client.post("/api/visitas/", {
+                "cliente": self.cliente.id, "endereco": self.endereco.id, "data": str(dia), "turno": "manha",
+            }, format="json").data["id"]
+
+        a, b = agendar(self.seg), agendar(self.seg)
+        amanha = agendar(self.seg + timedelta(days=1))
+        self.assertEqual(self.ids("/api/visitas/", dia=self.seg), {a, b})
+        self.assertEqual(self.ids("/api/visitas/", dia=self.seg + timedelta(days=1)), {amanha})
+
+        self.client.post(f"/api/visitas/{b}/perder/", {}, format="json")
+        self.assertEqual(self.ids("/api/visitas/", dia=self.seg), {a})
+        self.assertEqual(self.ids("/api/visitas/", dia=self.seg, status="perdida"), {b})
