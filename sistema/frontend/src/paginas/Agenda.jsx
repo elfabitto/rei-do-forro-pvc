@@ -1,10 +1,11 @@
 /**
  * Agenda do mês. A instalação aparece em todos os dias que ocupa (dia 1/3,
  * 2/3…); a entrega, no dia dela. Azul é entrega, laranja é instalação, roxo é
- * visita técnica (orçamento presencial, que ocupa uma vaga de entrega).
+ * visita técnica (orçamento presencial, que ocupa uma vaga de entrega). A
+ * situação manda na cor: finalizado fica verde e atrasado, vermelho.
  *
  * Exceção: a gestão (diretoria e TI) abre vaga a mais num dia lotado. O dia com
- * exceção ganha uma bolinha vermelha no calendário.
+ * exceção ganha uma bolinha laranja no calendário.
  *
  * No celular o mês vira uma grade compacta com marcações coloridas, e tocar
  * num dia abre a lista daquele dia logo abaixo — é o uso mais comum.
@@ -26,11 +27,15 @@ const ROT_TURNO = { manha: "manhã", tarde: "tarde" };
 const primeiroNome = (n) => String(n ?? "").split(" ")[0];
 const ICONE = { entrega: "entrega", instalacao: "instalacao", visita: "visita" };
 
+/** Classe da situação do compromisso, que manda na cor por cima da do tipo. */
+const situacao = (e) => (e.atrasado ? " atrasado" : e.os_status === "finalizada" ? " finalizada" : "");
+
 /** A visita técnica no mesmo formato de um agendamento, para entrar na mesma grade. */
 const comoCompromisso = (v) => ({
   id: `v${v.id}`, visita: v.id, tipo: "visita", tipo_display: "Visita técnica",
   data: v.data, turno: v.turno, ocupacao: [`${v.data}:${v.turno}`],
   os_numero: v.numero, atrasado: v.atrasada, cliente_nome: v.cliente_detalhe?.nome,
+  os_status: v.status === "convertida" ? "finalizada" : "",   // visita que virou serviço já aconteceu
   cliente_telefone: v.cliente_detalhe?.telefone, bairro: v.bairro, endereco_resumo: v.endereco_resumo,
 });
 
@@ -251,7 +256,7 @@ export default function Agenda() {
                     {/* desktop: um bloco por compromisso */}
                     <div className="evs">
                       {eventos.map((e) => (
-                        <button className={`ev ${e.tipo}${e.atrasado ? " atrasado" : ""}${e.partes > 1 ? " cont" : ""}`}
+                        <button className={`ev ${e.tipo}${situacao(e)}${e.partes > 1 ? " cont" : ""}`}
                                 key={`${e.id}-${e.parte}`}
                                 onClick={(ev) => { ev.stopPropagation(); abrir(e); }}
                                 title={`${e.os_numero} · ${e.tipo_display} · ${e.cliente_nome} — ${e.bairro}`}>
@@ -267,7 +272,7 @@ export default function Agenda() {
                     {/* celular: marcações coloridas */}
                     <div className="marcas" aria-hidden="true">
                       {eventos.slice(0, 4).map((e) => (
-                        <i key={`${e.id}-${e.parte}`} className={`${e.tipo}${e.atrasado ? " atrasado" : ""}`} />
+                        <i key={`${e.id}-${e.parte}`} className={`${e.tipo}${situacao(e)}`} />
                       ))}
                       {eventos.length > 4 && <b>+{eventos.length - 4}</b>}
                     </div>
@@ -286,7 +291,8 @@ export default function Agenda() {
               <span><i style={{ background: "var(--s-entrega)" }} />Entrega</span>
               <span><i style={{ background: "var(--s-instalacao)" }} />Instalação</span>
               <span><i style={{ background: "var(--s-visita)" }} />Visita técnica</span>
-              <span><i className="excBola" style={{ position: "static" }} />Exceção (vaga extra)</span>
+              <span><i style={{ background: "var(--st-verde)" }} />Finalizado</span>
+              <span><i style={{ background: "var(--st-vermelho)" }} />Atrasado</span>
               <span className="leg-vagas">
                 Números no canto: vagas livres de <b className="ve">entrega</b> e de <b className="vi">instalação</b>
               </span>
@@ -330,7 +336,7 @@ export default function Agenda() {
         ) : (
           <div className="agdia">
             {eventosSel.map((e) => (
-              <button key={`${e.id}-${e.parte}`} className={`agcard ${e.tipo}${e.atrasado ? " atrasado" : ""}`}
+              <button key={`${e.id}-${e.parte}`} className={`agcard ${e.tipo}${situacao(e)}`}
                       onClick={() => abrir(e)}>
                 <div className="topo">
                   <span className={`pill p-${e.tipo}`}>
@@ -339,6 +345,9 @@ export default function Agenda() {
                   <span className="quando">{turnoDoDia(e)}</span>
                   {e.partes > 1 && <span className="parte">dia {e.parte} de {e.partes}</span>}
                   {e.atrasado && <span className="tag t-atrasado">atrasado</span>}
+                  {!e.atrasado && e.os_status === "finalizada" && (
+                    <span className="tag t-finalizada">{e.tipo === "visita" ? "virou serviço" : "finalizado"}</span>
+                  )}
                 </div>
                 <b className="cli">{e.cliente_nome}</b>
                 <div className="sub2">
