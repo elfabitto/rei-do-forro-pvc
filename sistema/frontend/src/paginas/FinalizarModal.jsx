@@ -89,7 +89,10 @@ export default function FinalizarModal({ os, aoFechar, aoConcluir }) {
   const taxas = useApi("/taxas-cartao/");
   const [desconto, setDesconto] = useState("");
   const [observacao, setObservacao] = useState("");
-  const [linhas, setLinhas] = useState([{ forma: "pix", valor: "", parcelas: 1 }]);
+  // combinado no cartão: a linha já abre no crédito, nas parcelas escolhidas ao gerar a O.S.
+  const [linhas, setLinhas] = useState(() => (os.modalidade === "cartao"
+    ? [{ forma: "credito", valor: "", parcelas: os.parcelas_cartao || 5 }]
+    : [{ forma: "pix", valor: "", parcelas: 1 }]));
   const [erro, setErro] = useState("");
 
   const temReferencia = os.valor_vista != null;

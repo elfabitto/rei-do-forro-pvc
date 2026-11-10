@@ -25,6 +25,6 @@ export function acrescimoCartao(taxas, base, forma, parcelas = 1) {
   return cent(base / (1 - t) - base);
 }
 
-/** O valor à vista passado no crédito em 5x, com a taxa cadastrada. */
-export const valorNoCartao = (taxas, valor) =>
-  cent(Number(valor) + acrescimoCartao(taxas, Number(valor), "credito", PARCELAS_ORCAMENTO));
+/** O valor à vista passado no crédito (5x por padrão), com a taxa cadastrada. */
+export const valorNoCartao = (taxas, valor, parcelas = PARCELAS_ORCAMENTO) =>
+  cent(Number(valor) + acrescimoCartao(taxas, Number(valor), "credito", parcelas));

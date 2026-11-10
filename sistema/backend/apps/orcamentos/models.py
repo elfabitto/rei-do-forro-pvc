@@ -109,11 +109,11 @@ class Orcamento(models.Model):
 
     # ------------------------------------------------------------------ cálculo
     @staticmethod
-    def no_cartao(valor):
-        """O valor à vista passado no crédito em 5x: valor ÷ (1 − taxa cadastrada)."""
+    def no_cartao(valor, parcelas=PARCELAS_ORCAMENTO):
+        """O valor à vista passado no crédito (5x por padrão): valor ÷ (1 − taxa cadastrada)."""
         from apps.ordens.models import FormaPagamento, TaxasCartao
 
-        return valor + TaxasCartao.obter().acrescimo(valor, FormaPagamento.CREDITO, PARCELAS_ORCAMENTO)
+        return valor + TaxasCartao.obter().acrescimo(valor, FormaPagamento.CREDITO, parcelas)
 
     def precos_vigentes(self):
         """Preço do m² a aplicar, já com os acréscimos de acabamento e estrutura quando Instalado."""

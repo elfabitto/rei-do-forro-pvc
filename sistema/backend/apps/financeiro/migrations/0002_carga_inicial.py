@@ -9,6 +9,16 @@ from django.db import migrations
 
 
 def carregar(apps, schema_editor):
+    # Banco novo (testes, instalação do zero) não tem O.S. finalizada para levar ao caixa.
+    # A checagem usa o modelo histórico: o de verdade pode ter colunas que ainda não existem
+    # neste ponto das migrations (ex.: parcelas_cartao) e quebraria a consulta.
+    try:
+        historico = apps.get_model("ordens", "OrdemServico")
+    except LookupError:
+        return
+    if not historico.objects.filter(status="finalizada").exists():
+        return
+
     from apps.financeiro import servicos
     from apps.ordens.models import OrdemServico
 

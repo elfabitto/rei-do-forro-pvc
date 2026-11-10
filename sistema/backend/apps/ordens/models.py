@@ -121,6 +121,8 @@ class OrdemServico(models.Model):
     valor_vista = models.DecimalField(max_digits=11, decimal_places=2, null=True, blank=True)
     valor_cartao = models.DecimalField(max_digits=11, decimal_places=2, null=True, blank=True)
     modalidade = models.CharField(max_length=8, choices=Modalidade.choices, blank=True)
+    # em quantas vezes o cliente combinou no cartão (o orçamento sai em 5x); define o valor_cartao
+    parcelas_cartao = models.PositiveSmallIntegerField(default=5)
 
     valor_total = models.DecimalField(max_digits=11, decimal_places=2)
     desconto = models.DecimalField(max_digits=11, decimal_places=2, default=0)

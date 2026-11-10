@@ -109,7 +109,7 @@ class OrdemServicoListaSerializer(serializers.ModelSerializer):
     saldo = serializers.DecimalField(max_digits=11, decimal_places=2, read_only=True)
     atrasado = serializers.BooleanField(read_only=True)
     dias_atraso = serializers.IntegerField(read_only=True)
-    modalidade_display = serializers.CharField(source="get_modalidade_display", read_only=True, default="")
+    modalidade_display = serializers.SerializerMethodField()
     area_m2 = serializers.DecimalField(max_digits=9, decimal_places=2, read_only=True)
     comissao_valor = serializers.DecimalField(max_digits=11, decimal_places=2, read_only=True)
     comissao_detalhe = serializers.SerializerMethodField()
@@ -120,9 +120,23 @@ class OrdemServicoListaSerializer(serializers.ModelSerializer):
         fields = ["id", "numero", "tipo", "tipo_display", "cliente", "cliente_detalhe",
                   "vendedor", "vendedor_nome", "status", "status_display",
                   "valor_total", "valor_vista", "valor_cartao",
-                  "modalidade", "modalidade_display", "desconto", "saldo",
+                  "modalidade", "modalidade_display", "parcelas_cartao", "desconto", "saldo",
                   "entrega", "instalacao", "criado_em", "atrasado", "dias_atraso",
                   "area_m2", "comissao_valor", "comissao_detalhe", "comissao_paga", "pode_editar"]
+
+    def get_modalidade_display(self, obj):
+        """No cartão, antes de fechar, leva as parcelas e o total: "No cartão em 10x de R$ 77,23 (total R$ 772,26)"."""
+        texto = obj.get_modalidade_display() if obj.modalidade else ""
+        n = obj.parcelas_cartao or 1
+        if obj.modalidade == Modalidade.CARTAO and obj.status != StatusOS.FINALIZADA and n:
+            reais = lambda v: f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")  # noqa: E731
+            texto = f"{texto} em {n}x de R$ {reais(obj.valor_total / n)} (total R$ {reais(obj.valor_total)})"
+        return texto
+
+    def validate_parcelas_cartao(self, valor):
+        if not 1 <= valor <= TaxasCartao.PARCELAS_MAX:
+            raise serializers.ValidationError(f"De 1 a {TaxasCartao.PARCELAS_MAX} parcelas.")
+        return valor
 
     def get_entrega(self, obj):
         a = obj.agendamento_entrega
@@ -201,7 +215,15 @@ class OrdemServicoSerializer(OrdemServicoListaSerializer):
             attrs.setdefault("cliente", orcamento.cliente)
             attrs.setdefault("tipo", TipoServico(orcamento.tipo))
             attrs.setdefault("valor_vista", orcamento.total_vista)
-            attrs.setdefault("valor_cartao", orcamento.total_cartao)
+            # o orçamento já traz o cartão em 5x; em outro número de parcelas, recalcula com a taxa
+            parcelas = attrs.get("parcelas_cartao", getattr(self.instance, "parcelas_cartao", None) or 5)
+            if parcelas == 5:
+                attrs.setdefault("valor_cartao", orcamento.total_cartao)
+            else:
+                attrs.setdefault("valor_cartao", orcamento.no_cartao(orcamento.total_vista, parcelas))
+            # sem observação enviada, a O.S. leva a do orçamento (a tela já mostra preenchida)
+            if not self.instance and "observacoes" not in attrs and orcamento.observacoes:
+                attrs["observacoes"] = orcamento.observacoes
 
         modalidade = attrs.get("modalidade") or getattr(self.instance, "modalidade", "")
         if modalidade:

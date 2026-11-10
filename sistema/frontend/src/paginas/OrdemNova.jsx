@@ -13,6 +13,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api, brl, num } from "../api";
+import { PARCELAS_MAX, PARCELAS_ORCAMENTO, valorNoCartao } from "../cartao";
 import { useAuth } from "../auth";
 import CalendarioVagas from "../calendario";
 import { BotaoAcao, Campo, Estado, Selecao, linhas, useApi } from "../componentes";
@@ -36,6 +37,9 @@ export default function OrdemNova() {
   const [entrega, setEntrega] = useState({ data: "", turno: "" });
   const [instalacao, setInstalacao] = useState({ data: "", turno: "" });
   const [modalidade, setModalidade] = useState("");
+  // no cartão, o cliente escolhe as parcelas; o orçamento veio em 5x
+  const [parcelas, setParcelas] = useState(PARCELAS_ORCAMENTO);
+  const taxas = useApi("/taxas-cartao/");
   const [observacoes, setObservacoes] = useState("");
   const [erro, setErro] = useState("");
 
@@ -74,6 +78,22 @@ export default function OrdemNova() {
     if (orc && !vendedorId) setVendedorId(String(orc.vendedor));
   }, [orc, vendedorId]);
 
+  // a O.S. nasce com a observação do orçamento — dá para completar ou mudar aqui
+  const [obsDoOrcamento, setObsDoOrcamento] = useState(false);
+  useEffect(() => {
+    if (!orc || obsDoOrcamento) return;
+    setObsDoOrcamento(true);
+    if (orc.observacoes) setObservacoes((atual) => atual || orc.observacoes);
+  }, [orc, obsDoOrcamento]);
+
+  // valor no cartão das parcelas escolhidas: em 5x é o do orçamento; nas outras, a taxa de cada uma
+  const opcoesParcelas = orc && taxas.dados
+    ? Array.from({ length: PARCELAS_MAX }, (_, k) => k + 1).map((n) => ({
+        n, total: n === PARCELAS_ORCAMENTO ? Number(orc.total_cartao) : valorNoCartao(taxas.dados, orc.total_vista, n),
+      }))
+    : [];
+  const totalCartao = opcoesParcelas.find((o) => o.n === parcelas)?.total ?? Number(orc?.total_cartao ?? 0);
+
   const agendaOk = comInstalacao
     ? instalacao.data && instalacao.turno
     : entrega.data && entrega.turno;
@@ -91,6 +111,7 @@ export default function OrdemNova() {
         endereco: Number(enderecoId),
         vendedor: pode("trocarVendedor") ? Number(vendedorId) : undefined,
         modalidade,
+        parcelas_cartao: modalidade === "cartao" ? Number(parcelas) : PARCELAS_ORCAMENTO,
         observacoes,
         agendar_entrega: comInstalacao ? null : entrega,
         agendar_instalacao: comInstalacao ? instalacao : null,
@@ -208,10 +229,22 @@ export default function OrdemNova() {
                   <label className={`opt${modalidade === "cartao" ? " on" : ""}`}>
                     <input type="radio" name="mod" checked={modalidade === "cartao"}
                            onChange={() => setModalidade("cartao")} />
-                    <span className="t">No cartão<small>Crédito em até 5x, com a taxa da maquininha</small></span>
-                    <span className="v">{brl(orc.total_cartao)}</span>
+                    <span className="t">No cartão
+                      <small>Crédito em {parcelas}x de {brl(totalCartao / parcelas)}, com a taxa da maquininha</small>
+                    </span>
+                    <span className="v">{brl(totalCartao)}</span>
                   </label>
                 </div>
+                {modalidade === "cartao" && (
+                  <Campo rotulo="Em quantas vezes"
+                         dica={`O orçamento saiu em ${PARCELAS_ORCAMENTO}x; mude se o cliente pedir. Cada parcelamento tem a taxa dele.`}>
+                    <Selecao valor={parcelas} aoMudar={(v) => setParcelas(Number(v))}
+                             opcoes={opcoesParcelas.map((o) => ({
+                               valor: o.n,
+                               rotulo: `${o.n}x de ${brl(o.total / o.n)} — total ${brl(o.total)}`,
+                             }))} />
+                  </Campo>
+                )}
                 <p className="nota">
                   É só a escolha do cliente — quem executa o serviço precisa saber o que foi
                   combinado. Os valores recebidos são lançados na finalização, e aí a forma
@@ -238,7 +271,8 @@ export default function OrdemNova() {
                   </>
                 )}
 
-                <Campo rotulo="Observações da O.S.">
+                <Campo rotulo="Observações da O.S."
+                       dica={orc.observacoes ? "Veio do orçamento; complete ou ajuste para a equipe." : ""}>
                   <textarea rows={3} value={observacoes} onChange={(e) => setObservacoes(e.target.value)}
                             placeholder="Ex.: prédio sem elevador, subir pela escada." />
                 </Campo>
@@ -324,8 +358,8 @@ export default function OrdemNova() {
                   <span className="v">{brl(orc.total_vista)}</span>
                 </div>
                 <div className={`tot${modalidade === "cartao" ? " b" : ""}`}>
-                  <span className="k">Total no cartão</span>
-                  <span className="v">{brl(orc.total_cartao)}</span>
+                  <span className="k">Total no cartão{modalidade === "cartao" ? ` (${parcelas}x)` : ""}</span>
+                  <span className="v">{brl(totalCartao)}</span>
                 </div>
               </div>
               <p className="obs">

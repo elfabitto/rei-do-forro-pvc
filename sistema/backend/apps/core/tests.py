@@ -1138,3 +1138,74 @@ class FiltroHojeTest(ApiBase):
         self.client.post(f"/api/visitas/{b}/perder/", {}, format="json")
         self.assertEqual(self.ids("/api/visitas/", dia=self.seg), {a})
         self.assertEqual(self.ids("/api/visitas/", dia=self.seg, status="perdida"), {b})
+
+
+class ObservacaoDoOrcamentoTest(ApiBase):
+    """A observação do orçamento vai para a O.S."""
+
+    def criar(self, **extra):
+        self.client.force_authenticate(self.vendedor)
+        orc = self.client.post("/api/orcamentos/", {
+            "cliente": self.cliente.id, "tipo": "material", "area_m2": "30", "forro": self.forro.id,
+            "observacoes": "Portão azul; ligar antes de sair.",
+        }, format="json").data
+        hoje = timezone.localdate()
+        seg = hoje + timedelta(days=(7 - hoje.weekday()) % 7 or 7)
+        return self.client.post("/api/ordens-servico/", {
+            "orcamento": orc["id"], "endereco": self.endereco.id, "modalidade": "vista",
+            "agendar_entrega": {"data": str(seg), "turno": "manha"}, **extra,
+        }, format="json")
+
+    def test_sem_observacao_leva_a_do_orcamento(self):
+        r = self.criar()
+        self.assertEqual(r.status_code, 201, r.data)
+        self.assertEqual(r.data["observacoes"], "Portão azul; ligar antes de sair.")
+
+    def test_a_da_tela_manda(self):
+        self.assertEqual(self.criar(observacoes="Subir pela escada.").data["observacoes"], "Subir pela escada.")
+        self.assertEqual(self.criar(observacoes="").data["observacoes"], "")   # apagou de propósito
+
+
+class ParcelasNoCartaoTest(ApiBase):
+    """No cartão, a O.S. nasce nas parcelas que o cliente escolheu (o orçamento sai em 5x)."""
+
+    @staticmethod
+    def reais(v):   # 1139.84 → "1.139,84"
+        return f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+    def gerar(self, **extra):
+        self.client.force_authenticate(self.vendedor)
+        orc = self.client.post("/api/orcamentos/", {
+            "cliente": self.cliente.id, "tipo": "material", "area_m2": "30", "forro": self.forro.id,
+        }, format="json").data
+        hoje = timezone.localdate()
+        seg = hoje + timedelta(days=(7 - hoje.weekday()) % 7 or 7)
+        r = self.client.post("/api/ordens-servico/", {
+            "orcamento": orc["id"], "endereco": self.endereco.id, "modalidade": "cartao",
+            "agendar_entrega": {"data": str(seg), "turno": "manha"}, **extra,
+        }, format="json")
+        return orc, r
+
+    def test_padrao_5x_e_o_valor_do_orcamento(self):
+        orc, r = self.gerar()
+        self.assertEqual(r.status_code, 201, r.data)
+        self.assertEqual((r.data["parcelas_cartao"], r.data["valor_total"]), (5, orc["total_cartao"]))
+        self.assertTrue(r.data["modalidade_display"].startswith("No cartão em 5x de R$ "))
+        total = self.reais(D(r.data["valor_total"]))
+        self.assertTrue(r.data["modalidade_display"].endswith(f"(total R$ {total})"), r.data["modalidade_display"])
+
+    def test_mais_parcelas_usa_a_taxa_delas(self):
+        orc, r = self.gerar(parcelas_cartao=10)
+        self.assertEqual(r.status_code, 201, r.data)
+        vista = D(orc["total_vista"])                                       # 30 × 33,80 = 1014,00
+        esperado = vista + TaxasCartao.obter().acrescimo(vista, "credito", 10)
+        self.assertEqual(D(r.data["valor_total"]), esperado)
+        self.assertGreater(esperado, D(orc["total_cartao"]))               # 10x custa mais que 5x
+        parcela = self.reais(esperado / 10)
+        total = self.reais(esperado)
+        self.assertEqual(r.data["modalidade_display"], f"No cartão em 10x de R$ {parcela} (total R$ {total})")
+
+    def test_parcelas_fora_da_faixa_recusa(self):
+        _, r = self.gerar(parcelas_cartao=13)
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("parcelas_cartao", r.data)

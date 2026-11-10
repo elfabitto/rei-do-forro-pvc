@@ -76,7 +76,8 @@ function CardOS({ o, verFinanceiro, pode, aoAbrir, aoFinalizar, aoMudarStatus, a
             <span>Valor total</span>
             <b>{brl(o.valor_total)}</b>
           </div>
-          <span className="formaPg">{o.modalidade_display || "a definir"}</span>
+          {/* o total já está ao lado: no balão fica só a forma e as parcelas */}
+          <span className="formaPg">{(o.modalidade_display || "a definir").replace(/\s*\(total [^)]*\)$/, "")}</span>
         </div>
 
         <div className="rodape">
