@@ -96,7 +96,8 @@ class Estrutura(models.Model):
     """
     Estrutura que segura o forro (ripão), no orçamento Instalado — como o
     acabamento: a padrão vem com acréscimo zero (já inclusa no preço do m²) e
-    as outras somam um valor por m².
+    as outras somam um valor por m². Acréscimo negativo abate: "Sem ripão",
+    para o cliente que já tem a estrutura (a dúzia de R$ 150 a cada 10 m²).
     """
 
     nome = models.CharField(max_length=60, unique=True)

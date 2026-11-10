@@ -202,6 +202,9 @@ export default function OrdemDetalhe({ id, aoFechar, aoMudar }) {
                       {orc.estrutura_nome && (
                         <><dt>Estrutura</dt><dd className="wk">{orc.estrutura_nome}</dd></>
                       )}
+                      {Number(orc.abatimento_estrutura) > 0 && (
+                        <><dt>Sem ripão</dt><dd className="wk">valor abatido − {brl(orc.abatimento_estrutura)}</dd></>
+                      )}
                       {pecas.map(([nome, qtd]) => (
                         <Fragment key={nome}><dt>{nome}</dt><dd className="wk">{qtd}</dd></Fragment>
                       ))}

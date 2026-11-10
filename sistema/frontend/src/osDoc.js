@@ -111,6 +111,9 @@ export function montarOS(os, { verFinanceiro = true } = {}) {
     d.pedido.push(["Forro", orc.forro_nome ?? "—"]);
     if (orc.acabamento_nome) d.pedido.push(["Acabamento", orc.acabamento_nome]);
     if (orc.estrutura_nome) d.pedido.push(["Estrutura", orc.estrutura_nome]);
+    if (Number(orc.abatimento_estrutura) > 0) {
+      d.pedido.push(["Sem ripão", `valor abatido − R$ ${brl(orc.abatimento_estrutura)}`]);
+    }
     // todas as peças lançadas, com a quantidade — quem separa e entrega precisa da lista inteira
     d.pedido.push(...pecasDoPedido(orc.itens));
     const servico = orc.itens?.find(ehServico);

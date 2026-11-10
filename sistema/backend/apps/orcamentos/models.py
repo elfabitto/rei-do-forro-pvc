@@ -63,6 +63,8 @@ class Orcamento(models.Model):
     preco_m2_vista = models.DecimalField(max_digits=9, decimal_places=2)
     preco_m2_cartao = models.DecimalField(max_digits=9, decimal_places=2)
     taxa_logistica = models.DecimalField("taxa de logística", max_digits=9, decimal_places=2, default=0)
+    # "Sem ripão" (estrutura de acréscimo negativo): quanto saiu do total — registrado na O.S.
+    abatimento_estrutura = models.DecimalField(max_digits=11, decimal_places=2, default=0)
     # desconto em R$ dado já no orçamento: abate do à vista, e o cartão sai do valor já com desconto
     desconto = models.DecimalField(max_digits=11, decimal_places=2, default=0)
     total_vista = models.DecimalField(max_digits=11, decimal_places=2, default=0)
@@ -140,6 +142,8 @@ class Orcamento(models.Model):
         )
 
         forro_vista = (self.area_m2 * self.preco_m2_vista).quantize(CENTAVO)
+        abate = self.estrutura.acrescimo_m2 if self.estrutura_id and self.estrutura.acrescimo_m2 < 0 else 0
+        self.abatimento_estrutura = (self.area_m2 * -abate).quantize(CENTAVO) if abate else Decimal("0")
 
         # Antes do primeiro save não há PK, logo não há itens para somar — o
         # serializer cria os itens e chama save() de novo para fechar o total.

@@ -495,8 +495,11 @@ export default function OrcamentoNovo() {
                                onChange={() => alterou(setEstruturaId)(String(e.id))} />
                         <Miniatura nome={e.nome} tamanho={58} className="acab" />
                         <span className="t">{e.nome}</span>
-                        <span className={`v${Number(e.acrescimo_m2) ? "" : " z"}`}>
-                          {Number(e.acrescimo_m2) ? `+ R$ ${brl(e.acrescimo_m2)}/m²` : "Incluso"}
+                        <span className={`v${Number(e.acrescimo_m2) ? "" : " z"}${Number(e.acrescimo_m2) < 0 ? " abate" : ""}`}>
+                          {Number(e.acrescimo_m2) > 0 ? `+ R$ ${brl(e.acrescimo_m2)}/m²`
+                            : Number(e.acrescimo_m2) < 0
+                              ? `− R$ ${brl(-e.acrescimo_m2)}/m²${areaFinal ? ` (abate R$ ${brl(areaFinal * -e.acrescimo_m2)})` : ""}`
+                              : "Incluso"}
                         </span>
                       </label>
                     ))}

@@ -9,7 +9,7 @@ export const SEPARADOR = "━━━━━━━━━━━━━━━";
 const EMOJI = {
   Cliente: "🙋", Telefone: "📞", Endereço: "📍", Bairro: "🏘️", Cidade: "🌆",
   Área: "📐", Medidas: "📏", Folhas: "📏", Forro: "⬜", Acabamento: "✨", Estrutura: "🪵",
-  Serviço: "🛠️", Logística: "🚚", Desconto: "🔻",
+  Serviço: "🛠️", Logística: "🚚", Desconto: "🔻", "Sem ripão": "🔻",
   Entrega: "🚚", Instalação: "🛠️", Visita: "📐", Agendamento: "🗓️",
   "Agendado por": "🙍", Orçamento: "📄",
   "À vista": "💵", "No cartão": "💳", Tipo: "🏷️", Total: "✅", Pago: "💰", Saldo: "⏳",

@@ -95,3 +95,6 @@
 .agcard.atrasado{border-left-color:var(--st-vermelho)}
 .marcas i.finalizada{background:var(--st-verde)}
 .marcas i.atrasado{background:var(--st-vermelho)}
+
+/* estrutura que abate ("Sem ripão"): valor em verde, é desconto para o cliente */
+.opt .v.abate{color:var(--st-verde-tx)}

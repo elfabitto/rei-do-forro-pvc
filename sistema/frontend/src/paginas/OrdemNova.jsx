@@ -274,6 +274,10 @@ export default function OrdemNova() {
                   <div className="row"><span className="k">Estrutura</span>
                     <span className="v">{orc.estrutura_nome}</span></div>
                 )}
+                {Number(orc.abatimento_estrutura) > 0 && (
+                  <div className="row sm item"><span className="k">Sem ripão — valor abatido</span>
+                    <span className="v">− {brl(orc.abatimento_estrutura)}</span></div>
+                )}
                 {orc.acabamento_nome && (
                   <div className="row"><span className="k">Acabamento</span>
                     <span className="v">{orc.acabamento_nome}</span></div>

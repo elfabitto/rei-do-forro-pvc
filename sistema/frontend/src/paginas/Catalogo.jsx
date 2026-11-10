@@ -10,13 +10,13 @@ import { BotaoAcao, Estado, linhas, useApi } from "../componentes";
 import { brl } from "../orcamentoDoc";
 
 /** Célula de preço editável no lugar, salva ao sair do campo. */
-export function Preco({ registro, campo, recurso, editavel, aoSalvar }) {
+export function Preco({ registro, campo, recurso, editavel, aoSalvar, permiteNegativo = false }) {
   const [valor, setValor] = useState(String(registro[campo]).replace(".", ","));
   const [estado, setEstado] = useState("");
 
   async function salvar() {
     const n = parseFloat(valor.replace(/\./g, "").replace(",", "."));
-    if (!isFinite(n) || n < 0) { setEstado("erro"); return; }
+    if (!isFinite(n) || (n < 0 && !permiteNegativo)) { setEstado("erro"); return; }
     if (n === Number(registro[campo])) return;
     try {
       await api.patch(`/${recurso}/${registro.id}/`, { [campo]: String(n) });
@@ -195,7 +195,7 @@ export default function Catalogo() {
                     <tr key={e.id}>
                       <td><b>{e.nome}</b></td>
                       <td className="num">
-                        <Preco registro={e} campo="acrescimo_m2" recurso="estruturas"
+                        <Preco registro={e} campo="acrescimo_m2" recurso="estruturas" permiteNegativo
                                editavel={editavel} aoSalvar={estruturas.recarregar} />
                       </td>
                     </tr>
@@ -205,8 +205,9 @@ export default function Catalogo() {
             </div>
           </Estado>
           <p className="obs">
-            A padrão (acréscimo zero) já está no preço do m². No orçamento de Material o ripão
-            continua entrando como peça, por dúzia.
+            A padrão (acréscimo zero) já está no preço do m². Valor negativo abate do m²: o
+            &quot;Sem ripão&quot; tira a dúzia (R$ 150) a cada 10 m² = − R$ 15,00/m². No orçamento de
+            Material o ripão continua entrando como peça, por dúzia.
           </p>
         </div>
       </div>

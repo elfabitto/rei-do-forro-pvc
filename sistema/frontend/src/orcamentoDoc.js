@@ -99,7 +99,10 @@ function montarSemDesconto({ tipo, area, forro, acabamento, estrutura, itens, ex
 
   doc.resumo = [["Área", `${m2(area)} m²`], ["Forro", forro.nome]];
   if (instalado && acabamento) doc.resumo.push(["Acabamento", acabamento.nome]);
-  if (instalado && estrutura) doc.resumo.push(["Estrutura", estrutura.nome]);
+  // "Sem ripão": acréscimo negativo — o valor abatido aparece junto do nome
+  const abatido = instalado && Number(estrutura?.acrescimo_m2) < 0 ? cent(area * -Number(estrutura.acrescimo_m2)) : 0;
+  const nomeEstrutura = estrutura ? estrutura.nome + (abatido ? ` (abatido R$ ${brl(abatido)})` : "") : "";
+  if (instalado && estrutura) doc.resumo.push(["Estrutura", nomeEstrutura]);
 
   if (instalado) {
     const taxa = taxaLogistica(tipo, area);
@@ -135,7 +138,7 @@ function montarSemDesconto({ tipo, area, forro, acabamento, estrutura, itens, ex
 ----------
 *Área:* ${m2(area)}m²
 *Forro:* ${forro.nome}
-*Acabamento:* ${acabamento?.nome ?? "—"}${estrutura ? `\n*Estrutura:* ${estrutura.nome}` : ""}
+*Acabamento:* ${acabamento?.nome ?? "—"}${estrutura ? `\n*Estrutura:* ${nomeEstrutura}` : ""}
 
 *INSTALAÇÃO COMPLETA*
 _valor do metro quadrado_
