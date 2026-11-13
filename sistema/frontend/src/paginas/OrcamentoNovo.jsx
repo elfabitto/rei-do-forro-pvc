@@ -35,7 +35,7 @@ const paraNumero = (v) => {
   return isFinite(n) && n > 0 ? n : 0;
 };
 
-// forro vazio = o do passo 2; outro forro só nesse compartimento (ex.: Cedro no beiral)
+// forro vazio = o principal (passo 2); outro forro só nesse compartimento (ex.: Cedro no beiral)
 const COMPARTIMENTO_VAZIO = { nome: "", largura: "", comprimento: "", forro: "" };
 
 /* Em centímetros inteiros, para arredondar igual ao backend (área_dos_compartimentos). */
@@ -441,7 +441,7 @@ export default function OrcamentoNovo() {
                         {compartimentos.length > 1 && (
                           <Campo rotulo="Forro deste compartimento">
                             <select value={c.forro} onChange={(e) => mudarCompartimento(i, "forro", e.target.value)}>
-                              <option value="">{forro ? `${forro.nome} (o do passo 2)` : "O do passo 2"}</option>
+                              <option value="">{forro ? `${forro.nome} (principal)` : "Forro principal (escolha abaixo)"}</option>
                               {listaForros.filter((f) => String(f.id) !== String(forroId)).map((f) => (
                                 <option key={f.id} value={String(f.id)}>{f.nome}</option>
                               ))}
