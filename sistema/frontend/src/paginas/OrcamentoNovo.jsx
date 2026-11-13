@@ -178,7 +178,10 @@ export default function OrcamentoNovo() {
   // mais de um forro (por compartimento): cada um sai pelo seu m²; [] = um forro só
   const grupos = useMemo(
     () => (modo === "medidas"
-      ? gruposDeForro(compartimentos.map((c) => ({ nome: c.nome, area: areaDe(c), forro: c.forro })), forro, listaForros)
+      ? gruposDeForro(compartimentos.map((c) => ({
+          nome: c.nome, largura: paraNumero(c.largura), comprimento: paraNumero(c.comprimento),
+          area: areaDe(c), forro: c.forro,
+        })), forro, listaForros)
       : []),
     [modo, compartimentos, forro, listaForros]
   );

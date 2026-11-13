@@ -249,6 +249,12 @@ class OrcamentoApiTest(ApiBase):
         ]}, format="json")
         self.assertEqual((r.data["forro"], r.data["por_forro"], r.data["total_vista"]), (cedro.id, [], "3136.00"))
 
+        # sem nome, o compartimento aparece pela medida
+        r = self.client.post("/api/orcamentos/", {**base, "compartimentos": [
+            {"largura": "3.8", "comprimento": "6"}, {"nome": "", "largura": "0.8", "comprimento": "10", "forro": cedro.id},
+        ]}, format="json")
+        self.assertEqual([g["ambientes"] for g in r.data["por_forro"]], [["3,8 × 6 m"], ["0,8 × 10 m"]])
+
         # editar tirando o segundo forro limpa o detalhe por forro
         orc_id = os_.data["orcamento_detalhe"]["id"]
         r = self.client.patch(f"/api/orcamentos/{orc_id}/", {"compartimentos": comps[:2]}, format="json")
