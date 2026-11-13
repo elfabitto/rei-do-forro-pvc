@@ -14,7 +14,8 @@ import {
 import Icone from "../icones";
 import Telefone from "../Telefone";
 import {
-  baixarImagemOS, compartilharOS, copiarImagemOS, itensExtras, medidasDoPedido, montarOS, pecasDoPedido,
+  baixarImagemOS, compartilharOS, copiarImagemOS, forrosDoPedido, itensExtras, medidasDoPedido, montarOS,
+  pecasDoPedido, valorM2DoPedido,
 } from "../osDoc";
 import FinalizarModal from "./FinalizarModal";
 import ReciboModal from "./ReciboModal";
@@ -195,7 +196,9 @@ export default function OrdemDetalhe({ id, aoFechar, aoMudar }) {
                       {medidasDoPedido(orc).map(([nome, valor], i) => (
                         <Fragment key={i}><dt>{nome}</dt><dd className="wk">{valor}</dd></Fragment>
                       ))}
-                      <dt>Forro</dt><dd className="wk">{orc.forro_nome}</dd>
+                      {forrosDoPedido(orc).map(([nome, valor], i) => (
+                        <Fragment key={`f${i}`}><dt>{nome}</dt><dd className="wk">{valor}</dd></Fragment>
+                      ))}
                       {orc.acabamento_nome && (
                         <><dt>Acabamento</dt><dd className="wk">{orc.acabamento_nome}</dd></>
                       )}
@@ -213,10 +216,19 @@ export default function OrdemDetalhe({ id, aoFechar, aoMudar }) {
                           <dt>{e.descricao}</dt><dd className="wk">{brl(e.total)}</dd>
                         </Fragment>
                       ))}
-                      <dt>Valor do m²</dt>
-                      <dd className="wk">
-                        R$ {num(orc.preco_m2_vista)} à vista · R$ {num(orc.preco_m2_cartao)} cartão
-                      </dd>
+                      {orc.por_forro?.length > 1 ? orc.por_forro.map((g) => (
+                        <Fragment key={`m${g.forro}`}>
+                          <dt>Valor do m² — {g.nome}</dt>
+                          <dd className="wk">R$ {num(g.preco_m2_vista)} à vista · R$ {num(g.preco_m2_cartao)} cartão</dd>
+                        </Fragment>
+                      )) : (
+                        <>
+                          <dt>Valor do m²</dt>
+                          <dd className="wk">
+                            R$ {num(orc.preco_m2_vista)} à vista · R$ {num(orc.preco_m2_cartao)} cartão
+                          </dd>
+                        </>
+                      )}
                     </>
                   )}
                   <dt>Forma escolhida</dt>

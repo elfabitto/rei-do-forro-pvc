@@ -1,4 +1,4 @@
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 from django.conf import settings
 from django.core.validators import MinValueValidator
@@ -14,6 +14,15 @@ TAXA_LOGISTICA = Decimal("80.00")
 # O valor "no cartão" do orçamento é o crédito nesse número de parcelas, com a
 # taxa cadastrada em Parâmetros (TaxasCartao): o mesmo que sai na finalização.
 PARCELAS_ORCAMENTO = 5
+
+
+def area_do_compartimento(c):
+    """Largura × comprimento arredondado ao centavo — a mesma conta da tela."""
+    return (Decimal(str(c["largura"])) * Decimal(str(c["comprimento"]))).quantize(CENTAVO, ROUND_HALF_UP)
+
+
+def area_dos_compartimentos(compartimentos):
+    return sum((area_do_compartimento(c) for c in compartimentos), Decimal("0"))
 
 
 class TipoOrcamento(models.TextChoices):
@@ -36,8 +45,13 @@ class Orcamento(models.Model):
     tipo = models.CharField(max_length=12, choices=TipoOrcamento.choices)
 
     # medida: área direta, compartimentos (largura × comprimento de cada um) ou por folha
-    # (folha de 20 cm de largura). Lista de {nome, largura, comprimento}; a área é a soma.
+    # (folha de 20 cm de largura). Lista de {nome, largura, comprimento[, forro]}; a área é a soma.
+    # `forro` no compartimento = outro forro só nele (ex.: Cedro no beiral); sem ele, vale o `forro`.
     compartimentos = models.JSONField(default=list, blank=True)
+    # Com mais de um forro: o m² e o total de cada um, congelados no cálculo —
+    # [{forro, nome, area_m2, preco_m2_vista, preco_m2_cartao, total_vista, ambientes}].
+    # Vazio quando é um forro só (o caso comum e todos os orçamentos antigos).
+    por_forro = models.JSONField(default=list, blank=True)
     largura = models.DecimalField(max_digits=7, decimal_places=2, null=True, blank=True)
     comprimento = models.DecimalField(max_digits=7, decimal_places=2, null=True, blank=True)
     tamanho_folha = models.DecimalField("tamanho da folha (m)", max_digits=7, decimal_places=2, null=True, blank=True)
@@ -115,17 +129,39 @@ class Orcamento(models.Model):
 
         return valor + TaxasCartao.obter().acrescimo(valor, FormaPagamento.CREDITO, parcelas)
 
-    def precos_vigentes(self):
-        """Preço do m² a aplicar, já com os acréscimos de acabamento e estrutura quando Instalado."""
-        vista = self.forro.preco_m2(self.tipo, "vista")
+    def precos_vigentes(self, forro=None):
+        """
+        Preço do m² a aplicar, já com os acréscimos de acabamento e estrutura quando
+        Instalado. `forro` é o de um compartimento com outro forro; sem ele, o principal.
+        Acabamento e estrutura valem para a casa toda.
+        """
+        vista = (forro or self.forro).preco_m2(self.tipo, "vista")
         if self.tipo == TipoOrcamento.INSTALADO:
             vista += (self.acabamento.acrescimo_m2 if self.acabamento_id else 0) \
                 + (self.estrutura.acrescimo_m2 if self.estrutura_id else 0)
         return vista, self.no_cartao(vista)
 
+    def grupos_de_forro(self):
+        """
+        Compartimentos agrupados por forro, o principal primeiro:
+        [(forro, área, [ambientes])]. Um grupo só = orçamento de um forro.
+        """
+        from apps.catalogo.models import Forro
+
+        if not any(c.get("forro") and c["forro"] != self.forro_id for c in self.compartimentos or []):
+            return [(self.forro, self.area_m2, [])]
+        outros = Forro.objects.in_bulk({c["forro"] for c in self.compartimentos if c.get("forro")})
+        grupos = {self.forro_id: [self.forro, Decimal("0"), []]}
+        for i, c in enumerate(self.compartimentos, 1):
+            forro = outros.get(c.get("forro")) or self.forro
+            g = grupos.setdefault(forro.id, [forro, Decimal("0"), []])
+            g[1] += area_do_compartimento(c)
+            g[2].append(c.get("nome") or f"Compartimento {i}")
+        return [tuple(g) for g in grupos.values() if g[1] > 0]
+
     def recalcular(self):
         """
-        Refaz os totais a partir do m² e dos itens. O acabamento só entra no
+        Refaz os totais a partir do m² (de cada forro, quando há mais de um) e dos itens. O acabamento só entra no
         Instalado; no Material as peças são cobradas por unidade na lista de itens.
         Abaixo de 20 m² soma a taxa de logística (frete), no Instalado e no Material.
         O total no cartão é o total à vista (já com desconto) em 5x na maquininha.
@@ -141,7 +177,20 @@ class Orcamento(models.Model):
             else Decimal("0")
         )
 
-        forro_vista = (self.area_m2 * self.preco_m2_vista).quantize(CENTAVO)
+        # cada forro pelo seu m² (ex.: branco na sala, cedro no beiral); um forro só = área × m²
+        grupos = self.grupos_de_forro()
+        self.por_forro = []
+        if len(grupos) > 1:
+            for forro, area, ambientes in grupos:
+                vista, cartao = self.precos_vigentes(forro)
+                self.por_forro.append({
+                    "forro": forro.id, "nome": forro.nome, "area_m2": str(area),
+                    "preco_m2_vista": str(vista.quantize(CENTAVO)), "preco_m2_cartao": str(cartao.quantize(CENTAVO)),
+                    "total_vista": str((area * vista).quantize(CENTAVO)), "ambientes": ambientes,
+                })
+            forro_vista = sum((Decimal(g["total_vista"]) for g in self.por_forro), Decimal("0"))
+        else:
+            forro_vista = (self.area_m2 * self.preco_m2_vista).quantize(CENTAVO)
         abate = self.estrutura.acrescimo_m2 if self.estrutura_id and self.estrutura.acrescimo_m2 < 0 else 0
         self.abatimento_estrutura = (self.area_m2 * -abate).quantize(CENTAVO) if abate else Decimal("0")
 

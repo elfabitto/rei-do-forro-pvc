@@ -7,7 +7,7 @@ import {
 } from "../componentes";
 import Icone from "../icones";
 import {
-  VERBA, baixarImagem, copiarImagem, copiarTexto, ehServico, montarDocumento,
+  VERBA, baixarImagem, copiarImagem, copiarTexto, ehServico, gruposDoOrcamento, montarDocumento, nomeDosForros,
 } from "../orcamentoDoc";
 
 const FILTROS = [
@@ -25,6 +25,8 @@ function VerOrcamento({ orcamento, aoFechar }) {
   const taxas = useApi("/taxas-cartao/");
 
   const forro = linhas(forros.dados).find((f) => f.id === orcamento.forro);
+  // com outro forro em algum compartimento, cada um volta pelo seu m²
+  const grupos = forro ? gruposDoOrcamento(orcamento, forro, linhas(forros.dados)) : [];
   const acabamento = linhas(acabamentos.dados).find((a) => a.id === orcamento.acabamento);
   const estrutura = linhas(estruturas.dados).find((e) => e.id === orcamento.estrutura);
 
@@ -39,6 +41,7 @@ function VerOrcamento({ orcamento, aoFechar }) {
     estrutura,
     desconto: Number(orcamento.desconto ?? 0),   // reenviar sai com o mesmo desconto do salvo
     taxas: taxas.dados,
+    grupos,
     itens: gravados.filter((i) => i.unidade !== VERBA && !ehServico(i)).map((i) => ({
       rotulo: i.descricao,
       unidade: i.unidade,
@@ -124,7 +127,7 @@ function CardOrcamento({ o, aoVer, aoGerarOS, aoPerder, aoReabrir, aoEditar }) {
             <Icone nome={material ? "entrega" : "instalacao"} tamanho={15}
                    className={material ? "ic-ent" : "ic-ins"} />
             <span className="rot">Forro</span>
-            <span className="val">{o.forro_nome}</span>
+            <span className="val">{nomeDosForros(o)}</span>
           </div>
           {o.estrutura_nome && (
             <div className="li">

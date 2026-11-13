@@ -6,19 +6,11 @@ from rest_framework import serializers
 from apps.clientes.serializers import ClienteResumoSerializer
 from apps.core.permissions import pode_editar_registro
 
-from .models import Orcamento, OrcamentoItem, TipoOrcamento
+from .models import Orcamento, OrcamentoItem, TipoOrcamento, area_do_compartimento, area_dos_compartimentos
 
 
 CENTAVO = Decimal("0.01")
 MEDIDA_MAXIMA = Decimal("9999")    # metros: barra erro de digitação, cabe em largura/comprimento
-
-
-def area_dos_compartimentos(compartimentos):
-    """Soma de largura × comprimento, cada um arredondado — a mesma conta da tela."""
-    return sum(
-        ((Decimal(c["largura"]) * Decimal(c["comprimento"])).quantize(CENTAVO, ROUND_HALF_UP) for c in compartimentos),
-        Decimal("0"),
-    )
 
 
 class OrcamentoItemSerializer(serializers.ModelSerializer):
@@ -44,7 +36,8 @@ class OrcamentoResumoSerializer(serializers.ModelSerializer):
         model = Orcamento
         fields = ["id", "numero", "tipo", "tipo_display", "area_m2", "largura", "comprimento", "compartimentos",
                   "tamanho_folha", "quantidade_folhas",
-                  "forro_nome", "acabamento_nome", "estrutura_nome", "abatimento_estrutura", "preco_m2_vista",
+                  "forro_nome", "por_forro", "acabamento_nome", "estrutura_nome", "abatimento_estrutura",
+                  "preco_m2_vista",
                   "preco_m2_cartao", "taxa_logistica", "desconto", "total_vista", "total_cartao", "observacoes",
                   "itens"]
 
@@ -78,14 +71,15 @@ class OrcamentoSerializer(serializers.ModelSerializer):
         fields = ["id", "numero", "cliente", "cliente_detalhe", "tipo", "tipo_display",
                   "visita", "visita_numero",
                   "largura", "comprimento", "compartimentos", "tamanho_folha", "quantidade_folhas",
-                  "area_m2", "forro", "forro_nome",
+                  "area_m2", "forro", "forro_nome", "por_forro",
                   "acabamento", "acabamento_nome", "estrutura", "estrutura_nome", "abatimento_estrutura",
                   "preco_m2_vista", "preco_m2_cartao",
                   "taxa_logistica", "desconto", "total_vista", "total_cartao", "status", "status_display",
                   "validade_dias",
                   "observacoes", "vendedor", "vendedor_nome", "criado_por", "criado_em",
                   "itens", "tem_os", "os_id", "pode_editar"]
-        read_only_fields = ["numero", "preco_m2_vista", "preco_m2_cartao", "taxa_logistica", "abatimento_estrutura",
+        read_only_fields = ["numero", "preco_m2_vista", "preco_m2_cartao", "por_forro", "taxa_logistica",
+                            "abatimento_estrutura",
                             "total_vista",
                             "total_cartao", "criado_por", "criado_em"]
         extra_kwargs = {
@@ -108,8 +102,14 @@ class OrcamentoSerializer(serializers.ModelSerializer):
         return bool(pedido and pode_editar_registro(pedido.user, obj))
 
     def validate_compartimentos(self, valor):
+        from apps.catalogo.models import Forro
+
         if not isinstance(valor, list):
             raise serializers.ValidationError("Lista de compartimentos inválida.")
+        # outro forro num compartimento (ex.: Cedro no beiral, branco no resto da casa)
+        ids = {c.get("forro") for c in valor if isinstance(c, dict) and c.get("forro")}
+        existentes = set(Forro.objects.filter(pk__in=[i for i in ids if str(i).isdigit()])
+                         .values_list("pk", flat=True))
         limpos = []
         for i, c in enumerate(valor, 1):
             try:
@@ -119,11 +119,16 @@ class OrcamentoSerializer(serializers.ModelSerializer):
                 valido = False
             if not valido:
                 raise serializers.ValidationError(f"Compartimento {i}: informe largura e comprimento.")
-            limpos.append({
+            limpo = {
                 "nome": str(c.get("nome") or "").strip()[:40],
                 "largura": str(largura.quantize(CENTAVO, ROUND_HALF_UP)),
                 "comprimento": str(comprimento.quantize(CENTAVO, ROUND_HALF_UP)),
-            })
+            }
+            if c.get("forro"):
+                if not str(c["forro"]).isdigit() or int(c["forro"]) not in existentes:
+                    raise serializers.ValidationError(f"Compartimento {i}: forro não encontrado.")
+                limpo["forro"] = int(c["forro"])
+            limpos.append(limpo)
         return limpos
 
     def validate_desconto(self, valor):
@@ -135,6 +140,7 @@ class OrcamentoSerializer(serializers.ModelSerializer):
         # com compartimentos, a área sai deles — não do que a tela mandou
         compartimentos = attrs.get("compartimentos")
         if compartimentos:
+            self._normalizar_forros(attrs, compartimentos)
             attrs["area_m2"] = area_dos_compartimentos(compartimentos)
             um = compartimentos[0] if len(compartimentos) == 1 else None
             attrs["largura"] = Decimal(um["largura"]) if um else None
@@ -161,6 +167,26 @@ class OrcamentoSerializer(serializers.ModelSerializer):
                               "no Instalado use itens avulsos (Outros)."}
                 )
         return attrs
+
+    def _normalizar_forros(self, attrs, compartimentos):
+        """
+        O forro do compartimento só fica gravado quando difere do principal. Se nenhum
+        compartimento usa o principal, o principal passa a ser o de maior área.
+        """
+        principal = attrs.get("forro") or getattr(self.instance, "forro", None)
+        principal_id = principal.pk if principal else None
+        areas = {}
+        for c in compartimentos:
+            fid = c.get("forro") or principal_id
+            areas[fid] = areas.get(fid, Decimal("0")) + area_do_compartimento(c)
+        if principal_id not in areas and areas:
+            from apps.catalogo.models import Forro
+
+            principal_id = max(areas, key=lambda k: areas[k])
+            attrs["forro"] = Forro.objects.get(pk=principal_id)
+        for c in compartimentos:
+            if c.get("forro") == principal_id:
+                del c["forro"]
 
     def validate_visita(self, valor):
         if valor is None:

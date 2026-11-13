@@ -192,6 +192,73 @@ class OrcamentoApiTest(ApiBase):
             self.assertEqual(r.status_code, 400, ruim)
             self.assertIn("compartimentos", r.data)
 
+    def test_dois_forros_por_compartimento_um_pagamento(self):
+        """Branco liso na sala e no quarto, Cedro T1 no beiral: cada um pelo seu m², um total só."""
+        cedro = Forro.objects.create(nome="CEDRO T1", preco_material_vista=D("50.00"), preco_material_cartao=D("54"),
+                                     preco_instalado_vista=D("90.00"), preco_instalado_cartao=D("97"))
+        self.client.force_authenticate(self.vendedor)
+        base = {"cliente": self.cliente.id, "tipo": "instalado", "forro": self.forro.id,
+                "acabamento": self.sanca.id, "area_m2": "1"}
+        comps = [
+            {"nome": "Sala", "largura": "5", "comprimento": "4"},                       # 20
+            {"nome": "Quarto", "largura": "3", "comprimento": "3.5", "forro": self.forro.id},  # 10,5 — o principal
+            {"nome": "Beiral", "largura": "0.8", "comprimento": "15", "forro": cedro.id},      # 12
+        ]
+        r = self.client.post("/api/orcamentos/", {**base, "compartimentos": comps}, format="json")
+        self.assertEqual(r.status_code, 201, r.data)
+        self.assertEqual(r.data["area_m2"], "42.50")
+        self.assertNotIn("forro", r.data["compartimentos"][1])   # igual ao principal não fica gravado
+        self.assertEqual(r.data["compartimentos"][2]["forro"], cedro.id)
+        # branco: 30,5 × (64 + 8 sanca) = 2.196,00 · cedro: 12 × (90 + 8) = 1.176,00
+        pf = r.data["por_forro"]
+        self.assertEqual([(g["nome"], g["area_m2"], g["preco_m2_vista"], g["total_vista"], g["ambientes"]) for g in pf], [
+            ("BRANCO LISO BRILHOSO", "30.50", "72.00", "2196.00", ["Sala", "Quarto"]),
+            ("CEDRO T1", "12.00", "98.00", "1176.00", ["Beiral"]),
+        ])
+        self.assertEqual(r.data["total_vista"], "3372.00")
+        self.assertEqual(r.data["preco_m2_vista"], "72.00")   # o m² do forro principal
+
+        # uma O.S., um valor
+        hoje = timezone.localdate()
+        seg = hoje + timedelta(days=(7 - hoje.weekday()) % 7 or 7)
+        os_ = self.client.post("/api/ordens-servico/", {
+            "orcamento": r.data["id"], "endereco": self.endereco.id, "modalidade": "vista",
+            "agendar_instalacao": {"data": str(seg), "turno": "manha"},
+        }, format="json")
+        self.assertEqual(os_.status_code, 201, os_.data)
+        self.assertEqual(os_.data["valor_total"], "3372.00")
+        self.assertEqual(len(os_.data["orcamento_detalhe"]["por_forro"]), 2)
+        self.assertEqual(OrdemServico.objects.get(pk=os_.data["id"]).comissao_valor, D("85.00"))   # 42,5 m² × 2
+
+        # painel: cada forro com os seus m²
+        self.client.force_authenticate(self.diretor)
+        forros = {f["nome"]: f["m2"] for f in self.client.get("/api/painel/").data["forros"]}
+        self.assertEqual((forros["BRANCO LISO BRILHOSO"], forros["CEDRO T1"]), (D("30.50"), D("12.00")))
+        self.client.force_authenticate(self.vendedor)
+
+        # Material: só o forro de cada um, sem acabamento — 20 × 33,80 + 12 × 50 = 1.276,00
+        r = self.client.post("/api/orcamentos/", {"cliente": self.cliente.id, "tipo": "material",
+                                                  "forro": self.forro.id, "area_m2": "1",
+                                                  "compartimentos": [comps[0], comps[2]]}, format="json")
+        self.assertEqual(r.status_code, 201, r.data)
+        self.assertEqual(r.data["total_vista"], "1276.00")
+
+        # todos no cedro: o cedro vira o principal e volta a ser orçamento de um forro só
+        r = self.client.post("/api/orcamentos/", {**base, "compartimentos": [
+            {**comps[0], "forro": cedro.id}, {**comps[2]},
+        ]}, format="json")
+        self.assertEqual((r.data["forro"], r.data["por_forro"], r.data["total_vista"]), (cedro.id, [], "3136.00"))
+
+        # editar tirando o segundo forro limpa o detalhe por forro
+        orc_id = os_.data["orcamento_detalhe"]["id"]
+        r = self.client.patch(f"/api/orcamentos/{orc_id}/", {"compartimentos": comps[:2]}, format="json")
+        self.assertEqual((r.data["por_forro"], r.data["total_vista"]), ([], "2196.00"))
+
+        r = self.client.post("/api/orcamentos/", {**base, "compartimentos": [{**comps[0], "forro": 99999}]},
+                             format="json")
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("compartimentos", r.data)
+
     def test_sem_ripao_abate_a_duzia_a_cada_10m2_e_vai_para_a_os(self):
         from apps.catalogo.models import Estrutura
 

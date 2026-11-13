@@ -163,7 +163,10 @@ nav a.on .ic{color:var(--orange)}
   .pagina{padding:18px 14px 36px}
   .paginaTopo .grande{margin-left:0;width:100%}
   .cardGrid{grid-template-columns:1fr}
-  .cols.c-2,.cols.c-4{grid-template-columns:1fr}
+  .cols.c-2,.cols.c-4{grid-template-columns:minmax(0,1fr)}
+  /* "− R$ 15,00/m² (abate R$ 691,50)" do Sem ripão: quebra em vez de alargar a tela */
+  .opt .t{min-width:0}
+  .opt .v{white-space:normal;text-align:right;max-width:45%}
   .two{grid-template-columns:1fr}
   .contagem{width:100%;margin-left:0}
 

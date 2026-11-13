@@ -23,7 +23,7 @@ import { imagemDe } from "../imagensCatalogo";
 import { decimal, digitos } from "../mascaras";
 import SeletorForro, { Miniatura } from "./SeletorForro";
 import {
-  SERVICO, VERBA, baixarImagem, brl, copiarImagem, copiarTexto, ehServico, montarDocumento,
+  SERVICO, VERBA, baixarImagem, brl, copiarImagem, copiarTexto, ehServico, gruposDeForro, montarDocumento,
   unidadePlural,
 } from "../orcamentoDoc";
 
@@ -35,7 +35,8 @@ const paraNumero = (v) => {
   return isFinite(n) && n > 0 ? n : 0;
 };
 
-const COMPARTIMENTO_VAZIO = { nome: "", largura: "", comprimento: "" };
+// forro vazio = o do passo 2; outro forro só nesse compartimento (ex.: Cedro no beiral)
+const COMPARTIMENTO_VAZIO = { nome: "", largura: "", comprimento: "", forro: "" };
 
 /* Em centímetros inteiros, para arredondar igual ao backend (área_dos_compartimentos). */
 const emCm = (v) => Math.round(paraNumero(v) * 100);
@@ -115,6 +116,7 @@ export default function OrcamentoNovo() {
         nome: c.nome ?? "",
         largura: String(Number(c.largura)).replace(".", ","),
         comprimento: String(Number(c.comprimento)).replace(".", ","),
+        forro: c.forro ? String(c.forro) : "",
       })));
     } else if (o.largura && o.comprimento) {   // orçamento de antes dos compartimentos
       setModo("medidas");
@@ -122,6 +124,7 @@ export default function OrcamentoNovo() {
         nome: "",
         largura: String(Number(o.largura)).replace(".", ","),
         comprimento: String(Number(o.comprimento)).replace(".", ","),
+        forro: "",
       }]);
     } else {
       setModo("area");
@@ -172,6 +175,13 @@ export default function OrcamentoNovo() {
   };
 
   const forro = listaForros.find((f) => String(f.id) === String(forroId));
+  // mais de um forro (por compartimento): cada um sai pelo seu m²; [] = um forro só
+  const grupos = useMemo(
+    () => (modo === "medidas"
+      ? gruposDeForro(compartimentos.map((c) => ({ nome: c.nome, area: areaDe(c), forro: c.forro })), forro, listaForros)
+      : []),
+    [modo, compartimentos, forro, listaForros]
+  );
   const acabamento = listaAcabamentos.find((a) => String(a.id) === String(acabamentoId));
   // orçamento antigo sem estrutura = a padrão (acréscimo zero), como no backend
   const estruturaPadrao = listaEstruturas.find((e) => Number(e.acrescimo_m2) === 0);
@@ -213,7 +223,7 @@ export default function OrcamentoNovo() {
   const completo = areaFinal > 0 && forro && tipo && (tipo === "material" || acabamento);
   const doc = completo
     ? montarDocumento({ tipo, area: areaFinal, forro, acabamento, estrutura, itens, extras: extrasValidos,
-                        servico: valorServico, desconto: valorDesconto, taxas: taxas.dados })
+                        servico: valorServico, desconto: valorDesconto, taxas: taxas.dados, grupos })
     : null;
   const descontoDemais = doc && valorDesconto > (doc.subtotalVista ?? doc.totalVista);
 
@@ -228,6 +238,7 @@ export default function OrcamentoNovo() {
             nome: c.nome.trim(),
             largura: paraNumero(c.largura).toFixed(2),
             comprimento: paraNumero(c.comprimento).toFixed(2),
+            ...(c.forro && String(c.forro) !== String(forro.id) ? { forro: Number(c.forro) } : {}),
           }))
         : [],
       largura: null,
@@ -414,16 +425,29 @@ export default function OrcamentoNovo() {
                                     onClick={() => removerCompartimento(i)}>×</button>
                           )}
                         </div>
-                        <div className="two">
+                        {/* lado a lado também no celular: Largura × Comprimento, como se fala a medida */}
+                        <div className="lxc">
                           <Campo rotulo="Largura (m)">
                             <input value={c.largura} inputMode="decimal" placeholder="Ex.: 4,60"
                                    onChange={(e) => mudarCompartimento(i, "largura", decimal(e.target.value))} />
                           </Campo>
+                          <span className="vezes" aria-hidden="true">×</span>
                           <Campo rotulo="Comprimento (m)">
                             <input value={c.comprimento} inputMode="decimal" placeholder="Ex.: 5"
                                    onChange={(e) => mudarCompartimento(i, "comprimento", decimal(e.target.value))} />
                           </Campo>
                         </div>
+                        {/* outro forro só neste compartimento: ex.: branco na casa, Cedro no beiral */}
+                        {compartimentos.length > 1 && (
+                          <Campo rotulo="Forro deste compartimento">
+                            <select value={c.forro} onChange={(e) => mudarCompartimento(i, "forro", e.target.value)}>
+                              <option value="">{forro ? `${forro.nome} (o do passo 2)` : "O do passo 2"}</option>
+                              {listaForros.filter((f) => String(f.id) !== String(forroId)).map((f) => (
+                                <option key={f.id} value={String(f.id)}>{f.nome}</option>
+                              ))}
+                            </select>
+                          </Campo>
+                        )}
                       </div>
                     ))}
                     <button type="button" className="btn mb" onClick={novoCompartimento}>
@@ -433,13 +457,26 @@ export default function OrcamentoNovo() {
                       <span>Área total</span>
                       <b>{areaFinal ? `${num(areaFinal)} m²` : "—"}</b>
                     </div>
+                    {grupos.length > 1 && (
+                      <div className="calcForros">
+                        {grupos.map((g) => (
+                          <span key={g.forro.id}>{g.forro.nome}: <b>{num(g.area)} m²</b></span>
+                        ))}
+                      </div>
+                    )}
                   </>
                 )}
               </div>
 
               <div className="step">
-                {passo(2, "Tipo de forro")}
+                {passo(2, grupos.length > 1 ? "Tipo de forro (principal)" : "Tipo de forro")}
                 <SeletorForro forros={listaForros} valor={forroId} aoMudar={alterou(setForroId)} />
+                {grupos.length > 1 && (
+                  <p className="nota">
+                    Vale para os compartimentos sem outro forro marcado. Cada forro sai pelo seu
+                    preço do m²; acabamento e estrutura valem para a casa toda.
+                  </p>
+                )}
                 {forro && (
                   <div className="ref">
                     <Miniatura nome={forro.nome} cor={forro.cor_amostra} tamanho={64} className="grande" />

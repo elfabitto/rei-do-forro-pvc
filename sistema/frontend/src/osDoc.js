@@ -7,7 +7,7 @@
  */
 import { LOGO } from "./logo";
 import { periodoTexto } from "./agendaTexto";
-import { VERBA, ehServico, quantidadeTexto } from "./orcamentoDoc";
+import { VERBA, comAmbientes, ehServico, quantidadeTexto } from "./orcamentoDoc";
 import { bloco, montarTexto } from "./textoGestao";
 
 const brl = (n) =>
@@ -60,6 +60,30 @@ export function pecasDoPedido(itens = []) {
     .map((i) => [i.descricao, quantidadeTexto(i.quantidade, i.unidade)]);
 }
 
+/** Mais de um forro no orçamento (ex.: branco na casa, Cedro T1 no beiral)? */
+export const variosForros = (orc) => orc?.por_forro?.length > 1;
+
+/** Linhas do forro na ficha: uma por forro, com os ambientes e a área de cada um. */
+export function forrosDoPedido(orc) {
+  if (!variosForros(orc)) return [["Forro", orc.forro_nome ?? "—"]];
+  return orc.por_forro.map((g) => ["Forro", `${comAmbientes(g)} — ${m2(g.area_m2)} m²`]);
+}
+
+/** Valor do m², à vista e no cartão — de cada forro quando são vários. */
+export function valorM2DoPedido(orc) {
+  if (variosForros(orc)) {
+    return orc.por_forro.flatMap((g) => [
+      [`${g.nome} — à vista`, `R$ ${brl(g.preco_m2_vista)}/m²`],
+      [`${g.nome} — no cartão`, `R$ ${brl(g.preco_m2_cartao)}/m²`],
+    ]);
+  }
+  if (!Number(orc.preco_m2_vista)) return [];
+  return [
+    ["À vista", `R$ ${brl(orc.preco_m2_vista)}/m²`],
+    ["No cartão", `R$ ${brl(orc.preco_m2_cartao)}/m²`],
+  ];
+}
+
 /** Itens "Outro" do orçamento: descrição e valor fechado. */
 export const itensExtras = (itens = []) => itens.filter((i) => i.unidade === VERBA);
 
@@ -108,7 +132,7 @@ export function montarOS(os, { verFinanceiro = true } = {}) {
   if (orc) {
     d.pedido.push(["Área", `${m2(orc.area_m2)} m²`]);
     d.pedido.push(...medidasDoPedido(orc));
-    d.pedido.push(["Forro", orc.forro_nome ?? "—"]);
+    d.pedido.push(...forrosDoPedido(orc));
     if (orc.acabamento_nome) d.pedido.push(["Acabamento", orc.acabamento_nome]);
     if (orc.estrutura_nome) d.pedido.push(["Estrutura", orc.estrutura_nome]);
     if (Number(orc.abatimento_estrutura) > 0) {
@@ -126,8 +150,7 @@ export function montarOS(os, { verFinanceiro = true } = {}) {
     }
     if (Number(orc.desconto) > 0) d.pedido.push(["Desconto", `− R$ ${brl(orc.desconto)}`]);
 
-    d.m2Vista = Number(orc.preco_m2_vista);
-    d.m2Cartao = Number(orc.preco_m2_cartao);
+    d.valorM2 = valorM2DoPedido(orc);
   }
 
   /* ---- agendamento ---- */
@@ -148,10 +171,7 @@ export function montarOS(os, { verFinanceiro = true } = {}) {
       bloco("👤", "INFORMAÇÕES DO CLIENTE", d.cliente_linhas),
       bloco("📦", "INFORMAÇÕES DO PEDIDO", d.pedido),
       bloco("🗓️", "AGENDAMENTO", d.agenda),
-      d.m2Vista ? bloco("💰", "VALOR DO M²", [
-        ["À vista", `R$ ${brl(d.m2Vista)}/m²`],
-        ["No cartão", `R$ ${brl(d.m2Cartao)}/m²`],
-      ]) : "",
+      d.valorM2?.length ? bloco("💰", "VALOR DO M²", d.valorM2) : "",
       bloco("🧾", "INFORMAÇÕES DE PAGAMENTO", [
         ["Tipo", d.modalidade || "a definir"],
         ["Total", `R$ ${brl(d.valor)}`],
@@ -214,11 +234,10 @@ export function desenharOS(d) {
   secao("Agendamento");
   d.agenda.forEach(([k, v]) => linha(k, v));
 
-  if (d.m2Vista) {
+  if (d.valorM2?.length) {
     add(10, () => {});
     secao("Valor do metro quadrado");
-    linha("À vista", `R$ ${brl(d.m2Vista)}/m²`);
-    linha("No cartão", `R$ ${brl(d.m2Cartao)}/m²`);
+    d.valorM2.forEach(([k, v]) => linha(k, v));
   }
 
   if (d.observacoes) {

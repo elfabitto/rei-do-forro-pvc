@@ -8,6 +8,7 @@
  */
 import fonteAssinatura from "./fontes/mrs-saint-delafield.woff2";
 import { LOGO } from "./logo";
+import { nomeDosForros } from "./orcamentoDoc";
 
 const brl = (n) =>
   Number(n ?? 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -102,7 +103,7 @@ export function montarRecibo(os) {
   const recebido = Number(os.total_pago ?? 0);
   const emissao = os.finalizada_em || new Date().toISOString();
 
-  const servico = [os.tipo_display, orc?.forro_nome].filter(Boolean).join(" — ");
+  const servico = [os.tipo_display, nomeDosForros(orc)].filter(Boolean).join(" — ");
   const area = orc?.area_m2 ? `${m2(orc.area_m2)} m²` : "";
   const endereco = end
     ? [`${end.logradouro ?? ""}${end.numero ? `, ${end.numero}` : ""}`, end.bairro].filter(Boolean).join(" — ")

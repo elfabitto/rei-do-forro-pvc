@@ -17,8 +17,8 @@ import { PARCELAS_MAX, PARCELAS_ORCAMENTO, valorNoCartao } from "../cartao";
 import { useAuth } from "../auth";
 import CalendarioVagas from "../calendario";
 import { BotaoAcao, Campo, Estado, Selecao, linhas, useApi } from "../componentes";
-import { VERBA, ehServico, linhaServico, quantidadeTexto } from "../orcamentoDoc";
-import { medidasDoPedido } from "../osDoc";
+import { VERBA, ehServico, linhaServico, nomeDosForros, quantidadeTexto } from "../orcamentoDoc";
+import { forrosDoPedido, medidasDoPedido } from "../osDoc";
 import Icone from "../icones";
 import ClienteModal from "./ClienteModal";
 
@@ -143,7 +143,7 @@ export default function OrdemNova() {
                     <tr key={o.id}>
                       <td><b>{o.numero}</b></td>
                       <td>{o.cliente_detalhe?.nome ?? <span style={{ color: "var(--muted)" }}>cadastrar ao fechar</span>}</td>
-                      <td>{o.forro_nome}</td>
+                      <td>{nomeDosForros(o)}</td>
                       <td className="num">{brl(o.total_vista)}</td>
                       <td>
                         <button className="btn p" disabled={!o.pode_editar}
@@ -303,7 +303,9 @@ export default function OrdemNova() {
                 {medidasDoPedido(orc).map(([nome, valor], i) => (
                   <div className="row sm item" key={i}><span className="k">{nome}</span><span className="v">{valor}</span></div>
                 ))}
-                <div className="row"><span className="k">Forro</span><span className="v">{orc.forro_nome}</span></div>
+                {forrosDoPedido(orc).map(([nome, valor], i) => (
+                  <div className="row" key={`f${i}`}><span className="k">{nome}</span><span className="v">{valor}</span></div>
+                ))}
                 {orc.estrutura_nome && (
                   <div className="row"><span className="k">Estrutura</span>
                     <span className="v">{orc.estrutura_nome}</span></div>

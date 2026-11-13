@@ -285,9 +285,13 @@ def painel(request):
         t["m2"] += o.area_m2 or ZERO
         status[o.status] += 1
         if o.orcamento_id:
-            f = forros[o.orcamento.forro.nome]
-            f["m2"] += o.orcamento.area_m2
-            f["vendas"] += 1
+            # com dois forros (ex.: branco na casa, cedro no beiral), cada um conta os seus m²
+            partes = [(g["nome"], Decimal(g["area_m2"])) for g in o.orcamento.por_forro] \
+                or [(o.orcamento.forro.nome, o.orcamento.area_m2)]
+            for nome, area in partes:
+                f = forros[nome]
+                f["m2"] += area
+                f["vendas"] += 1
 
     orcs = Orcamento.objects.filter(criado_em__date__range=(de, ate))
 
