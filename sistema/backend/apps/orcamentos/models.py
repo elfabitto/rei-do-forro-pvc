@@ -21,12 +21,9 @@ def area_do_compartimento(c):
     return (Decimal(str(c["largura"])) * Decimal(str(c["comprimento"]))).quantize(CENTAVO, ROUND_HALF_UP)
 
 
-def nome_do_compartimento(c):
-    """O nome digitado; sem nome, a medida ("3,8 × 6 m") — igual ao documento da tela."""
-    if c.get("nome"):
-        return c["nome"]
-    medida = lambda v: f"{Decimal(str(v)).normalize():f}".replace(".", ",")   # noqa: E731
-    return f"{medida(c['largura'])} × {medida(c['comprimento'])} m"
+def nome_do_compartimento(c, posicao):
+    """O nome digitado; sem nome, a posição ("Área 2") — igual ao documento da tela e à O.S."""
+    return c.get("nome") or f"Área {posicao}"
 
 
 def area_dos_compartimentos(compartimentos):
@@ -160,11 +157,11 @@ class Orcamento(models.Model):
             return [(self.forro, self.area_m2, [])]
         outros = Forro.objects.in_bulk({c["forro"] for c in self.compartimentos if c.get("forro")})
         grupos = {self.forro_id: [self.forro, Decimal("0"), []]}
-        for c in self.compartimentos:
+        for i, c in enumerate(self.compartimentos, 1):
             forro = outros.get(c.get("forro")) or self.forro
             g = grupos.setdefault(forro.id, [forro, Decimal("0"), []])
             g[1] += area_do_compartimento(c)
-            g[2].append(nome_do_compartimento(c))
+            g[2].append(nome_do_compartimento(c, i))
         return [tuple(g) for g in grupos.values() if g[1] > 0]
 
     def recalcular(self):

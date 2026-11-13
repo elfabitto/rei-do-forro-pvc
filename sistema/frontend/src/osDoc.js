@@ -23,8 +23,9 @@ const logoPronta = new Promise((ok) => {
 const FF = '"Segoe UI", Arial, Helvetica, sans-serif';
 
 /**
- * Como a área foi tirada: uma linha por compartimento ("Sala: 5 m × 4 m = 20 m²"),
- * ou a contagem de folhas. Vai no texto, na imagem e na tela da O.S.
+ * Como a área foi tirada: uma linha por compartimento ("Sala: 5 m × 4 m = 20 m²"; sem nome,
+ * "Área 2: …"), ou a contagem de folhas. Com dois forros, cada linha diz o forro dela.
+ * Vai no texto, na imagem e na tela da O.S.
  */
 export function medidasDoPedido(orc) {
   const medida = (l, c) => `${m2(l)} m × ${m2(c)} m`;
@@ -32,9 +33,12 @@ export function medidasDoPedido(orc) {
   const areaDe = (c) => Math.round((Math.round(c.largura * 100) * Math.round(c.comprimento * 100)) / 100) / 100;
   const lista = orc.compartimentos ?? [];
   if (lista.length > 1) {
+    const forroDe = (c) => (orc.por_forro?.length > 1
+      ? ` · ${orc.por_forro.find((g) => g.forro === c.forro)?.nome ?? orc.forro_nome}`
+      : "");
     return lista.map((c, i) => [
-      c.nome || `Compartimento ${i + 1}`,
-      `${medida(c.largura, c.comprimento)} = ${m2(areaDe(c))} m²`,
+      c.nome || `Área ${i + 1}`,
+      `${medida(c.largura, c.comprimento)} = ${m2(areaDe(c))} m²${forroDe(c)}`,
       "📏",
     ]);
   }

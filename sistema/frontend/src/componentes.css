@@ -305,6 +305,8 @@ input.preco.erro{border-color:var(--critical);background:#fdf2f2}
 .compartimento{border:1px solid var(--line);border-radius:8px;padding:10px 12px 0;margin-bottom:10px;background:var(--surface-2)}
 .compartimento .topo{display:flex;align-items:center;gap:10px;margin-bottom:10px}
 .compartimento .topo input{flex:1 1 auto;min-width:0}
+.compartimento .topo .tituloArea{flex:1 1 auto;min-width:0;font-size:13px;font-weight:800;letter-spacing:.6px;
+          text-transform:uppercase;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .compartimento .topo b{flex:0 0 auto;font-size:13.5px;font-variant-numeric:tabular-nums;white-space:nowrap}
 .compartimento .topo .x{flex:0 0 auto;width:30px;height:30px;border:1px solid var(--line);border-radius:6px;
           background:var(--surface);color:var(--muted);font-size:17px;line-height:1;cursor:pointer}

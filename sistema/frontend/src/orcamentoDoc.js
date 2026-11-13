@@ -77,19 +77,19 @@ export function montarDocumento({ tipo, area, forro, acabamento, estrutura, iten
 /**
  * Compartimentos agrupados por forro, o principal primeiro: [{ forro, area, ambientes }].
  * `compartimentos` chega como [{ nome, largura, comprimento, area, forro }] (forro = id,
- * vazio = o principal). Sem nome, o compartimento aparece pela medida: "3,8 × 6 m".
+ * vazio = o principal). Sem nome, o compartimento aparece pela posição: "Área 2".
  * Devolve [] quando todos usam o mesmo forro — o orçamento comum, de um forro só.
  */
 export function gruposDeForro(compartimentos, forro, listaForros) {
   if (!forro) return [];
   const grupos = new Map([[String(forro.id), { forro, area: 0, ambientes: [] }]]);
-  compartimentos.forEach((c) => {
+  compartimentos.forEach((c, i) => {
     if (!(c.area > 0)) return;
     const f = (c.forro && listaForros.find((x) => String(x.id) === String(c.forro))) || forro;
     if (!grupos.has(String(f.id))) grupos.set(String(f.id), { forro: f, area: 0, ambientes: [] });
     const g = grupos.get(String(f.id));
     g.area = cent(g.area + c.area);
-    g.ambientes.push(c.nome?.trim() || `${m2(c.largura)} × ${m2(c.comprimento)} m`);
+    g.ambientes.push(c.nome?.trim() || `Área ${i + 1}`);
   });
   const lista = [...grupos.values()].filter((g) => g.area > 0);
   return lista.length > 1 ? lista : [];

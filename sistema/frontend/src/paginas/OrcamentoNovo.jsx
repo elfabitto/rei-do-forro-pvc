@@ -418,16 +418,19 @@ export default function OrcamentoNovo() {
                     </p>
                     {compartimentos.map((c, i) => (
                       <div className="compartimento" key={i}>
+                        {/* cabeçalho: "Área 1" (ou o nome dado) · m² · remover */}
                         <div className="topo">
-                          <input value={c.nome} maxLength={40} placeholder={`Compartimento ${i + 1} (ex.: Sala)`}
-                                 aria-label={`Nome do compartimento ${i + 1} (opcional)`}
-                                 onChange={(e) => mudarCompartimento(i, "nome", e.target.value)} />
+                          <span className="tituloArea">{c.nome.trim() || `Área ${i + 1}`}</span>
                           <b>{areaDe(c) ? `${num(areaDe(c))} m²` : "—"}</b>
                           {compartimentos.length > 1 && (
-                            <button type="button" className="x" aria-label={`Remover compartimento ${i + 1}`}
+                            <button type="button" className="x" aria-label={`Remover área ${i + 1}`}
                                     onClick={() => removerCompartimento(i)}>×</button>
                           )}
                         </div>
+                        <Campo rotulo="Nome do ambiente (opcional)">
+                          <input value={c.nome} maxLength={40} placeholder="Ex.: Sala, Quarto, Beiral"
+                                 onChange={(e) => mudarCompartimento(i, "nome", e.target.value)} />
+                        </Campo>
                         {/* lado a lado também no celular: Largura × Comprimento, como se fala a medida */}
                         <div className="lxc">
                           <Campo rotulo="Largura (m)">
@@ -440,9 +443,9 @@ export default function OrcamentoNovo() {
                                    onChange={(e) => mudarCompartimento(i, "comprimento", decimal(e.target.value))} />
                           </Campo>
                         </div>
-                        {/* outro forro só neste compartimento: ex.: branco na casa, Cedro no beiral */}
+                        {/* outro forro só nesta área: ex.: branco na casa, Cedro no beiral */}
                         {compartimentos.length > 1 && (
-                          <Campo rotulo="Forro deste compartimento">
+                          <Campo rotulo="Forro desta área">
                             <select value={c.forro} onChange={(e) => mudarCompartimento(i, "forro", e.target.value)}>
                               <option value="">{forro ? `${forro.nome} (principal)` : "Forro principal (escolha abaixo)"}</option>
                               {listaForros.filter((f) => String(f.id) !== String(forroId)).map((f) => (
@@ -454,7 +457,7 @@ export default function OrcamentoNovo() {
                       </div>
                     ))}
                     <button type="button" className="btn mb" onClick={novoCompartimento}>
-                      <Icone nome="mais" tamanho={14} /> Novo compartimento
+                      <Icone nome="mais" tamanho={14} /> Adicionar área
                     </button>
                     <div className="calc">
                       <span>Área total</span>
