@@ -6,18 +6,54 @@ from rest_framework import serializers
 from apps.clientes.serializers import ClienteResumoSerializer
 from apps.core.permissions import pode_editar_registro
 
-from .models import Orcamento, OrcamentoItem, TipoOrcamento, area_do_compartimento, area_dos_compartimentos
+from .models import (
+    CORES_MATERIAL, Orcamento, OrcamentoItem, TipoOrcamento, area_do_compartimento, area_dos_compartimentos,
+)
 
 
 CENTAVO = Decimal("0.01")
 MEDIDA_MAXIMA = Decimal("9999")    # metros: barra erro de digitação, cabe em largura/comprimento
 
 
+def limpar_compartimentos(valor, forros_validos=None, rotulo="Compartimento"):
+    """
+    [{nome, largura, comprimento}] conferidos e arredondados ao centavo. `forros_validos`
+    (ids) aceita o `forro` por compartimento do formato antigo; None = não aceita.
+    """
+    if not isinstance(valor, list):
+        raise serializers.ValidationError("Lista de compartimentos inválida.")
+    limpos = []
+    for i, c in enumerate(valor, 1):
+        try:
+            largura, comprimento = Decimal(str(c["largura"])), Decimal(str(c["comprimento"]))
+            valido = 0 < largura <= MEDIDA_MAXIMA and 0 < comprimento <= MEDIDA_MAXIMA
+        except (KeyError, TypeError, InvalidOperation):
+            valido = False
+        if not valido:
+            raise serializers.ValidationError(f"{rotulo} {i}: informe largura e comprimento.")
+        limpo = {
+            "nome": str(c.get("nome") or "").strip()[:40],
+            "largura": str(largura.quantize(CENTAVO, ROUND_HALF_UP)),
+            "comprimento": str(comprimento.quantize(CENTAVO, ROUND_HALF_UP)),
+        }
+        if c.get("forro") and forros_validos is not None:
+            if not str(c["forro"]).isdigit() or int(c["forro"]) not in forros_validos:
+                raise serializers.ValidationError(f"{rotulo} {i}: forro não encontrado.")
+            limpo["forro"] = int(c["forro"])
+        limpos.append(limpo)
+    return limpos
+
+
 class OrcamentoItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = OrcamentoItem
-        fields = ["id", "material", "descricao", "unidade", "quantidade", "preco_unitario", "total"]
+        fields = ["id", "material", "descricao", "unidade", "quantidade", "preco_unitario", "total", "cor"]
         read_only_fields = ["total"]
+
+    def validate_cor(self, valor):
+        if valor and valor not in CORES_MATERIAL:
+            raise serializers.ValidationError(f"Cor inválida. Use: {', '.join(CORES_MATERIAL)}.")
+        return valor
 
 
 class OrcamentoResumoSerializer(serializers.ModelSerializer):
@@ -36,7 +72,7 @@ class OrcamentoResumoSerializer(serializers.ModelSerializer):
         model = Orcamento
         fields = ["id", "numero", "tipo", "tipo_display", "area_m2", "largura", "comprimento", "compartimentos",
                   "tamanho_folha", "quantidade_folhas",
-                  "forro_nome", "por_forro", "acabamento_nome", "estrutura_nome", "abatimento_estrutura",
+                  "forro_nome", "forros_adicionais", "por_forro", "acabamento_nome", "estrutura_nome", "abatimento_estrutura",
                   "preco_m2_vista",
                   "preco_m2_cartao", "taxa_logistica", "desconto", "total_vista", "total_cartao", "observacoes",
                   "itens"]
@@ -71,7 +107,7 @@ class OrcamentoSerializer(serializers.ModelSerializer):
         fields = ["id", "numero", "cliente", "cliente_detalhe", "tipo", "tipo_display",
                   "visita", "visita_numero",
                   "largura", "comprimento", "compartimentos", "tamanho_folha", "quantidade_folhas",
-                  "area_m2", "forro", "forro_nome", "por_forro",
+                  "area_m2", "forro", "forro_nome", "forros_adicionais", "por_forro",
                   "acabamento", "acabamento_nome", "estrutura", "estrutura_nome", "abatimento_estrutura",
                   "preco_m2_vista", "preco_m2_cartao",
                   "taxa_logistica", "desconto", "total_vista", "total_cartao", "status", "status_display",
@@ -104,31 +140,48 @@ class OrcamentoSerializer(serializers.ModelSerializer):
     def validate_compartimentos(self, valor):
         from apps.catalogo.models import Forro
 
-        if not isinstance(valor, list):
-            raise serializers.ValidationError("Lista de compartimentos inválida.")
-        # outro forro num compartimento (ex.: Cedro no beiral, branco no resto da casa)
-        ids = {c.get("forro") for c in valor if isinstance(c, dict) and c.get("forro")}
+        # formato antigo de dois forros: outro forro marcado num compartimento (ainda aceito
+        # de telas abertas antes da atualização; a tela nova manda forros_adicionais)
+        ids = {c.get("forro") for c in valor if isinstance(c, dict) and c.get("forro")} \
+            if isinstance(valor, list) else set()
         existentes = set(Forro.objects.filter(pk__in=[i for i in ids if str(i).isdigit()])
                          .values_list("pk", flat=True))
-        limpos = []
-        for i, c in enumerate(valor, 1):
-            try:
-                largura, comprimento = Decimal(str(c["largura"])), Decimal(str(c["comprimento"]))
-                valido = 0 < largura <= MEDIDA_MAXIMA and 0 < comprimento <= MEDIDA_MAXIMA
-            except (KeyError, TypeError, InvalidOperation):
-                valido = False
-            if not valido:
-                raise serializers.ValidationError(f"Compartimento {i}: informe largura e comprimento.")
-            limpo = {
-                "nome": str(c.get("nome") or "").strip()[:40],
-                "largura": str(largura.quantize(CENTAVO, ROUND_HALF_UP)),
-                "comprimento": str(comprimento.quantize(CENTAVO, ROUND_HALF_UP)),
-            }
-            if c.get("forro"):
-                if not str(c["forro"]).isdigit() or int(c["forro"]) not in existentes:
-                    raise serializers.ValidationError(f"Compartimento {i}: forro não encontrado.")
-                limpo["forro"] = int(c["forro"])
-            limpos.append(limpo)
+        return limpar_compartimentos(valor, existentes)
+
+    def validate_forros_adicionais(self, valor):
+        """Os outros tipos de forro, cada um com a sua medida. A área de cada um vem conferida."""
+        from apps.catalogo.models import Forro
+
+        if not isinstance(valor, list):
+            raise serializers.ValidationError("Lista de forros inválida.")
+        limpos, vistos = [], set()
+        for n, b in enumerate(valor, 2):   # o 1º forro é o `forro` do orçamento
+            if not isinstance(b, dict) or not str(b.get("forro") or "").isdigit():
+                raise serializers.ValidationError(f"Forro {n}: escolha o tipo de forro.")
+            forro = Forro.objects.filter(pk=int(b["forro"])).first()
+            if not forro:
+                raise serializers.ValidationError(f"Forro {n}: forro não encontrado.")
+            if forro.pk in vistos:
+                raise serializers.ValidationError(f"Forro {n}: {forro.nome} já está no orçamento.")
+            vistos.add(forro.pk)
+            compartimentos = limpar_compartimentos(b.get("compartimentos") or [], rotulo=f"Forro {n} — área")
+            tamanho = quantidade = None
+            if compartimentos:
+                area = area_dos_compartimentos(compartimentos)
+            else:
+                try:
+                    area = Decimal(str(b.get("area_m2"))).quantize(CENTAVO, ROUND_HALF_UP)
+                    if b.get("tamanho_folha") and b.get("quantidade_folhas"):
+                        tamanho = Decimal(str(b["tamanho_folha"])).quantize(CENTAVO, ROUND_HALF_UP)
+                        quantidade = int(b["quantidade_folhas"])
+                except (TypeError, ValueError, InvalidOperation):
+                    area = Decimal("0")
+            if not 0 < area <= Decimal("99999"):
+                raise serializers.ValidationError(f"Forro {n} ({forro.nome}): informe a medida.")
+            limpos.append({
+                "forro": forro.pk, "area_m2": str(area), "compartimentos": compartimentos,
+                "tamanho_folha": str(tamanho) if tamanho else None, "quantidade_folhas": quantidade,
+            })
         return limpos
 
     def validate_desconto(self, valor):
@@ -137,14 +190,31 @@ class OrcamentoSerializer(serializers.ModelSerializer):
         return valor
 
     def validate(self, attrs):
-        # com compartimentos, a área sai deles — não do que a tela mandou
-        compartimentos = attrs.get("compartimentos")
+        instancia = self.instance
+        adicionais = attrs.get("forros_adicionais", getattr(instancia, "forros_adicionais", None) or [])
+        soma_adicionais = sum((Decimal(b["area_m2"]) for b in adicionais), Decimal("0"))
+        principal = attrs.get("forro") or getattr(instancia, "forro", None)
+        repetido = next((b for b in adicionais if principal and b["forro"] == principal.pk), None)
+        if repetido:
+            raise serializers.ValidationError(
+                {"forros_adicionais": f"{principal.nome} já é o primeiro forro do orçamento."})
+
+        # com compartimentos, a área do 1º forro sai deles — não do que a tela mandou;
+        # a área do orçamento é a soma de todos os forros
+        compartimentos = attrs["compartimentos"] if "compartimentos" in attrs \
+            else getattr(instancia, "compartimentos", None)
         if compartimentos:
-            self._normalizar_forros(attrs, compartimentos)
-            attrs["area_m2"] = area_dos_compartimentos(compartimentos)
-            um = compartimentos[0] if len(compartimentos) == 1 else None
-            attrs["largura"] = Decimal(um["largura"]) if um else None
-            attrs["comprimento"] = Decimal(um["comprimento"]) if um else None
+            if "compartimentos" in attrs:
+                self._normalizar_forros(attrs, compartimentos)
+                um = compartimentos[0] if len(compartimentos) == 1 else None
+                attrs["largura"] = Decimal(um["largura"]) if um else None
+                attrs["comprimento"] = Decimal(um["comprimento"]) if um else None
+            if "compartimentos" in attrs or "forros_adicionais" in attrs:
+                attrs["area_m2"] = area_dos_compartimentos(compartimentos) + soma_adicionais
+        elif adicionais and ("area_m2" in attrs or "forros_adicionais" in attrs):
+            total = attrs.get("area_m2", getattr(instancia, "area_m2", None)) or Decimal("0")
+            if total - soma_adicionais <= 0:
+                raise serializers.ValidationError({"area_m2": "Informe a medida do primeiro forro."})
         tipo = attrs.get("tipo", getattr(self.instance, "tipo", None))
         if tipo == TipoOrcamento.MATERIAL and attrs.get("estrutura"):
             raise serializers.ValidationError(

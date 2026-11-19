@@ -56,6 +56,8 @@ class Material(models.Model):
     # Comissão do vendedor na O.S. de Material, por unidade de lançamento
     # (perfil R$ 1,00/und, ripão R$ 5,00/dúzia). Congelada no item do orçamento.
     comissao = models.DecimalField("comissão por unidade", max_digits=7, decimal_places=2, default=0)
+    # perfil, moldura e sanca saem em cores (Branco, Mogno…): o orçamento pede a cor do item
+    tem_cor = models.BooleanField("escolhe a cor", default=False)
 
     ativo = models.BooleanField(default=True)
 

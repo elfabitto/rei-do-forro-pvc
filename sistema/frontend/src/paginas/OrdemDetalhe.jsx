@@ -14,7 +14,7 @@ import {
 import Icone from "../icones";
 import Telefone from "../Telefone";
 import {
-  baixarImagemOS, compartilharOS, copiarImagemOS, forrosDoPedido, itensExtras, medidasDoPedido, montarOS,
+  baixarImagemOS, compartilharOS, copiarImagemOS, forrosEMedidas, itensExtras, montarOS,
   pecasDoPedido, valorM2DoPedido,
 } from "../osDoc";
 import FinalizarModal from "./FinalizarModal";
@@ -193,11 +193,9 @@ export default function OrdemDetalhe({ id, aoFechar, aoMudar }) {
                   {orc && (
                     <>
                       <dt>Área</dt><dd>{num(orc.area_m2)} m²</dd>
-                      {medidasDoPedido(orc).map(([nome, valor], i) => (
+                      {/* com mais de um forro: cada forro seguido das medidas dele */}
+                      {forrosEMedidas(orc).map(([nome, valor], i) => (
                         <Fragment key={i}><dt>{nome}</dt><dd className="wk">{valor}</dd></Fragment>
-                      ))}
-                      {forrosDoPedido(orc).map(([nome, valor], i) => (
-                        <Fragment key={`f${i}`}><dt>{nome}</dt><dd className="wk">{valor}</dd></Fragment>
                       ))}
                       {orc.acabamento_nome && (
                         <><dt>Acabamento</dt><dd className="wk">{orc.acabamento_nome}</dd></>

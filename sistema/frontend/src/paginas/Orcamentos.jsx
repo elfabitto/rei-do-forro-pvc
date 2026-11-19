@@ -25,8 +25,8 @@ function VerOrcamento({ orcamento, aoFechar }) {
   const taxas = useApi("/taxas-cartao/");
 
   const forro = linhas(forros.dados).find((f) => f.id === orcamento.forro);
-  // com outro forro em algum compartimento, cada um volta pelo seu m²
-  const grupos = forro ? gruposDoOrcamento(orcamento, forro, linhas(forros.dados)) : [];
+  // com mais de um tipo de forro, cada um volta pelo seu m²
+  const grupos = forro ? gruposDoOrcamento(orcamento, linhas(forros.dados)) : [];
   const acabamento = linhas(acabamentos.dados).find((a) => a.id === orcamento.acabamento);
   const estrutura = linhas(estruturas.dados).find((e) => e.id === orcamento.estrutura);
 
@@ -44,6 +44,7 @@ function VerOrcamento({ orcamento, aoFechar }) {
     grupos,
     itens: gravados.filter((i) => i.unidade !== VERBA && !ehServico(i)).map((i) => ({
       rotulo: i.descricao,
+      cor: i.cor,
       unidade: i.unidade,
       quantidade: Number(i.quantidade),
       preco: Number(i.preco_unitario),

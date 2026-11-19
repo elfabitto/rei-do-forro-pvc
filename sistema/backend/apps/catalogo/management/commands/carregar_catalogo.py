@@ -31,15 +31,18 @@ FORROS = [
 # meia dúzia é 0,5 e sai por R$ 75,00 no Cutiuba.
 # comissão = R$ por unidade de lançamento, para quem trouxe o cliente
 MATERIAIS = [
-    # nome,          rótulo,                grupo,        unidade,  preço,       cotação, comissão
-    ("Perfil 6 m",   "Perfil 6 m",          "",           "und",   D("25.00"),  None,    D("1.00")),
-    ("Moldura 6 m",  "Moldura 6 m",         "",           "und",   D("40.00"),  None,    D("1.00")),
-    ("Sanca 6 m",    "Sanca 6 m",           "",           "und",   D("50.00"),  None,    D("1.00")),
-    ("Plastilon",    "Plastilon",           "",           "und",   D("27.00"),  None,    D("0")),
-    ("Cutiuba",      "Ripão 4 m Cutiuba",   "Ripão 4 m",  "dúzia", D("150.00"), None,    D("5.00")),
-    ("Cupiuba",      "Ripão 4 m Cupiuba",   "Ripão 4 m",  "dúzia", D("180.00"), None,    D("5.00")),
-    ("Prego 2 × 12", "Prego 2 × 12",        "Pregos",     "kg",    D("30.00"),  None,    D("0")),
-    ("Prego 1 × 16", "Prego 1 × 16",        "Pregos",     "kg",    D("40.00"),  None,    D("0")),
+    # nome,              rótulo,              grupo,         unidade, preço,       cotação, comissão, cor
+    ("Perfil 6 m",        "Perfil 6 m",        "Acabamentos", "und",   D("25.00"),  None,    D("1.00"), True),
+    ("Perfil adesivado",  "Perfil adesivado",  "Acabamentos", "und",   D("40.00"),  None,    D("1.00"), False),
+    ("Moldura 6 m",       "Moldura 6 m",       "Acabamentos", "und",   D("40.00"),  None,    D("1.00"), True),
+    ("Sanca 6 m",         "Sanca 6 m",         "Acabamentos", "und",   D("50.00"),  None,    D("1.00"), True),
+    ("Emenda H",          "Emenda H",          "Acabamentos", "und",   D("35.00"),  None,    D("0"),    False),
+    ("Emenda Flexível",   "Emenda Flexível",   "Acabamentos", "und",   D("35.00"),  None,    D("0"),    False),
+    ("Plastilon",         "Plastilon",         "Estrutura",   "und",   D("27.00"),  None,    D("0"),    False),
+    ("Ripão 4 m Cutiuba", "Ripão 4 m Cutiuba", "Estrutura",   "dúzia", D("150.00"), None,    D("5.00"), False),
+    ("Ripão 4 m Cupiuba", "Ripão 4 m Cupiuba", "Estrutura",   "dúzia", D("180.00"), None,    D("5.00"), False),
+    ("Prego 2 × 12",      "Prego 2 × 12",      "Pregos",      "kg",    D("30.00"),  None,    D("0"),    False),
+    ("Prego 1 × 16",      "Prego 1 × 16",      "Pregos",      "kg",    D("40.00"),  None,    D("0"),    False),
 ]
 
 ACABAMENTOS = [
@@ -74,7 +77,7 @@ class Command(BaseCommand):
             )
         self.stdout.write(self.style.SUCCESS(f"{len(FORROS)} forros"))
 
-        for i, (nome, rotulo, grupo, unid, preco, cot, comissao) in enumerate(MATERIAIS):
+        for i, (nome, rotulo, grupo, unid, preco, cot, comissao, cor) in enumerate(MATERIAIS):
             Material.objects.update_or_create(
                 rotulo=rotulo,
                 defaults={
@@ -86,6 +89,7 @@ class Command(BaseCommand):
                     "unidade_cotacao": cot[0] if cot else "",
                     "preco_cotacao": cot[1] if cot else None,
                     "comissao": comissao,
+                    "tem_cor": cor,
                     "ativo": True,
                 },
             )

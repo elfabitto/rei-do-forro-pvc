@@ -1,6 +1,7 @@
 /**
- * Gerador de orçamento — mesma estrutura do gerador estático em docs/:
- * medida → tipo de forro → tipo de orçamento → acabamento e estrutura (Instalado) ou materiais (Material).
+ * Gerador de orçamento: tipo de forro → medida → tipo de orçamento → acabamento e estrutura
+ * (Instalado) ou materiais (Material). Cada forro a mais ("+ Adicionar outro tipo de forro")
+ * traz a sua própria medida — ex.: branco na casa por cômodos, Cedro no beiral em m².
  *
  * A diferença é que aqui o catálogo vem da API e o orçamento é salvo, podendo
  * virar Ordem de Serviço. Enviar ao cliente só aparece depois de gravar: o que
@@ -23,7 +24,7 @@ import { imagemDe } from "../imagensCatalogo";
 import { decimal, digitos } from "../mascaras";
 import SeletorForro, { Miniatura } from "./SeletorForro";
 import {
-  SERVICO, VERBA, baixarImagem, brl, copiarImagem, copiarTexto, ehServico, gruposDeForro, montarDocumento,
+  CORES_MATERIAL, SERVICO, VERBA, baixarImagem, brl, copiarImagem, copiarTexto, ehServico, montarDocumento,
   unidadePlural,
 } from "../orcamentoDoc";
 
@@ -35,12 +36,159 @@ const paraNumero = (v) => {
   return isFinite(n) && n > 0 ? n : 0;
 };
 
-// forro vazio = o principal (passo 2); outro forro só nesse compartimento (ex.: Cedro no beiral)
-const COMPARTIMENTO_VAZIO = { nome: "", largura: "", comprimento: "", forro: "" };
+const COMPARTIMENTO_VAZIO = { nome: "", largura: "", comprimento: "" };
 
 /* Em centímetros inteiros, para arredondar igual ao backend (área_dos_compartimentos). */
 const emCm = (v) => Math.round(paraNumero(v) * 100);
 const areaDe = (c) => Math.round((emCm(c.largura) * emCm(c.comprimento)) / 100) / 100;
+
+/*
+ * Um tipo de forro do orçamento com a sua medida. O 1º é o forro do orçamento; os
+ * outros vão em forros_adicionais. Abre pedindo as medidas ao cliente; sem elas, é só
+ * trocar para Área em m².
+ */
+const novoBloco = () => ({
+  forroId: "", modo: "medidas", area: "", compartimentos: [{ ...COMPARTIMENTO_VAZIO }],
+  tamanhoFolha: "", qtdFolhas: "",
+});
+// quantidade de folhas é contagem: só inteiro
+const folhasDe = (b) => Math.floor(paraNumero(b.qtdFolhas));
+function areaDoBloco(b) {
+  if (b.modo === "area") return paraNumero(b.area);
+  if (b.modo === "folhas") return Math.round(paraNumero(b.tamanhoFolha) * LARGURA_FOLHA * folhasDe(b) * 100) / 100;
+  return Math.round(b.compartimentos.reduce((s, c) => s + areaDe(c), 0) * 100) / 100;
+}
+// só os preenchidos; o backend refaz a área a partir deles
+const compartimentosDe = (b) => (b.modo === "medidas"
+  ? b.compartimentos.filter((c) => areaDe(c) > 0).map((c) => ({
+      nome: c.nome.trim(),
+      largura: paraNumero(c.largura).toFixed(2),
+      comprimento: paraNumero(c.comprimento).toFixed(2),
+    }))
+  : []);
+const virgula = (n) => String(Number(n)).replace(".", ",");
+
+/** Bloco da tela a partir do que está gravado (o 1º forro ou um de forros_adicionais). */
+function blocoGravado({ forro, compartimentos, largura, comprimento, tamanho_folha, quantidade_folhas, area }) {
+  const b = { ...novoBloco(), forroId: String(forro) };
+  if (tamanho_folha && quantidade_folhas) {
+    return { ...b, modo: "folhas", tamanhoFolha: virgula(tamanho_folha), qtdFolhas: String(quantidade_folhas) };
+  }
+  if (compartimentos?.length) {
+    return { ...b, compartimentos: compartimentos.map((c) => ({
+      nome: c.nome ?? "", largura: virgula(c.largura), comprimento: virgula(c.comprimento),
+    })) };
+  }
+  if (Number(largura) && Number(comprimento)) {   // orçamento de antes dos compartimentos
+    return { ...b, compartimentos: [{ nome: "", largura: virgula(largura), comprimento: virgula(comprimento) }] };
+  }
+  return { ...b, modo: "area", area: virgula(area) };
+}
+
+/** A medida de um forro: Área em m², Largura × Comprimento (por área) ou Cálculo por folha. */
+function MedidaDoForro({ bloco, mudar, rotuloTotal }) {
+  const area = areaDoBloco(bloco);
+  const mudarComp = (i, campo, valor) =>
+    mudar({ compartimentos: bloco.compartimentos.map((c, k) => (k === i ? { ...c, [campo]: valor } : c)) });
+  const comps = bloco.compartimentos;
+  return (
+    <>
+      <div className="seg" style={{ marginBottom: 14 }}>
+        <button type="button" className={bloco.modo === "area" ? "on" : ""}
+                onClick={() => mudar({ modo: "area" })}>Área em m²</button>
+        <button type="button" className={bloco.modo === "medidas" ? "on" : ""}
+                onClick={() => mudar({ modo: "medidas" })}>Largura × Comprimento</button>
+        <button type="button" className={bloco.modo === "folhas" ? "on" : ""}
+                onClick={() => mudar({ modo: "folhas" })}>Cálculo por folha</button>
+      </div>
+
+      {bloco.modo === "area" ? (
+        <Campo rotulo="Área (m²)"
+               dica="Se o cliente tiver as medidas, prefira Largura × Comprimento: elas vão para a O.S.">
+          <input value={bloco.area} onChange={(e) => mudar({ area: decimal(e.target.value) })}
+                 inputMode="decimal" placeholder="Ex.: 23" />
+        </Campo>
+      ) : bloco.modo === "folhas" ? (
+        <>
+          <div className="two">
+            <Campo rotulo="Tamanho da folha (m)">
+              <input value={bloco.tamanhoFolha} onChange={(e) => mudar({ tamanhoFolha: decimal(e.target.value) })}
+                     inputMode="decimal" placeholder="Ex.: 5" />
+            </Campo>
+            <Campo rotulo="Quantidade de folhas">
+              <input value={bloco.qtdFolhas} onChange={(e) => mudar({ qtdFolhas: digitos(e.target.value).slice(0, 4) })}
+                     inputMode="numeric" placeholder="Ex.: 20" />
+            </Campo>
+          </div>
+          <div className="calc">
+            <span>Área calculada · folha de 0,20 m</span>
+            <b>{area ? `${num(area)} m²` : "—"}</b>
+          </div>
+        </>
+      ) : (
+        <>
+          <p className="nota" style={{ marginTop: 0 }}>
+            Peça as medidas ao cliente, se ele tiver. Não é obrigatório: sem elas, use Área em m².
+          </p>
+          {comps.map((c, i) => (
+            <div className="compartimento" key={i}>
+              {/* cabeçalho: "Área 1" (ou o nome dado) · m² · remover */}
+              <div className="topo">
+                <span className="tituloArea">{c.nome.trim() || `Área ${i + 1}`}</span>
+                <b>{areaDe(c) ? `${num(areaDe(c))} m²` : "—"}</b>
+                {comps.length > 1 && (
+                  <button type="button" className="x" aria-label={`Remover área ${i + 1}`}
+                          onClick={() => mudar({ compartimentos: comps.filter((_, k) => k !== i) })}>×</button>
+                )}
+              </div>
+              <Campo rotulo="Nome do ambiente (opcional)">
+                <input value={c.nome} maxLength={40} placeholder="Ex.: Sala, Quarto, Beiral"
+                       onChange={(e) => mudarComp(i, "nome", e.target.value)} />
+              </Campo>
+              {/* lado a lado também no celular: Largura × Comprimento, como se fala a medida */}
+              <div className="lxc">
+                <Campo rotulo="Largura (m)">
+                  <input value={c.largura} inputMode="decimal" placeholder="Ex.: 4,60"
+                         onChange={(e) => mudarComp(i, "largura", decimal(e.target.value))} />
+                </Campo>
+                <span className="vezes" aria-hidden="true">×</span>
+                <Campo rotulo="Comprimento (m)">
+                  <input value={c.comprimento} inputMode="decimal" placeholder="Ex.: 5"
+                         onChange={(e) => mudarComp(i, "comprimento", decimal(e.target.value))} />
+                </Campo>
+              </div>
+            </div>
+          ))}
+          <button type="button" className="btn mb" onClick={() => mudar({ compartimentos: [...comps, { ...COMPARTIMENTO_VAZIO }] })}>
+            <Icone nome="mais" tamanho={14} /> Adicionar área
+          </button>
+          <div className="calc">
+            <span>{rotuloTotal}</span>
+            <b>{area ? `${num(area)} m²` : "—"}</b>
+          </div>
+        </>
+      )}
+    </>
+  );
+}
+
+/** Escolha do forro com a foto e o preço do m² — só o forro, à vista e no cartão. */
+function EscolhaDoForro({ forros, valor, aoMudar, taxas }) {
+  const forro = forros.find((f) => String(f.id) === String(valor));
+  return (
+    <>
+      <SeletorForro forros={forros} valor={valor} aoMudar={aoMudar} />
+      {forro && (
+        <div className="ref">
+          <Miniatura nome={forro.nome} cor={forro.cor_amostra} tamanho={64} className="grande" />
+          <div className="tx">Preço do m² — só o forro
+            <b>R$ {brl(forro.preco_material_vista)} à vista · R$ {brl(valorNoCartao(taxas, forro.preco_material_vista))} cartão</b>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
 
 export default function OrcamentoNovo() {
   const navegar = useNavigate();
@@ -59,20 +207,16 @@ export default function OrcamentoNovo() {
   const taxas = useApi("/taxas-cartao/");   // o valor no cartão sai da taxa de 5x
   const original = useApi(editando ? `/orcamentos/${id}/` : null, null, [id]);
 
-  // 1. medida
-  // abre pedindo as medidas ao cliente; sem elas, é só trocar para Área em m²
-  const [modo, setModo] = useState("medidas");
-  const [area, setArea] = useState("");
-  const [compartimentos, setCompartimentos] = useState([{ ...COMPARTIMENTO_VAZIO }]);
-  const [tamanhoFolha, setTamanhoFolha] = useState("");
-  const [qtdFolhas, setQtdFolhas] = useState("");
+  // 1 e 2: os tipos de forro, cada um com a sua medida — o 1º é o forro do orçamento
+  const [blocos, setBlocos] = useState(() => [novoBloco()]);
 
-  // 2 a 4
-  const [forroId, setForroId] = useState("");
+  // 3 em diante
   const [tipo, setTipo] = useState("");
   const [acabamentoId, setAcabamentoId] = useState("");
   const [estruturaId, setEstruturaId] = useState("");
   const [quantidades, setQuantidades] = useState({});
+  // cor de perfil, moldura e sanca (material com tem_cor): { [id do material]: "Mogno" }; sem escolha = Branco
+  const [cores, setCores] = useState({});
   // serviço, só no orçamento de Material: o sistema sugere área × R$ 25,00/m²,
   // mas o total é negociado. Campo vazio = usa o sugerido (e acompanha a área).
   const [servico, setServico] = useState(false);
@@ -101,36 +245,31 @@ export default function OrcamentoNovo() {
     const o = original.dados;
     if (!o || !listaMateriais.length) return;
     setTipo(o.tipo);
-    setForroId(String(o.forro));
     setAcabamentoId(o.acabamento ? String(o.acabamento) : "");
     setEstruturaId(o.estrutura ? String(o.estrutura) : "");
     setObservacoes(o.observacoes ?? "");
     setDesconto(Number(o.desconto) > 0 ? String(Number(o.desconto)).replace(".", ",") : "");
-    if (o.tamanho_folha && o.quantidade_folhas) {
-      setModo("folhas");
-      setTamanhoFolha(String(o.tamanho_folha).replace(".", ","));
-      setQtdFolhas(String(o.quantidade_folhas));
-    } else if (o.compartimentos?.length) {
-      setModo("medidas");
-      setCompartimentos(o.compartimentos.map((c) => ({
-        nome: c.nome ?? "",
-        largura: String(Number(c.largura)).replace(".", ","),
-        comprimento: String(Number(c.comprimento)).replace(".", ","),
-        forro: c.forro ? String(c.forro) : "",
-      })));
-    } else if (o.largura && o.comprimento) {   // orçamento de antes dos compartimentos
-      setModo("medidas");
-      setCompartimentos([{
-        nome: "",
-        largura: String(Number(o.largura)).replace(".", ","),
-        comprimento: String(Number(o.comprimento)).replace(".", ","),
-        forro: "",
-      }]);
-    } else {
-      setModo("area");
-      setArea(String(o.area_m2));
-    }
+    // o 1º forro fica com a área dele (no detalhe por forro); a do orçamento é a soma de todos
+    const areaPrincipal = o.por_forro?.length > 1
+      ? o.por_forro.find((g) => g.forro === o.forro)?.area_m2 ?? o.area_m2
+      : o.area_m2;
+    // formato antigo (nov/2026): outro forro marcado num compartimento vira um bloco próprio
+    const deOutro = (c) => c.forro && c.forro !== o.forro;
+    const comps = o.compartimentos ?? [];
+    const antigos = [...new Set(comps.filter(deOutro).map((c) => c.forro))].map((f) => blocoGravado({
+      forro: f, compartimentos: comps.filter((c) => c.forro === f),
+    }));
+    setBlocos([
+      blocoGravado({
+        forro: o.forro, compartimentos: comps.filter((c) => !deOutro(c)), largura: o.largura,
+        comprimento: o.comprimento, tamanho_folha: o.tamanho_folha, quantidade_folhas: o.quantidade_folhas,
+        area: areaPrincipal,
+      }),
+      ...antigos,
+      ...(o.forros_adicionais ?? []).map((b) => blocoGravado({ ...b, area: b.area_m2 })),
+    ]);
     const q = {};
+    const c = {};   // cores dos itens gravados
     const outros = [];
     let comServico = false;
     for (const item of o.itens ?? []) {
@@ -144,47 +283,46 @@ export default function OrcamentoNovo() {
       } else if (item.material) {
         // vírgula, não ponto: é o separador que o campo lê de volta
         q[item.material] = String(Number(item.quantidade)).replace(".", ",");
+        if (item.cor) c[item.material] = item.cor;
       }
     }
     setQuantidades(q);
+    setCores(c);
     setServico(comServico);
     setExtras(outros);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [original.dados, listaMateriais.length]);
 
-  // quantidade de folhas é contagem: só inteiro
-  const folhas = Math.floor(paraNumero(qtdFolhas));
-
-  const areaFinal = useMemo(() => {
-    if (modo === "area") return paraNumero(area);
-    if (modo === "folhas") return Math.round(paraNumero(tamanhoFolha) * LARGURA_FOLHA * folhas * 100) / 100;
-    return Math.round(compartimentos.reduce((s, c) => s + areaDe(c), 0) * 100) / 100;
-  }, [modo, area, compartimentos, tamanhoFolha, folhas]);
-
-  const mudarCompartimento = (i, campo, valor) => {
+  // mexer em qualquer bloco invalida o "já salvo": o documento mudou
+  const mudarBloco = (k, mudanca) => {
     setSalvo(null);
-    setCompartimentos((s) => s.map((c, k) => (k === i ? { ...c, [campo]: valor } : c)));
+    setBlocos((s) => s.map((b, j) => (j === k ? { ...b, ...mudanca } : b)));
   };
-  const novoCompartimento = () => {
-    setSalvo(null);
-    setCompartimentos((s) => [...s, { ...COMPARTIMENTO_VAZIO }]);
-  };
-  const removerCompartimento = (i) => {
-    setSalvo(null);
-    setCompartimentos((s) => s.filter((_, k) => k !== i));
-  };
-
-  const forro = listaForros.find((f) => String(f.id) === String(forroId));
-  // mais de um forro (por compartimento): cada um sai pelo seu m²; [] = um forro só
-  const grupos = useMemo(
-    () => (modo === "medidas"
-      ? gruposDeForro(compartimentos.map((c) => ({
-          nome: c.nome, largura: paraNumero(c.largura), comprimento: paraNumero(c.comprimento),
-          area: areaDe(c), forro: c.forro,
-        })), forro, listaForros)
-      : []),
-    [modo, compartimentos, forro, listaForros]
+  const adicionarForro = () => { setSalvo(null); setBlocos((s) => [...s, novoBloco()]); };
+  const removerForro = (k) => { setSalvo(null); setBlocos((s) => s.filter((_, j) => j !== k)); };
+  // cada forro só uma vez: o seletor de um bloco não mostra os já escolhidos nos outros
+  const forrosLivres = (k) => listaForros.filter(
+    (f) => !blocos.some((b, j) => j !== k && String(b.forroId) === String(f.id))
   );
+  const forroDe = (b) => listaForros.find((f) => String(f.id) === String(b.forroId));
+
+  const principal = blocos[0];
+  const forro = forroDe(principal);
+  const areaFinal = Math.round(blocos.reduce((s, b) => s + areaDoBloco(b), 0) * 100) / 100;
+  const blocosProntos = blocos.every((b) => forroDe(b) && areaDoBloco(b) > 0);
+  // mais de um forro: cada um sai pelo seu m² ([] = um forro só, a conta de sempre)
+  const grupos = useMemo(() => {
+    if (blocos.length < 2) return [];
+    return blocos.filter((b) => forroDe(b) && areaDoBloco(b) > 0).map((b) => ({
+      forro: forroDe(b),
+      area: areaDoBloco(b),
+      ambientes: b.modo === "medidas"
+        ? b.compartimentos.filter((c) => areaDe(c) > 0).map((c, i) => c.nome.trim() || `Área ${i + 1}`)
+        : [],
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [blocos, listaForros]);
+
   const acabamento = listaAcabamentos.find((a) => String(a.id) === String(acabamentoId));
   // orçamento antigo sem estrutura = a padrão (acréscimo zero), como no backend
   const estruturaPadrao = listaEstruturas.find((e) => Number(e.acrescimo_m2) === 0);
@@ -194,9 +332,12 @@ export default function OrcamentoNovo() {
   // itens escolhidos no cardápio (quantidade > 0)
   const itens = useMemo(
     () => listaMateriais
-      .map((m) => ({ ...m, quantidade: paraNumero(quantidades[m.id]), preco: Number(m.preco) }))
+      .map((m) => ({
+        ...m, quantidade: paraNumero(quantidades[m.id]), preco: Number(m.preco),
+        cor: m.tem_cor ? cores[m.id] ?? CORES_MATERIAL[0] : "",
+      }))
       .filter((m) => m.quantidade > 0),
-    [listaMateriais, quantidades]
+    [listaMateriais, quantidades, cores]
   );
 
   const servicoSugerido = Math.round(areaFinal * SERVICO.precoM2 * 100) / 100;
@@ -223,7 +364,7 @@ export default function OrcamentoNovo() {
   );
 
   const valorDesconto = paraNumero(desconto);
-  const completo = areaFinal > 0 && forro && tipo && (tipo === "material" || acabamento);
+  const completo = blocosProntos && tipo && (tipo === "material" || acabamento);
   const doc = completo
     ? montarDocumento({ tipo, area: areaFinal, forro, acabamento, estrutura, itens, extras: extrasValidos,
                         servico: valorServico, desconto: valorDesconto, taxas: taxas.dados, grupos })
@@ -234,21 +375,23 @@ export default function OrcamentoNovo() {
     if (descontoDemais) throw new Error("O desconto passa do valor à vista do orçamento.");
     const corpo = {
       tipo,
+      // a área do orçamento é a de todos os forros; o backend refaz a partir das medidas
       area_m2: areaFinal.toFixed(2),
-      // só os preenchidos; o backend refaz a área e guarda largura/comprimento quando é um só
-      compartimentos: modo === "medidas"
-        ? compartimentos.filter((c) => areaDe(c) > 0).map((c) => ({
-            nome: c.nome.trim(),
-            largura: paraNumero(c.largura).toFixed(2),
-            comprimento: paraNumero(c.comprimento).toFixed(2),
-            ...(c.forro && String(c.forro) !== String(forro.id) ? { forro: Number(c.forro) } : {}),
-          }))
-        : [],
+      // medida do 1º forro; o backend guarda largura/comprimento quando é uma área só
+      compartimentos: compartimentosDe(principal),
       largura: null,
       comprimento: null,
-      tamanho_folha: modo === "folhas" ? paraNumero(tamanhoFolha).toFixed(2) : null,
-      quantidade_folhas: modo === "folhas" ? folhas : null,
+      tamanho_folha: principal.modo === "folhas" ? paraNumero(principal.tamanhoFolha).toFixed(2) : null,
+      quantidade_folhas: principal.modo === "folhas" ? folhasDe(principal) : null,
       forro: forro.id,
+      // os outros tipos de forro, cada um com a sua medida
+      forros_adicionais: blocos.slice(1).map((b) => ({
+        forro: Number(b.forroId),
+        area_m2: areaDoBloco(b).toFixed(2),
+        compartimentos: compartimentosDe(b),
+        tamanho_folha: b.modo === "folhas" ? paraNumero(b.tamanhoFolha).toFixed(2) : null,
+        quantidade_folhas: b.modo === "folhas" ? folhasDe(b) : null,
+      })),
       acabamento: tipo === "instalado" ? acabamento.id : null,
       estrutura: tipo === "instalado" && estrutura ? estrutura.id : null,
       observacoes,
@@ -263,6 +406,7 @@ export default function OrcamentoNovo() {
               unidade: i.unidade,
               quantidade: String(i.quantidade),
               preco_unitario: String(i.preco),
+              cor: i.cor,
             }))
           : []),
         // serviço: valor fechado, quantidade 1 e a unidade `serviço` o identificam
@@ -378,118 +522,53 @@ export default function OrcamentoNovo() {
             <div className="body">
 
               <div className="step">
-                {passo(1, "Medida")}
-                <div className="seg" style={{ marginBottom: 14 }}>
-                  <button type="button" className={modo === "area" ? "on" : ""}
-                          onClick={() => { setSalvo(null); setModo("area"); }}>Área em m²</button>
-                  <button type="button" className={modo === "medidas" ? "on" : ""}
-                          onClick={() => { setSalvo(null); setModo("medidas"); }}>Largura × Comprimento</button>
-                  <button type="button" className={modo === "folhas" ? "on" : ""}
-                          onClick={() => { setSalvo(null); setModo("folhas"); }}>Cálculo por folha</button>
-                </div>
-
-                {modo === "area" ? (
-                  <Campo rotulo="Área total (m²)"
-                         dica="Se o cliente tiver as medidas, prefira Largura × Comprimento: elas vão para a O.S.">
-                    <input value={area} onChange={(e) => alterou(setArea)(decimal(e.target.value))}
-                           inputMode="decimal" placeholder="Ex.: 23" />
-                  </Campo>
-                ) : modo === "folhas" ? (
-                  <>
-                    <div className="two">
-                      <Campo rotulo="Tamanho da folha (m)">
-                        <input value={tamanhoFolha} onChange={(e) => alterou(setTamanhoFolha)(decimal(e.target.value))}
-                               inputMode="decimal" placeholder="Ex.: 5" />
-                      </Campo>
-                      <Campo rotulo="Quantidade de folhas">
-                        <input value={qtdFolhas} onChange={(e) => alterou(setQtdFolhas)(digitos(e.target.value).slice(0, 4))}
-                               inputMode="numeric" placeholder="Ex.: 20" />
-                      </Campo>
-                    </div>
-                    <div className="calc">
-                      <span>Área calculada · folha de 0,20 m</span>
-                      <b>{areaFinal ? `${num(areaFinal)} m²` : "—"}</b>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <p className="nota" style={{ marginTop: 0 }}>
-                      Peça as medidas ao cliente, se ele tiver. Não é obrigatório: sem elas, use Área em m².
-                    </p>
-                    {compartimentos.map((c, i) => (
-                      <div className="compartimento" key={i}>
-                        {/* cabeçalho: "Área 1" (ou o nome dado) · m² · remover */}
-                        <div className="topo">
-                          <span className="tituloArea">{c.nome.trim() || `Área ${i + 1}`}</span>
-                          <b>{areaDe(c) ? `${num(areaDe(c))} m²` : "—"}</b>
-                          {compartimentos.length > 1 && (
-                            <button type="button" className="x" aria-label={`Remover área ${i + 1}`}
-                                    onClick={() => removerCompartimento(i)}>×</button>
-                          )}
-                        </div>
-                        <Campo rotulo="Nome do ambiente (opcional)">
-                          <input value={c.nome} maxLength={40} placeholder="Ex.: Sala, Quarto, Beiral"
-                                 onChange={(e) => mudarCompartimento(i, "nome", e.target.value)} />
-                        </Campo>
-                        {/* lado a lado também no celular: Largura × Comprimento, como se fala a medida */}
-                        <div className="lxc">
-                          <Campo rotulo="Largura (m)">
-                            <input value={c.largura} inputMode="decimal" placeholder="Ex.: 4,60"
-                                   onChange={(e) => mudarCompartimento(i, "largura", decimal(e.target.value))} />
-                          </Campo>
-                          <span className="vezes" aria-hidden="true">×</span>
-                          <Campo rotulo="Comprimento (m)">
-                            <input value={c.comprimento} inputMode="decimal" placeholder="Ex.: 5"
-                                   onChange={(e) => mudarCompartimento(i, "comprimento", decimal(e.target.value))} />
-                          </Campo>
-                        </div>
-                        {/* outro forro só nesta área: ex.: branco na casa, Cedro no beiral */}
-                        {compartimentos.length > 1 && (
-                          <Campo rotulo="Forro desta área">
-                            <select value={c.forro} onChange={(e) => mudarCompartimento(i, "forro", e.target.value)}>
-                              <option value="">{forro ? `${forro.nome} (principal)` : "Forro principal (escolha abaixo)"}</option>
-                              {listaForros.filter((f) => String(f.id) !== String(forroId)).map((f) => (
-                                <option key={f.id} value={String(f.id)}>{f.nome}</option>
-                              ))}
-                            </select>
-                          </Campo>
-                        )}
-                      </div>
-                    ))}
-                    <button type="button" className="btn mb" onClick={novoCompartimento}>
-                      <Icone nome="mais" tamanho={14} /> Adicionar área
-                    </button>
-                    <div className="calc">
-                      <span>Área total</span>
-                      <b>{areaFinal ? `${num(areaFinal)} m²` : "—"}</b>
-                    </div>
-                    {grupos.length > 1 && (
-                      <div className="calcForros">
-                        {grupos.map((g) => (
-                          <span key={g.forro.id}>{g.forro.nome}: <b>{num(g.area)} m²</b></span>
-                        ))}
-                      </div>
-                    )}
-                  </>
-                )}
+                {passo(1, "Tipo de forro")}
+                <EscolhaDoForro forros={forrosLivres(0)} valor={principal.forroId} taxas={taxas.dados}
+                                aoMudar={(id) => mudarBloco(0, { forroId: id })} />
               </div>
 
               <div className="step">
-                {passo(2, grupos.length > 1 ? "Tipo de forro (principal)" : "Tipo de forro")}
-                <SeletorForro forros={listaForros} valor={forroId} aoMudar={alterou(setForroId)} />
-                {grupos.length > 1 && (
-                  <p className="nota">
-                    Vale para os compartimentos sem outro forro marcado. Cada forro sai pelo seu
-                    preço do m²; acabamento e estrutura valem para a casa toda.
-                  </p>
-                )}
-                {forro && (
-                  <div className="ref">
-                    <Miniatura nome={forro.nome} cor={forro.cor_amostra} tamanho={64} className="grande" />
-                    <div className="tx">Preço do m² — só o forro
-                      <b>R$ {brl(forro.preco_material_vista)} à vista · R$ {brl(valorNoCartao(taxas.dados, forro.preco_material_vista))} cartão</b>
+                {passo(2, blocos.length > 1 && forro ? `Medida — ${forro.nome}` : "Medida")}
+                <MedidaDoForro bloco={principal} mudar={(m) => mudarBloco(0, m)}
+                               rotuloTotal={blocos.length > 1 ? "Área deste forro" : "Área total"} />
+
+                {/* outros tipos de forro: cada um com o seu seletor e a sua medida */}
+                {blocos.slice(1).map((b, j) => {
+                  const k = j + 1;
+                  return (
+                    <div className="blocoForro" key={k}>
+                      <div className="blocoForroTopo">
+                        <span className="t">{k + 1}º tipo de forro</span>
+                        <button type="button" className="x" aria-label={`Remover o ${k + 1}º tipo de forro`}
+                                onClick={() => removerForro(k)}>×</button>
+                      </div>
+                      <EscolhaDoForro forros={forrosLivres(k)} valor={b.forroId} taxas={taxas.dados}
+                                      aoMudar={(id) => mudarBloco(k, { forroId: id })} />
+                      <div className="blocoForroMedida">Medida{forroDe(b) ? ` — ${forroDe(b).nome}` : ""}</div>
+                      <MedidaDoForro bloco={b} mudar={(m) => mudarBloco(k, m)} rotuloTotal="Área deste forro" />
                     </div>
-                  </div>
+                  );
+                })}
+
+                <button type="button" className="btn maisForro" onClick={adicionarForro}>
+                  <Icone nome="mais" tamanho={14} /> Adicionar outro tipo de forro
+                </button>
+
+                {blocos.length > 1 && (
+                  <>
+                    <div className="calc total">
+                      <span>Área total do orçamento</span>
+                      <b>{areaFinal ? `${num(areaFinal)} m²` : "—"}</b>
+                    </div>
+                    <div className="calcForros">
+                      {blocos.map((b, k) => (
+                        <span key={k}>{forroDe(b)?.nome ?? `${k + 1}º forro`}: <b>{num(areaDoBloco(b))} m²</b></span>
+                      ))}
+                    </div>
+                    <p className="nota">
+                      Cada forro sai pelo seu preço do m²; acabamento e estrutura valem para todos.
+                    </p>
+                  </>
                 )}
               </div>
 
@@ -570,6 +649,8 @@ export default function OrcamentoNovo() {
                               {m.tem_cotacao_diferente && (
                                 <em> · R$ {brl(m.preco_cotacao)} a {m.unidade_cotacao}</em>
                               )}
+                              {/* no celular o subtotal vem aqui, e a coluna da direita some */}
+                              {q > 0 && <b className="sbm">R$ {brl(q * Number(m.preco))}</b>}
                             </small>
                           </div>
                           <div className="q">
@@ -583,6 +664,19 @@ export default function OrcamentoNovo() {
                             <span className="sb">{q > 0 ? `R$ ${brl(q * Number(m.preco))}` : ""}</span>
                           </div>
                         </div>
+                        {/* perfil, moldura e sanca: a cor vai no orçamento e no texto do WhatsApp */}
+                        {m.tem_cor && q > 0 && (
+                          <label className="corMat">
+                            <span>Cor</span>
+                            <select value={cores[m.id] ?? CORES_MATERIAL[0]}
+                                    aria-label={`${m.nome} — cor`}
+                                    onChange={(e) => alterou(setCores)((s) => ({ ...s, [m.id]: e.target.value }))}>
+                              {CORES_MATERIAL.map((c) => (
+                                <option key={c} value={c}>{c}{c === CORES_MATERIAL[0] ? " (padrão)" : ""}</option>
+                              ))}
+                            </select>
+                          </label>
+                        )}
                       </div>
                     );
                   })}
@@ -680,8 +774,8 @@ export default function OrcamentoNovo() {
               <div className="empty">
                 <b>Nenhum orçamento gerado</b>
                 <ol>
-                  <li className={areaFinal ? "ok" : ""}>Informar a medida</li>
-                  <li className={forro ? "ok" : ""}>Escolher o tipo de forro</li>
+                  <li className={blocos.every(forroDe) ? "ok" : ""}>Escolher o tipo de forro</li>
+                  <li className={blocos.every((b) => areaDoBloco(b) > 0) ? "ok" : ""}>Informar a medida</li>
                   <li className={tipo ? "ok" : ""}>Escolher o tipo de orçamento</li>
                 </ol>
               </div>

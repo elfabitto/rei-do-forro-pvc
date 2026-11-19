@@ -7,7 +7,7 @@
  */
 import { LOGO } from "./logo";
 import { periodoTexto } from "./agendaTexto";
-import { VERBA, comAmbientes, ehServico, quantidadeTexto } from "./orcamentoDoc";
+import { VERBA, comAmbientes, ehServico, nomeComCor, quantidadeTexto } from "./orcamentoDoc";
 import { bloco, montarTexto } from "./textoGestao";
 
 const brl = (n) =>
@@ -61,7 +61,7 @@ export function medidasDoPedido(orc) {
 export function pecasDoPedido(itens = []) {
   return itens
     .filter((i) => i.unidade !== VERBA && !ehServico(i))
-    .map((i) => [i.descricao, quantidadeTexto(i.quantidade, i.unidade)]);
+    .map((i) => [nomeComCor(i.descricao, i.cor), quantidadeTexto(i.quantidade, i.unidade)]);
 }
 
 /** Mais de um forro no orçamento (ex.: branco na casa, Cedro T1 no beiral)? */
@@ -71,6 +71,23 @@ export const variosForros = (orc) => orc?.por_forro?.length > 1;
 export function forrosDoPedido(orc) {
   if (!variosForros(orc)) return [["Forro", orc.forro_nome ?? "—"]];
   return orc.por_forro.map((g) => ["Forro", `${comAmbientes(g)} — ${m2(g.area_m2)} m²`]);
+}
+
+/**
+ * Forro e medidas na ficha da O.S. Um forro: as medidas e depois o forro. Vários: cada forro
+ * com a sua área, seguido das medidas dele ("Área 1: 3,8 m × 6 m = 22,8 m²").
+ */
+export function forrosEMedidas(orc) {
+  if (!variosForros(orc)) return [...medidasDoPedido(orc), ["Forro", orc.forro_nome ?? "—"]];
+  // orçamento de nov/2026 ainda não regravado (forro marcado no compartimento): sem medida por forro
+  if (!orc.por_forro.every((g) => Array.isArray(g.compartimentos))) {
+    return [...medidasDoPedido(orc), ...forrosDoPedido(orc)];
+  }
+  return orc.por_forro.flatMap((g) => [
+    ["Forro", `${g.nome} — ${m2(g.area_m2)} m²`],
+    ...medidasDoPedido({ compartimentos: g.compartimentos, tamanho_folha: g.tamanho_folha,
+                         quantidade_folhas: g.quantidade_folhas }),
+  ]);
 }
 
 /** Valor do m², à vista e no cartão — de cada forro quando são vários. */
@@ -135,8 +152,7 @@ export function montarOS(os, { verFinanceiro = true } = {}) {
   d.pedido = [];
   if (orc) {
     d.pedido.push(["Área", `${m2(orc.area_m2)} m²`]);
-    d.pedido.push(...medidasDoPedido(orc));
-    d.pedido.push(...forrosDoPedido(orc));
+    d.pedido.push(...forrosEMedidas(orc));
     if (orc.acabamento_nome) d.pedido.push(["Acabamento", orc.acabamento_nome]);
     if (orc.estrutura_nome) d.pedido.push(["Estrutura", orc.estrutura_nome]);
     if (Number(orc.abatimento_estrutura) > 0) {

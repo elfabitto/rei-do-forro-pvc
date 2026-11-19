@@ -67,8 +67,20 @@ textarea:focus{border-color:var(--orange);box-shadow:0 0 0 3px rgba(238,106,30,.
 .matgrp{font-size:11px;font-weight:800;letter-spacing:1.1px;text-transform:uppercase;color:var(--muted);
         margin:16px 0 6px;padding-top:12px;border-top:1px solid var(--line-2)}
 .mat{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line-2)}
-.mat .i{min-width:0}
-.mat .i b{display:block;font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mat .i{min-width:0;flex:1 1 auto}
+/* o nome quebra em duas linhas em vez de cortar ("Moldur…") */
+.mat .i b{display:block;font-size:14px;font-weight:600;line-height:1.25;overflow-wrap:break-word}
+.mat .i small .sbm{display:none}
+@media (max-width:520px){
+  /* subtotal embaixo do preço: o nome do material fica com a largura da coluna */
+  .mat .sb{display:none}
+  .mat .i small .sbm{display:block;font-size:13px;color:var(--ink);font-weight:700}
+  .corMat{padding-left:0}
+}
+/* cor do perfil, da moldura e da sanca, logo abaixo do item */
+.corMat{display:flex;align-items:center;gap:10px;padding:0 0 9px 58px;border-bottom:1px solid var(--line-2);
+        margin-top:-1px;font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px}
+.corMat select{flex:0 1 190px;min-width:0;padding:6px 8px;font-size:13.5px;text-transform:none;letter-spacing:0}
 .mat .i small{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
 .mat .i small em{font-style:normal;color:#a7adb6}
 .mat .q{margin-left:auto;display:flex;align-items:center;gap:6px;flex:0 0 auto}
@@ -311,6 +323,20 @@ input.preco.erro{border-color:var(--critical);background:#fdf2f2}
 .compartimento .topo .x{flex:0 0 auto;width:30px;height:30px;border:1px solid var(--line);border-radius:6px;
           background:var(--surface);color:var(--muted);font-size:17px;line-height:1;cursor:pointer}
 .compartimento .topo .x:hover{border-color:var(--st-vermelho);color:var(--st-vermelho-tx);background:#fff}
+/* outro tipo de forro no orçamento: quadro com o seletor e a medida dele */
+.blocoForro{border:1.5px solid var(--orange);border-radius:10px;padding:12px 12px 2px;margin:16px 0 12px;
+            background:var(--orange-bg)}
+.blocoForroTopo{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.blocoForroTopo .t{flex:1 1 auto;font-size:12px;font-weight:800;letter-spacing:1px;text-transform:uppercase;
+                   color:var(--orange-dk)}
+.blocoForroTopo .x{flex:0 0 auto;width:30px;height:30px;border:1px solid var(--line);border-radius:6px;
+                   background:var(--surface);color:var(--muted);font-size:17px;line-height:1;cursor:pointer}
+.blocoForroTopo .x:hover{border-color:var(--st-vermelho);color:var(--st-vermelho-tx)}
+.blocoForroMedida{margin:14px 0 9px;font-size:11.5px;font-weight:800;letter-spacing:1.1px;
+                  text-transform:uppercase;color:var(--ink-2)}
+.blocoForro .compartimento{background:var(--surface)}
+.btn.maisForro{margin-top:12px;border-style:dashed;border-color:var(--orange);color:var(--orange-dk)}
+.calc.total{margin-top:14px}
 /* Largura × Comprimento na mesma linha, em qualquer tela */
 .lxc{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:8px;align-items:end}
 .lxc .vezes{align-self:end;height:44px;margin-bottom:14px;display:grid;place-items:center;

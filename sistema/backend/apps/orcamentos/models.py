@@ -15,6 +15,10 @@ TAXA_LOGISTICA = Decimal("80.00")
 # taxa cadastrada em Parâmetros (TaxasCartao): o mesmo que sai na finalização.
 PARCELAS_ORCAMENTO = 5
 
+# cores de perfil, moldura e sanca no orçamento de Material — a 1ª é a padrão
+CORES_MATERIAL = ["Branco", "Mogno", "Guaruba", "Cerejeira", "Bege", "Cinza"]
+COR_PADRAO = CORES_MATERIAL[0]
+
 
 def area_do_compartimento(c):
     """Largura × comprimento arredondado ao centavo — a mesma conta da tela."""
@@ -49,13 +53,18 @@ class Orcamento(models.Model):
     )
     tipo = models.CharField(max_length=12, choices=TipoOrcamento.choices)
 
-    # medida: área direta, compartimentos (largura × comprimento de cada um) ou por folha
-    # (folha de 20 cm de largura). Lista de {nome, largura, comprimento[, forro]}; a área é a soma.
-    # `forro` no compartimento = outro forro só nele (ex.: Cedro no beiral); sem ele, vale o `forro`.
+    # Medida do 1º forro (`forro`): área direta, compartimentos (largura × comprimento de cada um)
+    # ou por folha (folha de 20 cm de largura). Lista de {nome, largura, comprimento}.
+    # Orçamentos de nov/2026 podem ter `forro` num compartimento (outro forro só nele) —
+    # o formato antigo de dois forros, que continua valendo na conta.
     compartimentos = models.JSONField(default=list, blank=True)
-    # Com mais de um forro: o m² e o total de cada um, congelados no cálculo —
-    # [{forro, nome, area_m2, preco_m2_vista, preco_m2_cartao, total_vista, ambientes}].
-    # Vazio quando é um forro só (o caso comum e todos os orçamentos antigos).
+    # Os outros tipos de forro do orçamento, cada um com a sua medida:
+    # [{forro, area_m2, compartimentos, tamanho_folha, quantidade_folhas}]. Vazio = um forro só.
+    # `area_m2` do orçamento é a soma de todos.
+    forros_adicionais = models.JSONField(default=list, blank=True)
+    # Com mais de um forro: área, m², total e medida de cada um, congelados no cálculo —
+    # [{forro, nome, area_m2, preco_m2_vista, preco_m2_cartao, total_vista, ambientes,
+    #   compartimentos, tamanho_folha, quantidade_folhas}]. Vazio quando é um forro só.
     por_forro = models.JSONField(default=list, blank=True)
     largura = models.DecimalField(max_digits=7, decimal_places=2, null=True, blank=True)
     comprimento = models.DecimalField(max_digits=7, decimal_places=2, null=True, blank=True)
@@ -137,7 +146,7 @@ class Orcamento(models.Model):
     def precos_vigentes(self, forro=None):
         """
         Preço do m² a aplicar, já com os acréscimos de acabamento e estrutura quando
-        Instalado. `forro` é o de um compartimento com outro forro; sem ele, o principal.
+        Instalado. `forro` é um dos outros forros do orçamento; sem ele, o 1º.
         Acabamento e estrutura valem para a casa toda.
         """
         vista = (forro or self.forro).preco_m2(self.tipo, "vista")
@@ -148,21 +157,54 @@ class Orcamento(models.Model):
 
     def grupos_de_forro(self):
         """
-        Compartimentos agrupados por forro, o principal primeiro:
-        [(forro, área, [ambientes])]. Um grupo só = orçamento de um forro.
+        Um grupo por tipo de forro, o 1º primeiro: [{forro, area, ambientes, compartimentos,
+        tamanho_folha, quantidade_folhas}]. Um grupo só = orçamento de um forro.
         """
         from apps.catalogo.models import Forro
 
-        if not any(c.get("forro") and c["forro"] != self.forro_id for c in self.compartimentos or []):
-            return [(self.forro, self.area_m2, [])]
-        outros = Forro.objects.in_bulk({c["forro"] for c in self.compartimentos if c.get("forro")})
-        grupos = {self.forro_id: [self.forro, Decimal("0"), []]}
-        for i, c in enumerate(self.compartimentos, 1):
-            forro = outros.get(c.get("forro")) or self.forro
-            g = grupos.setdefault(forro.id, [forro, Decimal("0"), []])
-            g[1] += area_do_compartimento(c)
-            g[2].append(nome_do_compartimento(c, i))
-        return [tuple(g) for g in grupos.values() if g[1] > 0]
+        adicionais = self.forros_adicionais or []
+        compartimentos = self.compartimentos or []
+        de_outro = lambda c: c.get("forro") and c["forro"] != self.forro_id   # noqa: E731 — formato antigo
+        if not adicionais and not any(de_outro(c) for c in compartimentos):
+            return [{"forro": self.forro, "area": self.area_m2}]
+
+        outros = Forro.objects.in_bulk({b["forro"] for b in adicionais} | {c["forro"] for c in compartimentos
+                                                                            if de_outro(c)})
+        grupos = {}
+
+        def grupo(forro):
+            return grupos.setdefault(forro.id, {"forro": forro, "area": Decimal("0"), "ambientes": [],
+                                                "compartimentos": [], "tamanho_folha": None,
+                                                "quantidade_folhas": None})
+
+        def medir(g, comps):
+            for i, c in enumerate(comps, 1):
+                g["area"] += area_do_compartimento(c)
+                g["ambientes"].append(nome_do_compartimento(c, i))
+                g["compartimentos"].append({k: c[k] for k in ("nome", "largura", "comprimento") if k in c})
+
+        principal = grupo(self.forro)
+        if compartimentos:
+            medir(principal, [c for c in compartimentos if not de_outro(c)])
+            for fid in dict.fromkeys(c["forro"] for c in compartimentos if de_outro(c)):
+                if fid in outros:
+                    medir(grupo(outros[fid]), [c for c in compartimentos if c.get("forro") == fid])
+        else:
+            # área em m² ou folhas: o 1º forro fica com o que sobra da área total
+            principal["area"] = self.area_m2 - sum((Decimal(b["area_m2"]) for b in adicionais), Decimal("0"))
+            if self.tamanho_folha and self.quantidade_folhas:
+                principal["tamanho_folha"] = str(self.tamanho_folha)
+                principal["quantidade_folhas"] = self.quantidade_folhas
+        for b in adicionais:
+            if b["forro"] not in outros:
+                continue
+            g = grupo(outros[b["forro"]])
+            if b.get("compartimentos"):
+                medir(g, b["compartimentos"])
+            else:
+                g["area"] += Decimal(b["area_m2"])
+                g["tamanho_folha"], g["quantidade_folhas"] = b.get("tamanho_folha"), b.get("quantidade_folhas")
+        return [g for g in grupos.values() if g["area"] > 0]
 
     def recalcular(self):
         """
@@ -186,12 +228,15 @@ class Orcamento(models.Model):
         grupos = self.grupos_de_forro()
         self.por_forro = []
         if len(grupos) > 1:
-            for forro, area, ambientes in grupos:
+            for g in grupos:
+                forro, area = g["forro"], g["area"]
                 vista, cartao = self.precos_vigentes(forro)
                 self.por_forro.append({
                     "forro": forro.id, "nome": forro.nome, "area_m2": str(area),
                     "preco_m2_vista": str(vista.quantize(CENTAVO)), "preco_m2_cartao": str(cartao.quantize(CENTAVO)),
-                    "total_vista": str((area * vista).quantize(CENTAVO)), "ambientes": ambientes,
+                    "total_vista": str((area * vista).quantize(CENTAVO)), "ambientes": g["ambientes"],
+                    "compartimentos": g["compartimentos"], "tamanho_folha": g["tamanho_folha"],
+                    "quantidade_folhas": g["quantidade_folhas"],
                 })
             forro_vista = sum((Decimal(g["total_vista"]) for g in self.por_forro), Decimal("0"))
         else:
@@ -238,6 +283,8 @@ class OrcamentoItem(models.Model):
     total = models.DecimalField(max_digits=11, decimal_places=2, default=0)
     # comissão por unidade, copiada do material quando o item é gravado
     comissao_unitaria = models.DecimalField(max_digits=7, decimal_places=2, default=0)
+    # cor do perfil, da moldura ou da sanca (material com tem_cor); vazio nos demais
+    cor = models.CharField(max_length=20, blank=True)
 
     class Meta:
         ordering = ["id"]
@@ -254,5 +301,8 @@ class OrcamentoItem(models.Model):
             self.preco_unitario = self.material.preco
         if self.material and not self.pk:
             self.comissao_unitaria = self.material.comissao
+        # só perfil, moldura e sanca têm cor; sem escolha, sai na padrão (Branco)
+        tem_cor = bool(self.material and self.material.tem_cor)
+        self.cor = (self.cor or COR_PADRAO) if tem_cor else ""
         self.total = (self.quantidade * self.preco_unitario).quantize(CENTAVO)
         return super().save(*args, **kwargs)

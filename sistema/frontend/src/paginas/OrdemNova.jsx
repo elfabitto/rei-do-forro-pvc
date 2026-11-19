@@ -17,8 +17,8 @@ import { PARCELAS_MAX, PARCELAS_ORCAMENTO, valorNoCartao } from "../cartao";
 import { useAuth } from "../auth";
 import CalendarioVagas from "../calendario";
 import { BotaoAcao, Campo, Estado, Selecao, linhas, useApi } from "../componentes";
-import { VERBA, ehServico, linhaServico, nomeDosForros, quantidadeTexto } from "../orcamentoDoc";
-import { forrosDoPedido, medidasDoPedido } from "../osDoc";
+import { VERBA, ehServico, linhaServico, nomeComCor, nomeDosForros, quantidadeTexto } from "../orcamentoDoc";
+import { forrosEMedidas } from "../osDoc";
 import Icone from "../icones";
 import ClienteModal from "./ClienteModal";
 
@@ -300,11 +300,11 @@ export default function OrdemNova() {
                 <div className="row"><span className="k">Tipo</span>
                   <span className="v">{comInstalacao ? "Instalação Completa" : "Fornecimento de Material"}</span></div>
                 <div className="row"><span className="k">Área</span><span className="v">{num(orc.area_m2)} m²</span></div>
-                {medidasDoPedido(orc).map(([nome, valor], i) => (
-                  <div className="row sm item" key={i}><span className="k">{nome}</span><span className="v">{valor}</span></div>
-                ))}
-                {forrosDoPedido(orc).map(([nome, valor], i) => (
-                  <div className="row" key={`f${i}`}><span className="k">{nome}</span><span className="v">{valor}</span></div>
+                {/* com mais de um forro: cada forro seguido das medidas dele */}
+                {forrosEMedidas(orc).map(([nome, valor], i) => (
+                  <div className={nome === "Forro" ? "row" : "row sm item"} key={i}>
+                    <span className="k">{nome}</span><span className="v">{valor}</span>
+                  </div>
                 ))}
                 {orc.estrutura_nome && (
                   <div className="row"><span className="k">Estrutura</span>
@@ -330,7 +330,7 @@ export default function OrdemNova() {
                             ? i.descricao
                             : ehServico(i)
                               ? linhaServico(orc.area_m2)
-                              : `${i.descricao} — ${quantidadeTexto(i.quantidade, i.unidade)}`}
+                              : `${nomeComCor(i.descricao, i.cor)} — ${quantidadeTexto(i.quantidade, i.unidade)}`}
                         </span>
                         <span className="v">{brl(i.total)}</span>
                       </div>

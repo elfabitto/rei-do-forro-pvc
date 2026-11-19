@@ -39,10 +39,15 @@ export const linhaServico = (area) => `Serviço ${m2(area)} m²`;
 export const unidadePlural = (q, u) => (u === "dúzia" && Number(q) > 1 ? "dúzias" : u);
 export const quantidadeTexto = (q, u) => `${qtd(q)} ${unidadePlural(q, u)}`;
 
+/** Cores de perfil, moldura e sanca (material com tem_cor) — a 1ª é a padrão; igual ao backend. */
+export const CORES_MATERIAL = ["Branco", "Mogno", "Guaruba", "Cerejeira", "Bege", "Cinza"];
+/** "Perfil 6 m (Mogno)"; sem cor, só o nome. */
+export const nomeComCor = (nome, cor) => (cor ? `${nome} (${cor})` : nome);
+
 export const descricaoItem = (i) =>
   ehExtra(i)
     ? i.rotulo
-    : `${i.rotulo} — ${quantidadeTexto(i.quantidade, i.unidade)} × R$ ${brl(i.preco)}`;
+    : `${nomeComCor(i.rotulo, i.cor)} — ${quantidadeTexto(i.quantidade, i.unidade)} × R$ ${brl(i.preco)}`;
 
 /**
  * Monta o documento a partir do que está na tela.
@@ -54,7 +59,7 @@ export const descricaoItem = (i) =>
  * fechado do serviço, só no orçamento de Material (0 = sem serviço). `desconto`
  * é em R$ e abate do à vista. `taxas` é a tabela da maquininha: o valor no cartão
  * é o à vista em 5x com a taxa cadastrada — a mesma conta do backend. `grupos` (de
- * gruposDeForro) traz os forros quando há mais de um: cada um sai pelo seu m².
+ * gruposDoOrcamento, ou montado na tela) traz os forros quando há mais de um: cada um sai pelo seu m².
  */
 export function montarDocumento({ tipo, area, forro, acabamento, estrutura, itens = [], extras = [], servico = 0,
                                   desconto = 0, taxas, grupos = [] }) {
@@ -75,33 +80,15 @@ export function montarDocumento({ tipo, area, forro, acabamento, estrutura, iten
 }
 
 /**
- * Compartimentos agrupados por forro, o principal primeiro: [{ forro, area, ambientes }].
- * `compartimentos` chega como [{ nome, largura, comprimento, area, forro }] (forro = id,
- * vazio = o principal). Sem nome, o compartimento aparece pela posição: "Área 2".
- * Devolve [] quando todos usam o mesmo forro — o orçamento comum, de um forro só.
+ * Os forros de um orçamento já salvo, para reabrir o documento: [{ forro, area, ambientes }],
+ * do detalhe por forro que o backend grava. [] = um forro só.
  */
-export function gruposDeForro(compartimentos, forro, listaForros) {
-  if (!forro) return [];
-  const grupos = new Map([[String(forro.id), { forro, area: 0, ambientes: [] }]]);
-  compartimentos.forEach((c, i) => {
-    if (!(c.area > 0)) return;
-    const f = (c.forro && listaForros.find((x) => String(x.id) === String(c.forro))) || forro;
-    if (!grupos.has(String(f.id))) grupos.set(String(f.id), { forro: f, area: 0, ambientes: [] });
-    const g = grupos.get(String(f.id));
-    g.area = cent(g.area + c.area);
-    g.ambientes.push(c.nome?.trim() || `Área ${i + 1}`);
-  });
-  const lista = [...grupos.values()].filter((g) => g.area > 0);
-  return lista.length > 1 ? lista : [];
-}
-
-/** Área de um compartimento gravado ("3.33" × "2.50"), em centímetros inteiros como no backend: 8,33. */
-export const areaCompartimento = (c) =>
-  Math.round((Math.round(Number(c.largura) * 100) * Math.round(Number(c.comprimento) * 100)) / 100) / 100;
-
-/** Os grupos de forro de um orçamento já salvo (para reabrir o documento). */
-export const gruposDoOrcamento = (orc, forro, listaForros) =>
-  gruposDeForro((orc.compartimentos ?? []).map((c) => ({ ...c, area: areaCompartimento(c) })), forro, listaForros);
+export const gruposDoOrcamento = (orc, listaForros) =>
+  (orc.por_forro?.length > 1
+    ? orc.por_forro
+        .map((g) => ({ forro: listaForros.find((f) => f.id === g.forro), area: Number(g.area_m2), ambientes: g.ambientes }))
+        .filter((g) => g.forro)
+    : []);
 
 /** "Branco liso + Cedro T1" quando o orçamento tem mais de um forro; senão o nome do forro. */
 export const nomeDosForros = (orc) =>

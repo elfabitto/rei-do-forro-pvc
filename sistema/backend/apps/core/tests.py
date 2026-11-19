@@ -114,6 +114,44 @@ class OrcamentoApiTest(ApiBase):
         self.assertEqual(r.status_code, 201, r.data)
         self.assertEqual(r.data["total_vista"], "1047.40")   # 23 × 33,80 = 777,40 + 10 × 27,00
 
+    def test_materiais_em_acabamentos_e_estrutura_com_cor(self):
+        from django.core.management import call_command
+
+        from apps.catalogo.models import Material
+
+        # a migration já arrumou o que existe; perfil, moldura e sanca vêm da carga do catálogo
+        self.assertEqual(Material.objects.get(rotulo="Plastilon").grupo, "Estrutura")
+        precos = {m.rotulo: m.preco for m in Material.objects.filter(rotulo__in=["Perfil adesivado", "Emenda H",
+                                                                                 "Emenda Flexível"])}
+        self.assertEqual(precos, {"Perfil adesivado": D("40"), "Emenda H": D("35"), "Emenda Flexível": D("35")})
+        call_command("carregar_catalogo", stdout=open(__import__("os").devnull, "w"))
+        grupos = {m.rotulo: (m.grupo, m.tem_cor) for m in Material.objects.all()}
+        self.assertEqual(grupos["Perfil 6 m"], ("Acabamentos", True))
+        self.assertEqual(grupos["Sanca 6 m"], ("Acabamentos", True))
+        self.assertEqual(grupos["Emenda H"], ("Acabamentos", False))
+        self.assertEqual(grupos["Plastilon"], ("Estrutura", False))
+        self.assertEqual(grupos["Ripão 4 m Cutiuba"], ("Estrutura", False))
+        ordem = list(Material.objects.values_list("grupo", flat=True))
+        self.assertEqual(ordem[:9], ["Acabamentos"] * 6 + ["Estrutura"] * 3)   # grupos contínuos na tela
+
+        perfil = Material.objects.get(rotulo="Perfil 6 m")
+        moldura = Material.objects.get(rotulo="Moldura 6 m")
+        plastilon = Material.objects.get(rotulo="Plastilon")
+        item = lambda m, **kw: {"material": m.id, "descricao": m.rotulo, "unidade": m.unidade,   # noqa: E731
+                                "quantidade": "2", "preco_unitario": str(m.preco), **kw}
+        self.client.force_authenticate(self.vendedor)
+        base = {"cliente": self.cliente.id, "tipo": "material", "area_m2": "30", "forro": self.forro.id}
+        r = self.client.post("/api/orcamentos/", {**base, "itens": [
+            item(perfil, cor="Mogno"), item(moldura), item(plastilon, cor="Mogno"),
+        ]}, format="json")
+        self.assertEqual(r.status_code, 201, r.data)
+        # perfil na cor pedida, moldura sem escolha sai Branco, plastilon não tem cor
+        self.assertEqual([i["cor"] for i in r.data["itens"]], ["Mogno", "Branco", ""])
+
+        r = self.client.post("/api/orcamentos/", {**base, "itens": [item(perfil, cor="Roxo")]}, format="json")
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("itens", r.data)
+
     def test_cartao_do_orcamento_e_o_mesmo_valor_de_5x_na_finalizacao(self):
         """O caso do print: R$ 3.626,60 à vista, 5x a 10,38% na maquininha = R$ 4.046,64."""
         from apps.catalogo.models import Forro
@@ -253,7 +291,7 @@ class OrcamentoApiTest(ApiBase):
         r = self.client.post("/api/orcamentos/", {**base, "compartimentos": [
             {"largura": "3.8", "comprimento": "6"}, {"nome": "", "largura": "0.8", "comprimento": "10", "forro": cedro.id},
         ]}, format="json")
-        self.assertEqual([g["ambientes"] for g in r.data["por_forro"]], [["Área 1"], ["Área 2"]])
+        self.assertEqual([g["ambientes"] for g in r.data["por_forro"]], [["Área 1"], ["Área 1"]])   # cada forro numera as suas áreas
 
         # editar tirando o segundo forro limpa o detalhe por forro
         orc_id = os_.data["orcamento_detalhe"]["id"]
@@ -264,6 +302,67 @@ class OrcamentoApiTest(ApiBase):
                              format="json")
         self.assertEqual(r.status_code, 400)
         self.assertIn("compartimentos", r.data)
+
+    def test_mais_de_um_tipo_de_forro_cada_um_com_a_sua_medida(self):
+        """Forro 1 por compartimentos, forro 2 em m², forro 3 por folhas: um total, uma O.S."""
+        cedro = Forro.objects.create(nome="CEDRO T1", preco_material_vista=D("50.00"), preco_material_cartao=D("54"),
+                                     preco_instalado_vista=D("90.00"), preco_instalado_cartao=D("97"))
+        mogno = Forro.objects.create(nome="MOGNO", preco_material_vista=D("60.00"), preco_material_cartao=D("64"),
+                                     preco_instalado_vista=D("100.00"), preco_instalado_cartao=D("107"))
+        self.client.force_authenticate(self.vendedor)
+        base = {"cliente": self.cliente.id, "tipo": "instalado", "forro": self.forro.id, "acabamento": self.sanca.id}
+        r = self.client.post("/api/orcamentos/", {**base, "area_m2": "1", "compartimentos": [
+            {"nome": "Sala", "largura": "5", "comprimento": "4"}, {"largura": "3", "comprimento": "3.5"},
+        ], "forros_adicionais": [
+            {"forro": cedro.id, "area_m2": "12"},
+            {"forro": mogno.id, "area_m2": "10", "tamanho_folha": "5", "quantidade_folhas": 10},
+        ]}, format="json")
+        self.assertEqual(r.status_code, 201, r.data)
+        self.assertEqual(r.data["area_m2"], "52.50")   # 30,5 + 12 + 10: a área do orçamento é a de todos
+        # branco 30,5 × 72 = 2.196 · cedro 12 × 98 = 1.176 · mogno 10 × 108 = 1.080
+        pf = r.data["por_forro"]
+        self.assertEqual([(g["nome"], g["area_m2"], g["total_vista"]) for g in pf], [
+            ("BRANCO LISO BRILHOSO", "30.50", "2196.00"), ("CEDRO T1", "12.00", "1176.00"), ("MOGNO", "10.00", "1080.00"),
+        ])
+        self.assertEqual(r.data["total_vista"], "4452.00")
+        self.assertEqual((pf[0]["ambientes"], len(pf[0]["compartimentos"])), (["Sala", "Área 2"], 2))
+        self.assertEqual((pf[2]["tamanho_folha"], pf[2]["quantidade_folhas"]), ("5.00", 10))
+
+        hoje = timezone.localdate()
+        seg = hoje + timedelta(days=(7 - hoje.weekday()) % 7 or 7)
+        os_ = self.client.post("/api/ordens-servico/", {
+            "orcamento": r.data["id"], "endereco": self.endereco.id, "modalidade": "vista",
+            "agendar_instalacao": {"data": str(seg), "turno": "manha"},
+        }, format="json")
+        self.assertEqual(os_.status_code, 201, os_.data)
+        self.assertEqual(os_.data["valor_total"], "4452.00")
+        self.assertEqual(len(os_.data["orcamento_detalhe"]["forros_adicionais"]), 2)
+
+        # 1º forro em m²: a área total menos a dos outros
+        r = self.client.post("/api/orcamentos/", {**base, "area_m2": "42", "compartimentos": [],
+                                                  "forros_adicionais": [{"forro": cedro.id, "area_m2": "12"}]},
+                             format="json")
+        self.assertEqual(r.status_code, 201, r.data)
+        self.assertEqual([g["area_m2"] for g in r.data["por_forro"]], ["30.00", "12.00"])
+        self.assertEqual(r.data["total_vista"], "3336.00")   # 30 × 72 + 12 × 98
+
+        # editar tirando o 2º forro volta a ser um forro só, com a área do 1º
+        r = self.client.patch(f"/api/orcamentos/{r.data['id']}/", {"area_m2": "30", "forros_adicionais": []},
+                              format="json")
+        self.assertEqual((r.data["por_forro"], r.data["total_vista"]), ([], "2160.00"))
+
+        ruins = [
+            ({"area_m2": "20", "forros_adicionais": [{"forro": self.forro.id, "area_m2": "5"}]}, "forros_adicionais"),
+            ({"area_m2": "30", "forros_adicionais": [{"forro": cedro.id, "area_m2": "5"},
+                                                     {"forro": cedro.id, "area_m2": "5"}]}, "forros_adicionais"),
+            ({"area_m2": "30", "forros_adicionais": [{"forro": cedro.id, "area_m2": "0"}]}, "forros_adicionais"),
+            ({"area_m2": "30", "forros_adicionais": [{"area_m2": "5"}]}, "forros_adicionais"),
+            ({"area_m2": "12", "forros_adicionais": [{"forro": cedro.id, "area_m2": "12"}]}, "area_m2"),
+        ]
+        for corpo, campo in ruins:
+            r = self.client.post("/api/orcamentos/", {**base, **corpo}, format="json")
+            self.assertEqual(r.status_code, 400, corpo)
+            self.assertIn(campo, r.data, corpo)
 
     def test_sem_ripao_abate_a_duzia_a_cada_10m2_e_vai_para_a_os(self):
         from apps.catalogo.models import Estrutura
