@@ -124,6 +124,8 @@ class OrcamentoApiTest(ApiBase):
         precos = {m.rotulo: m.preco for m in Material.objects.filter(rotulo__in=["Perfil adesivado", "Emenda H",
                                                                                  "Emenda Flexível"])}
         self.assertEqual(precos, {"Perfil adesivado": D("40"), "Emenda H": D("35"), "Emenda Flexível": D("35")})
+        self.assertEqual(set(Material.objects.filter(rotulo__startswith="Emenda").values_list("comissao", flat=True)),
+                         {D("1.00")})   # R$ 1,00 por unidade, como o perfil
         call_command("carregar_catalogo", stdout=open(__import__("os").devnull, "w"))
         grupos = {m.rotulo: (m.grupo, m.tem_cor) for m in Material.objects.all()}
         self.assertEqual(grupos["Perfil 6 m"], ("Acabamentos", True))

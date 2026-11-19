@@ -24,6 +24,8 @@ class ClienteCadastroTest(ApiBase):
         r = self.client.post("/api/clientes/", {"nome": "Outro", "telefone": "(94) 99123-4567"}, format="json")
         self.assertEqual(r.status_code, 400)
         self.assertIn("João dos Santos", str(r.data["telefone"]))
+        self.assertIn('Cliente já cadastrado no sistema', str(r.data["telefone"]))
+        self.assertIn('"Já cadastrado"', str(r.data["telefone"]))   # manda para a aba certa
 
         r = self.client.post("/api/clientes/", {"nome": "Ana", "telefone": "1234"}, format="json")
         self.assertEqual(r.status_code, 400)

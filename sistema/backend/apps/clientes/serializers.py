@@ -5,6 +5,12 @@ from apps.core import formatos
 from .models import Cliente, Endereco
 
 
+def mensagem_duplicado(nome):
+    """Telefone de cliente que já existe: o mesmo comprador não vira dois cadastros."""
+    return (f'Cliente já cadastrado no sistema ({nome}). Vá na aba "Já cadastrado" '
+            "e busque o nome do cliente.")
+
+
 class EnderecoSerializer(serializers.ModelSerializer):
     resumo = serializers.CharField(source="__str__", read_only=True)
 
@@ -87,8 +93,7 @@ class ClienteSerializer(serializers.ModelSerializer):
             outros = outros.exclude(pk=self.instance.pk)
         dono = outros.first()
         if dono:
-            raise serializers.ValidationError(
-                f"Já existe cliente com este telefone: {dono.nome}. Use o cadastro dele.")
+            raise serializers.ValidationError(mensagem_duplicado(dono.nome))
         return v
 
     def validate_telefone_alt(self, v):

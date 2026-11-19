@@ -3,19 +3,26 @@
  *
  * O orçamento nasce sem cliente — só quando vira O.S. é que os dados importam.
  * Além do cadastro novo, dá para apontar um cliente já existente, senão o mesmo
- * comprador vira dois registros a cada obra. Se o telefone digitado já é de um
- * cliente, o sistema avisa e oferece usar o cadastro dele.
+ * comprador vira dois registros a cada obra. Assim que o telefone digitado em
+ * "Novo cliente" bate com um cliente já cadastrado, o sistema avisa e manda para
+ * a aba "Já cadastrado" (o backend também recusa o cadastro repetido).
  *
  * `useEscolhaCliente` é o formulário sem a moldura do modal — a página de
  * agendar visita técnica usa o mesmo, direto na tela.
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "../api";
+import { digitos } from "../mascaras";
 import { BotaoAcao, Campo, Modal, linhas, useApi } from "../componentes";
 import {
   CLIENTE_VAZIO, CamposCliente, CamposEndereco, ENDERECO_VAZIO,
   corpoCliente, corpoEndereco, errosDaApi, paramsBusca, validarCliente, validarEndereco,
 } from "./formCliente";
+
+/** O mesmo texto do backend (clientes/serializers.py), para o aviso aparecer já ao digitar. */
+const AVISO_DUPLICADO = "Cliente já cadastrado no sistema";
+const mensagemDuplicado = (nome) =>
+  `${AVISO_DUPLICADO} (${nome}). Vá na aba "Já cadastrado" e busque o nome do cliente.`;
 
 /**
  * Novo cliente ou já cadastrado. `confirmar()` valida, grava se for novo e
@@ -31,6 +38,27 @@ export function useEscolhaCliente({ rotuloEndereco = "Endereço da obra", comObs
   const [existente, setExistente] = useState(null);
   const [erro, setErro] = useState("");
 
+  // telefone completo (10 ou 11 dígitos) já de outro cliente: avisa sem esperar o "Confirmar"
+  const fone = digitos(c.telefone);
+  useEffect(() => {
+    if (aba !== "novo") return undefined;
+    const limpar = () => setErros((s) => (s.telefone?.startsWith(AVISO_DUPLICADO)
+      ? (({ telefone, ...resto }) => resto)(s) : s));   // eslint-disable-line no-unused-vars
+    if (fone.length < 10) { limpar(); return undefined; }
+    let valido = true;
+    const espera = setTimeout(async () => {
+      try {
+        const achados = linhas(await api.get("/clientes/", { fone }));
+        // a busca acha o número dentro de outro maior: confere o telefone inteiro
+        const dono = achados.find((x) => digitos(x.telefone) === fone || digitos(x.telefone_alt) === fone);
+        if (!valido) return;
+        if (dono) setErros((s) => ({ ...s, telefone: mensagemDuplicado(dono.nome) }));
+        else limpar();
+      } catch { /* sem rede: o backend confere de novo ao gravar */ }
+    }, 350);
+    return () => { valido = false; clearTimeout(espera); };
+  }, [fone, aba]);
+
   const filtro = paramsBusca(busca);
   const clientes = useApi(aba === "existente" ? "/clientes/" : null, filtro, [aba, JSON.stringify(filtro)]);
   const achados = linhas(clientes.dados).slice(0, 8);
@@ -44,7 +72,8 @@ export function useEscolhaCliente({ rotuloEndereco = "Endereço da obra", comObs
       return { cliente: existente.id, endereco: end.id, nome: existente.nome };
     }
 
-    const ec = validarCliente(c);
+    // o aviso de telefone repetido continua valendo: não deixa gravar o cadastro duplicado
+    const ec = { ...validarCliente(c), ...(erros.telefone?.startsWith(AVISO_DUPLICADO) ? { telefone: erros.telefone } : {}) };
     const ee = validarEndereco(e);
     setErros(ec);
     setErrosE(ee);
@@ -65,7 +94,7 @@ export function useEscolhaCliente({ rotuloEndereco = "Endereço da obra", comObs
   }
 
   // telefone já cadastrado: leva direto para "Já cadastrado" com a busca pronta
-  const duplicado = erros.telefone?.startsWith("Já existe cliente");
+  const duplicado = erros.telefone?.startsWith(AVISO_DUPLICADO);
   function usarExistente() {
     setBusca(c.telefone);
     setExistente(null);
@@ -82,9 +111,12 @@ export function useEscolhaCliente({ rotuloEndereco = "Endereço da obra", comObs
                 onClick={() => setAba("existente")}>Já cadastrado</button>
       </div>
 
-      {erro && <div className="erro">{erro}</div>}
+      {erro && !duplicado && <div className="erro">{erro}</div>}
       {aba === "novo" && duplicado && (
-        <button type="button" className="btn mb" onClick={usarExistente}>Usar o cliente já cadastrado</button>
+        <div className="erro">
+          {erros.telefone}{" "}
+          <button type="button" className="lnk" onClick={usarExistente}>Ir para "Já cadastrado"</button>
+        </div>
       )}
 
       {aba === "existente" ? (
@@ -111,7 +143,9 @@ export function useEscolhaCliente({ rotuloEndereco = "Endereço da obra", comObs
         </>
       ) : (
         <>
-          <CamposCliente c={c} setC={setC} erros={erros} setErros={setErros} autoFocus />
+          {/* o aviso completo, com o atalho, fica no quadro de cima; no campo, só o destaque */}
+          <CamposCliente c={c} setC={setC} setErros={setErros} autoFocus
+                         erros={duplicado ? { ...erros, telefone: "Telefone de um cliente já cadastrado." } : erros} />
           <div className="lbl" style={{ marginTop: 6 }}>{rotuloEndereco}</div>
           <CamposEndereco e={e} setE={setE} erros={errosE} setErros={setErrosE} />
           {comObservacao && <Campo rotulo="Observação">
