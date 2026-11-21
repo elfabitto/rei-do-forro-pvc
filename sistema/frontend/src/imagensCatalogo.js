@@ -21,6 +21,10 @@ const REGRAS = [
   [/cedro/, "cedro"],
   [/cerejeira/, "cerejeira"],
   [/[gq]uaruba/, "quaruba"],
+  [/marmorizado.*rosa/, "marmorizado_rosa"],
+  [/marmorizado.*azul/, "marmorizado_azul"],
+  [/marmorizado.*prata/, "marmorizado_prata"],
+  [/marmorizado.*ouro/, "marmorizado_ouro"],
   // acabamentos e materiais
   [/sanca/, "sanca_8cm"],
   [/moldura/, "moldura_4cm"],
