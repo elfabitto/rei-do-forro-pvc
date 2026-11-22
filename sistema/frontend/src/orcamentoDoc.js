@@ -152,15 +152,10 @@ function montarSemDesconto({ tipo, area, forro, acabamento, estrutura, itens, ex
       ? "\n\n*OUTROS*\n" + linhasOutros.map(([k, v]) => `• ${k} = ${v}`).join("\n")
       : "";
 
+    // Na imagem o m² aparece só dentro da conta (área × m²): o "valor do metro
+    // quadrado" à vista / no cartão ficava repetido. O texto do WhatsApp mantém.
     if (partes) {
       doc.secoes = [
-        {
-          titulo: "Valor do metro quadrado",
-          linhas: partes.flatMap((p) => [
-            [`${p.nome} — à vista`, `R$ ${brl(p.m2Vista)}/m²`],
-            [`${p.nome} — no cartão`, `R$ ${brl(p.m2Cartao)}/m²`],
-          ]),
-        },
         {
           titulo: "Instalação por forro",
           linhas: partes.map((p) => [`${comAmbientes(p)} — ${m2(p.area)} m² × R$ ${brl(p.m2Vista)}/m²`,
@@ -171,21 +166,10 @@ function montarSemDesconto({ tipo, area, forro, acabamento, estrutura, itens, ex
       doc.totalVista = cent(partes.reduce((s, p) => s + p.total, 0) + taxa + somaExtras);
     } else {
       doc.secoes = [{
-        titulo: "Valor do metro quadrado",
-        linhas: [
-          ["À vista", `R$ ${brl(m2Vista)}/m²`],
-          ["No cartão", `R$ ${brl(m2Cartao)}/m²`],
-        ],
+        titulo: "Instalação",
+        linhas: [[`Instalação ${m2(area)} m² × R$ ${brl(m2Vista)}/m²`, `R$ ${brl(cent(area * m2Vista))}`]],
       }];
-      if (linhasOutros.length) {
-        doc.secoes.push({
-          titulo: "Outros",
-          linhas: [
-            [`Instalação ${m2(area)} m² × R$ ${brl(m2Vista)}/m²`, `R$ ${brl(cent(area * m2Vista))}`],
-            ...linhasOutros,
-          ],
-        });
-      }
+      if (linhasOutros.length) doc.secoes.push({ titulo: "Outros", linhas: linhasOutros });
       doc.totalVista = cent(area * m2Vista + taxa + somaExtras);
     }
     doc.obs = OBS_CARTAO;

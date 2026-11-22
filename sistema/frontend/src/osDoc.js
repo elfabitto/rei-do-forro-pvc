@@ -191,7 +191,7 @@ export function montarOS(os, { verFinanceiro = true } = {}) {
       bloco("👤", "INFORMAÇÕES DO CLIENTE", d.cliente_linhas),
       bloco("📦", "INFORMAÇÕES DO PEDIDO", d.pedido),
       bloco("🗓️", "AGENDAMENTO", d.agenda),
-      d.valorM2?.length ? bloco("💰", "VALOR DO M²", d.valorM2) : "",
+      // sem o bloco "VALOR DO M²" (à vista / no cartão): pedido da diretoria, deixava o texto cheio
       bloco("🧾", "INFORMAÇÕES DE PAGAMENTO", [
         ["Tipo", d.modalidade || "a definir"],
         ["Total", `R$ ${brl(d.valor)}`],
