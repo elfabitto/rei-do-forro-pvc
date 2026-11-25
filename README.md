@@ -118,6 +118,10 @@ de acabamento, no HTML. Os materiais avulsos ficam no array `MATERIAIS`.
 | Freijó Germinado | 41,00 / 44,30 | 71,00 / 76,50 |
 | Mogno Germinado | 41,00 / 44,30 | 71,00 / 76,50 |
 | Freijó T1 Liso | 41,00 / 44,30 | 71,00 / 76,50 |
+| Marmorizado Rosa | 41,00 / 44,30 | 71,00 / 76,50 |
+| Marmorizado Azul | 41,00 / 44,30 | 71,00 / 76,50 |
+| Marmorizado Prata | 41,00 / 44,30 | 71,00 / 76,50 |
+| Marmorizado Ouro | 41,00 / 44,30 | 71,00 / 76,50 |
 | Mogno Liso | 43,60 / 47,00 | 74,00 / 79,90 |
 | Cerejeira Liso | 43,60 / 47,00 | 74,00 / 79,90 |
 | Guaruba Liso | 43,60 / 47,00 | 74,00 / 79,90 |
