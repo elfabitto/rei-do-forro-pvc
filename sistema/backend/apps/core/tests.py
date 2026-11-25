@@ -410,22 +410,22 @@ class OrcamentoApiTest(ApiBase):
         from apps.catalogo.models import Estrutura
 
         sem = Estrutura.objects.get(nome__startswith="Sem ripão")   # cadastrada pela migration
-        self.assertEqual(sem.acrescimo_m2, D("-15.00"))
+        self.assertEqual(sem.acrescimo_m2, D("-10.00"))   # R$ 100,00 a dúzia, 1 dúzia a cada 10 m²
         self.client.force_authenticate(self.vendedor)
         base = {"cliente": self.cliente.id, "tipo": "instalado", "forro": self.forro.id}
         com = self.client.post("/api/orcamentos/", {**base, "area_m2": "25"}, format="json").data
         r = self.client.post("/api/orcamentos/", {**base, "area_m2": "25", "estrutura": sem.id}, format="json")
         self.assertEqual(r.status_code, 201, r.data)
-        # 25 m² = 2,5 dúzias × R$ 150 = R$ 375 a menos
-        self.assertEqual(r.data["abatimento_estrutura"], "375.00")
-        self.assertEqual(D(com["total_vista"]) - D(r.data["total_vista"]), D("375.00"))
-        self.assertEqual(r.data["preco_m2_vista"], "49.00")                # 64 − 15
+        # 25 m² = 2,5 dúzias × R$ 100 = R$ 250 a menos
+        self.assertEqual(r.data["abatimento_estrutura"], "250.00")
+        self.assertEqual(D(com["total_vista"]) - D(r.data["total_vista"]), D("250.00"))
+        self.assertEqual(r.data["preco_m2_vista"], "54.00")                # 64 − 10
 
         os_ = self.client.post("/api/ordens-servico/", {
             "orcamento": r.data["id"], "endereco": self.endereco.id, "modalidade": "vista",
         }, format="json")
         self.assertEqual(os_.status_code, 201, os_.data)
-        self.assertEqual(os_.data["orcamento_detalhe"]["abatimento_estrutura"], "375.00")
+        self.assertEqual(os_.data["orcamento_detalhe"]["abatimento_estrutura"], "250.00")
         self.assertEqual(os_.data["orcamento_detalhe"]["estrutura_nome"], sem.nome)
 
         # trocando para o ripão padrão, o abatimento some

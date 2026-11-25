@@ -206,7 +206,7 @@ export default function Catalogo() {
           </Estado>
           <p className="obs">
             A padrão (acréscimo zero) já está no preço do m². Valor negativo abate do m²: o
-            &quot;Sem ripão&quot; tira a dúzia (R$ 150) a cada 10 m² = − R$ 15,00/m². No orçamento de
+            &quot;Sem ripão&quot; abate R$ 100,00 por dúzia, 1 dúzia a cada 10 m² = − R$ 10,00/m². No orçamento de
             Material o ripão continua entrando como peça, por dúzia.
           </p>
         </div>
