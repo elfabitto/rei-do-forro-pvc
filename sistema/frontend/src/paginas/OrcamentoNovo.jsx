@@ -70,7 +70,7 @@ const virgula = (n) => String(Number(n)).replace(".", ",");
 
 /** Bloco da tela a partir do que está gravado (o 1º forro ou um de forros_adicionais). */
 function blocoGravado({ forro, compartimentos, largura, comprimento, tamanho_folha, quantidade_folhas, area }) {
-  const b = { ...novoBloco(), forroId: String(forro) };
+  const b = { ...novoBloco(), forroId: forro ? String(forro) : "" };
   if (tamanho_folha && quantidade_folhas) {
     return { ...b, modo: "folhas", tamanhoFolha: virgula(tamanho_folha), qtdFolhas: String(quantidade_folhas) };
   }
@@ -220,7 +220,11 @@ export default function OrcamentoNovo() {
   // serviço, só no orçamento de Material: o sistema sugere área × R$ 25,00/m²,
   // mas o total é negociado. Campo vazio = usa o sugerido (e acompanha a área).
   const [servico, setServico] = useState(false);
-  const [totalServico, setTotalServico] = useState("");
+  // m² do serviço (Material) e da instalação sem forro: vazio = o padrão de R$ 25,00, pode mudar
+  const [m2Servico, setM2Servico] = useState("");
+  // "Sem forro": o cliente já tem forro e material — orçamento só da instalação
+  const [semForro, setSemForro] = useState(false);
+  const [m2Instalacao, setM2Instalacao] = useState("");
   // itens "Outro": descrição livre e valor fechado, nos dois tipos de orçamento
   const [extras, setExtras] = useState([]);
   const [observacoes, setObservacoes] = useState("");
@@ -245,6 +249,10 @@ export default function OrcamentoNovo() {
     const o = original.dados;
     if (!o || !listaMateriais.length) return;
     setTipo(o.tipo);
+    // m² diferente do padrão volta no campo; o padrão volta vazio (usa os R$ 25,00)
+    const m2Campo = (v) => (Number(v) > 0 && Math.abs(Number(v) - SERVICO.precoM2) >= 0.005 ? brl(v) : "");
+    setSemForro(!o.forro);
+    setM2Instalacao(o.forro ? "" : m2Campo(o.preco_servico_m2));
     setAcabamentoId(o.acabamento ? String(o.acabamento) : "");
     setEstruturaId(o.estrutura ? String(o.estrutura) : "");
     setObservacoes(o.observacoes ?? "");
@@ -275,9 +283,8 @@ export default function OrcamentoNovo() {
     for (const item of o.itens ?? []) {
       if (ehServico(item)) {
         comServico = true;
-        // igual ao sugerido volta como automático; negociado volta fixo
-        const sugerido = Math.round(Number(o.area_m2) * SERVICO.precoM2 * 100) / 100;
-        setTotalServico(Number(item.total) === sugerido ? "" : brl(item.total));
+        // o total gravado ÷ a área dá o m² cobrado
+        setM2Servico(Number(o.area_m2) > 0 ? m2Campo(Number(item.total) / Number(o.area_m2)) : "");
       } else if (item.unidade === VERBA) {
         outros.push({ descricao: item.descricao, valor: String(Number(item.total)).replace(".", ",") });
       } else if (item.material) {
@@ -309,7 +316,22 @@ export default function OrcamentoNovo() {
   const principal = blocos[0];
   const forro = forroDe(principal);
   const areaFinal = Math.round(blocos.reduce((s, b) => s + areaDoBloco(b), 0) * 100) / 100;
-  const blocosProntos = blocos.every((b) => forroDe(b) && areaDoBloco(b) > 0);
+  const blocosProntos = semForro
+    ? areaDoBloco(principal) > 0
+    : blocos.every((b) => forroDe(b) && areaDoBloco(b) > 0);
+  // R$/m² da instalação sem forro; vazio = padrão
+  const valorM2Instalacao = paraNumero(m2Instalacao) || SERVICO.precoM2;
+  function marcarSemForro(marcado) {
+    setSalvo(null);
+    setSemForro(marcado);
+    if (marcado) {
+      // um bloco só, sem forro; o tipo é Instalado (só a instalação), sem acabamento nem estrutura
+      setBlocos((s) => [{ ...s[0], forroId: "" }]);
+      setTipo("instalado");
+    } else if (tipo) {
+      escolherTipo(tipo);   // volta com acabamento e estrutura padrão no Instalado
+    }
+  }
   // mais de um forro: cada um sai pelo seu m² ([] = um forro só, a conta de sempre)
   const grupos = useMemo(() => {
     if (blocos.length < 2) return [];
@@ -340,10 +362,9 @@ export default function OrcamentoNovo() {
     [listaMateriais, quantidades, cores]
   );
 
-  const servicoSugerido = Math.round(areaFinal * SERVICO.precoM2 * 100) / 100;
-  const valorServico = tipo === "material" && servico
-    ? (totalServico.trim() ? paraNumero(totalServico) : servicoSugerido)
-    : 0;
+  // Serviço do Material: área × m² (R$ 25,00 por padrão, o vendedor pode mudar)
+  const valorM2Servico = paraNumero(m2Servico) || SERVICO.precoM2;
+  const valorServico = tipo === "material" && servico ? Math.round(areaFinal * valorM2Servico * 100) / 100 : 0;
 
   // o acabamento padrão é o de acréscimo zero (perfil)
   const acabamentoPadrao = listaAcabamentos.find((a) => Number(a.acrescimo_m2) === 0);
@@ -364,10 +385,11 @@ export default function OrcamentoNovo() {
   );
 
   const valorDesconto = paraNumero(desconto);
-  const completo = blocosProntos && tipo && (tipo === "material" || acabamento);
+  const completo = blocosProntos && tipo && (semForro || tipo === "material" || acabamento);
   const doc = completo
     ? montarDocumento({ tipo, area: areaFinal, forro, acabamento, estrutura, itens, extras: extrasValidos,
-                        servico: valorServico, desconto: valorDesconto, taxas: taxas.dados, grupos })
+                        servico: valorServico, desconto: valorDesconto, taxas: taxas.dados, grupos,
+                        semForro, precoServico: valorM2Instalacao })
     : null;
   const descontoDemais = doc && valorDesconto > (doc.subtotalVista ?? doc.totalVista);
 
@@ -383,7 +405,8 @@ export default function OrcamentoNovo() {
       comprimento: null,
       tamanho_folha: principal.modo === "folhas" ? paraNumero(principal.tamanhoFolha).toFixed(2) : null,
       quantidade_folhas: principal.modo === "folhas" ? folhasDe(principal) : null,
-      forro: forro.id,
+      forro: semForro ? null : forro.id,
+      preco_servico_m2: semForro ? valorM2Instalacao.toFixed(2) : null,
       // os outros tipos de forro, cada um com a sua medida
       forros_adicionais: blocos.slice(1).map((b) => ({
         forro: Number(b.forroId),
@@ -392,8 +415,8 @@ export default function OrcamentoNovo() {
         tamanho_folha: b.modo === "folhas" ? paraNumero(b.tamanhoFolha).toFixed(2) : null,
         quantidade_folhas: b.modo === "folhas" ? folhasDe(b) : null,
       })),
-      acabamento: tipo === "instalado" ? acabamento.id : null,
-      estrutura: tipo === "instalado" && estrutura ? estrutura.id : null,
+      acabamento: tipo === "instalado" && !semForro ? acabamento.id : null,
+      estrutura: tipo === "instalado" && !semForro && estrutura ? estrutura.id : null,
       observacoes,
       desconto: valorDesconto.toFixed(2),
       // só na criação: liga o orçamento à visita e traz o cliente dela
@@ -460,6 +483,8 @@ export default function OrcamentoNovo() {
     }
   }
 
+  // Outros vem depois de Acabamento e Estrutura (Instalado) ou de Materiais (Material); sem forro, logo após o tipo
+  const nOutros = semForro ? 4 : tipo === "instalado" ? 6 : 5;
   const passo = (n, titulo) => (
     <div className="h"><span className="n">{n}</span><span className="t">{titulo}</span></div>
   );
@@ -523,12 +548,34 @@ export default function OrcamentoNovo() {
 
               <div className="step">
                 {passo(1, "Tipo de forro")}
-                <EscolhaDoForro forros={forrosLivres(0)} valor={principal.forroId} taxas={taxas.dados}
-                                aoMudar={(id) => mudarBloco(0, { forroId: id })} />
+                {!semForro && (
+                  <EscolhaDoForro forros={forrosLivres(0)} valor={principal.forroId} taxas={taxas.dados}
+                                  aoMudar={(id) => mudarBloco(0, { forroId: id })} />
+                )}
+                <div className="opts" style={{ marginTop: semForro ? 0 : 10 }}>
+                  <label className={`opt${semForro ? " on" : ""}`}>
+                    <input type="checkbox" checked={semForro} onChange={(e) => marcarSemForro(e.target.checked)} />
+                    <span className="t">Sem forro
+                      <small>O cliente já tem forro e material: orçar só a instalação</small>
+                    </span>
+                  </label>
+                </div>
+                {semForro && (
+                  <Campo rotulo="Valor do m² da instalação (R$)"
+                         dica={areaFinal
+                           ? `${num(areaFinal)} m² × R$ ${brl(valorM2Instalacao)} = R$ ${brl(areaFinal * valorM2Instalacao)}. Em branco usa o padrão de R$ ${brl(SERVICO.precoM2)}.`
+                           : `Padrão: R$ ${brl(SERVICO.precoM2)}/m². Mude se for combinado outro valor.`}>
+                    <div className="campoReais">
+                      <span className="cifrao">R$</span>
+                      <input value={m2Instalacao} inputMode="decimal" placeholder={brl(SERVICO.precoM2)}
+                             onChange={(e) => alterou(setM2Instalacao)(decimal(e.target.value))} />
+                    </div>
+                  </Campo>
+                )}
               </div>
 
               <div className="step">
-                {passo(2, blocos.length > 1 && forro ? `Medida — ${forro.nome}` : "Medida")}
+                {passo(2, blocos.length > 1 && forro ? `Medida — ${forro.nome}` : semForro ? "Medida da instalação" : "Medida")}
                 <MedidaDoForro bloco={principal} mudar={(m) => mudarBloco(0, m)}
                                rotuloTotal={blocos.length > 1 ? "Área deste forro" : "Área total"} />
 
@@ -550,9 +597,11 @@ export default function OrcamentoNovo() {
                   );
                 })}
 
-                <button type="button" className="btn maisForro" onClick={adicionarForro}>
-                  <Icone nome="mais" tamanho={14} /> Adicionar outro tipo de forro
-                </button>
+                {!semForro && (
+                  <button type="button" className="btn maisForro" onClick={adicionarForro}>
+                    <Icone nome="mais" tamanho={14} /> Adicionar outro tipo de forro
+                  </button>
+                )}
 
                 {blocos.length > 1 && (
                   <>
@@ -574,6 +623,16 @@ export default function OrcamentoNovo() {
 
               <div className="step">
                 {passo(3, "Tipo de orçamento")}
+                {semForro ? (
+                  <div className="opts">
+                    <label className="opt on">
+                      <input type="radio" name="tipo" checked readOnly />
+                      <span className="t">Só instalação
+                        <small>Sem forro: a equipe instala o que o cliente já tem, preço por m²</small>
+                      </span>
+                    </label>
+                  </div>
+                ) : (
                 <div className="opts">
                   <label className={`opt${tipo === "material" ? " on" : ""}`}>
                     <input type="radio" name="tipo" checked={tipo === "material"}
@@ -586,9 +645,10 @@ export default function OrcamentoNovo() {
                     <span className="t">Instalado<small>Instalação completa, preço por m²</small></span>
                   </label>
                 </div>
+                )}
               </div>
 
-              {tipo === "instalado" && (
+              {tipo === "instalado" && !semForro && (
                 <div className="step">
                   {passo(4, "Acabamento")}
                   <div className="opts">
@@ -607,7 +667,7 @@ export default function OrcamentoNovo() {
                 </div>
               )}
 
-              {tipo === "instalado" && listaEstruturas.length > 0 && (
+              {tipo === "instalado" && !semForro && listaEstruturas.length > 0 && (
                 <div className="step">
                   {passo(5, "Estrutura")}
                   <div className="opts">
@@ -687,18 +747,20 @@ export default function OrcamentoNovo() {
                       <input type="checkbox" checked={servico}
                              onChange={(e) => alterou(setServico)(e.target.checked)} />
                       <span className="t">Serviço
-                        <small>Sugerido: R$ {brl(SERVICO.precoM2)}/m² sobre a área</small>
+                        <small>R$ {brl(valorM2Servico)}/m² sobre a área</small>
                       </span>
                       <span className="v">{servico && valorServico > 0 ? `R$ ${brl(valorServico)}` : ""}</span>
                     </label>
                     {servico && (
-                      <Campo rotulo="Valor total do serviço (R$)"
-                             dica={servicoSugerido
-                               ? `Sugerido: ${num(areaFinal)} m² × R$ ${brl(SERVICO.precoM2)} = R$ ${brl(servicoSugerido)}. Altere se for negociado; em branco usa o sugerido.`
-                               : "Informe a medida para o sistema sugerir o valor."}>
-                        <input value={totalServico} inputMode="decimal"
-                               placeholder={servicoSugerido ? brl(servicoSugerido) : "0,00"}
-                               onChange={(e) => alterou(setTotalServico)(decimal(e.target.value))} />
+                      <Campo rotulo="Valor do m² do serviço (R$)"
+                             dica={areaFinal
+                               ? `${num(areaFinal)} m² × R$ ${brl(valorM2Servico)} = R$ ${brl(valorServico)}. Em branco usa o padrão de R$ ${brl(SERVICO.precoM2)}.`
+                               : `Padrão: R$ ${brl(SERVICO.precoM2)}/m². Mude se for combinado outro valor.`}>
+                        <div className="campoReais">
+                          <span className="cifrao">R$</span>
+                          <input value={m2Servico} inputMode="decimal" placeholder={brl(SERVICO.precoM2)}
+                                 onChange={(e) => alterou(setM2Servico)(decimal(e.target.value))} />
+                        </div>
                       </Campo>
                     )}
                   </div>
@@ -712,7 +774,7 @@ export default function OrcamentoNovo() {
 
               {tipo && (
                 <div className="step">
-                  {passo(tipo === "instalado" ? 6 : 5, "Outros")}
+                  {passo(nOutros, "Outros")}
                   <p className="nota" style={{ marginTop: 0 }}>
                     Para o que não está na tabela: taxa de deslocamento, retirada de forro
                     antigo, andaime. Entra no total dos dois tipos de orçamento.
@@ -740,7 +802,7 @@ export default function OrcamentoNovo() {
 
               {tipo && (
                 <div className="step">
-                  {passo(tipo === "instalado" ? 7 : 6, "Desconto")}
+                  {passo(nOutros + 1, "Desconto")}
                   <Campo rotulo="Desconto (R$)" erro={descontoDemais ? "Maior que o valor à vista do orçamento." : ""}
                          dica={doc && valorDesconto > 0
                            ? `À vista R$ ${brl(doc.subtotalVista)} → R$ ${brl(doc.totalVista)}; o cartão é calculado sobre o valor com desconto.`
@@ -755,7 +817,7 @@ export default function OrcamentoNovo() {
               )}
 
               <div className="step">
-                {passo(tipo === "instalado" ? 8 : tipo ? 7 : 6, "Observações")}
+                {passo(tipo ? nOutros + 2 : 4, "Observações")}
                 <Campo rotulo="Observações"
                        dica={v ? `Cliente da visita: ${v.cliente_detalhe?.nome}.`
                          : "Os dados do cliente são pedidos só na hora de fechar o negócio."}>
@@ -774,7 +836,7 @@ export default function OrcamentoNovo() {
               <div className="empty">
                 <b>Nenhum orçamento gerado</b>
                 <ol>
-                  <li className={blocos.every(forroDe) ? "ok" : ""}>Escolher o tipo de forro</li>
+                  <li className={semForro || blocos.every(forroDe) ? "ok" : ""}>Escolher o tipo de forro</li>
                   <li className={blocos.every((b) => areaDoBloco(b) > 0) ? "ok" : ""}>Informar a medida</li>
                   <li className={tipo ? "ok" : ""}>Escolher o tipo de orçamento</li>
                 </ol>

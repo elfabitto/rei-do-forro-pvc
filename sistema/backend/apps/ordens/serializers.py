@@ -103,7 +103,7 @@ class OrdemServicoListaSerializer(serializers.ModelSerializer):
     cliente_detalhe = ClienteResumoSerializer(source="cliente", read_only=True)
     vendedor_nome = serializers.CharField(source="vendedor.get_full_name", read_only=True)
     status_display = serializers.CharField(source="get_status_display", read_only=True)
-    tipo_display = serializers.CharField(source="get_tipo_display", read_only=True)
+    tipo_display = serializers.SerializerMethodField()
     entrega = serializers.SerializerMethodField()
     instalacao = serializers.SerializerMethodField()
     saldo = serializers.DecimalField(max_digits=11, decimal_places=2, read_only=True)
@@ -137,6 +137,12 @@ class OrdemServicoListaSerializer(serializers.ModelSerializer):
         if not 1 <= valor <= TaxasCartao.PARCELAS_MAX:
             raise serializers.ValidationError(f"De 1 a {TaxasCartao.PARCELAS_MAX} parcelas.")
         return valor
+
+    def get_tipo_display(self, obj):
+        # orçamento sem forro: a equipe só instala o que o cliente já tem
+        if obj.tipo == TipoServico.INSTALADO and obj.orcamento_id and not obj.orcamento.forro_id:
+            return "Só Instalação"
+        return obj.get_tipo_display()
 
     def get_entrega(self, obj):
         a = obj.agendamento_entrega

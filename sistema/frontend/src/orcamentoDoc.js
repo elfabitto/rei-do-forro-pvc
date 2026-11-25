@@ -33,7 +33,14 @@ export const taxaLogistica = (tipo, area) =>
  */
 export const SERVICO = { descricao: "Serviço", unidade: "serviço", precoM2: 25 };
 export const ehServico = (i) => !i.material && i.unidade === SERVICO.unidade;
-export const linhaServico = (area) => `Serviço ${m2(area)} m²`;
+/** "Serviço 30 m² × R$ 25,00/m²" — o m² sai do total gravado (o vendedor pode mudar o padrão). */
+export const linhaServico = (area, total) =>
+  (Number(area) > 0 && Number(total) > 0
+    ? `Serviço ${m2(area)} m² × R$ ${brl(cent(Number(total) / Number(area)))}/m²`
+    : `Serviço ${m2(area)} m²`);
+
+/** "Sem forro": o cliente já tem forro e material — o orçamento é só da instalação, por m². */
+export const SEM_FORRO = "Sem forro (cliente já tem)";
 
 /* "1 dúzia" / "3,5 dúzias"; und e kg não flexionam */
 export const unidadePlural = (q, u) => (u === "dúzia" && Number(q) > 1 ? "dúzias" : u);
@@ -62,8 +69,13 @@ export const descricaoItem = (i) =>
  * gruposDoOrcamento, ou montado na tela) traz os forros quando há mais de um: cada um sai pelo seu m².
  */
 export function montarDocumento({ tipo, area, forro, acabamento, estrutura, itens = [], extras = [], servico = 0,
-                                  desconto = 0, taxas, grupos = [] }) {
-  const doc = montarSemDesconto({ tipo, area, forro, acabamento, estrutura, itens, extras, servico, taxas, grupos });
+                                  desconto = 0, taxas, grupos = [], semForro = false, precoServico = SERVICO.precoM2 }) {
+  // sem forro: a conta é a do Instalado com o m² da instalação no lugar do forro, sem acréscimos
+  const doc = semForro
+    ? montarSemDesconto({ tipo: "instalado", area, semForro,
+                          forro: { nome: SEM_FORRO, preco_instalado_vista: precoServico },
+                          itens: [], extras, servico: 0, taxas, grupos: [] })
+    : montarSemDesconto({ tipo, area, forro, acabamento, estrutura, itens, extras, servico, taxas, grupos });
   const d = cent(desconto);
   if (d > 0) {
     doc.desconto = d;
@@ -97,7 +109,8 @@ export const nomeDosForros = (orc) =>
 /** "Cedro T1 (Beiral)" — o forro com os ambientes em que vai. */
 export const comAmbientes = (p) => (p.ambientes?.length ? `${p.nome} (${p.ambientes.join(", ")})` : p.nome);
 
-function montarSemDesconto({ tipo, area, forro, acabamento, estrutura, itens, extras, servico, taxas, grupos }) {
+function montarSemDesconto({ tipo, area, forro, acabamento, estrutura, itens, extras, servico, taxas, grupos,
+                             semForro = false }) {
   const instalado = tipo === "instalado";
   const somaExtras = extras.reduce((s, e) => s + cent(e.valor), 0);
   const linhasExtras = extras.map((e) => [e.descricao, `R$ ${brl(cent(e.valor))}`]);
@@ -127,7 +140,7 @@ function montarSemDesconto({ tipo, area, forro, acabamento, estrutura, itens, ex
 
   const doc = {
     tipo,
-    titulo: instalado ? "INSTALAÇÃO COMPLETA" : "MATERIAL",
+    titulo: semForro ? "SÓ INSTALAÇÃO" : instalado ? "INSTALAÇÃO COMPLETA" : "MATERIAL",
     area,
     forro: nomeForro,
     acabamento: instalado ? acabamento?.nome ?? "" : "",
@@ -135,7 +148,8 @@ function montarSemDesconto({ tipo, area, forro, acabamento, estrutura, itens, ex
     m2Cartao,
   };
 
-  doc.resumo = [["Área", `${m2(area)} m²`], [partes ? "Forros" : "Forro", nomeForro]];
+  doc.resumo = [["Área", `${m2(area)} m²`],
+                semForro ? ["Forro e material", "do cliente"] : [partes ? "Forros" : "Forro", nomeForro]];
   if (instalado && acabamento) doc.resumo.push(["Acabamento", acabamento.nome]);
   // "Sem ripão": acréscimo negativo — o valor abatido aparece junto do nome
   const abatido = instalado && Number(estrutura?.acrescimo_m2) < 0 ? cent(area * -Number(estrutura.acrescimo_m2)) : 0;
@@ -198,13 +212,21 @@ function montarSemDesconto({ tipo, area, forro, acabamento, estrutura, itens, ex
           .join("\n")
       : `*À vista*: R$ ${brl(m2Vista)}/m²\n*No cartão*: R$ ${brl(m2Cartao)}/m²`;
 
-    doc.texto = `*ORÇAMENTO — REI DO FORRO*
+    const cabecalho = semForro
+      ? `*ORÇAMENTO DE INSTALAÇÃO — REI DO FORRO*
+----------
+*Área:* ${m2(area)}m²
+*Forro e material:* do cliente
+
+*SÓ INSTALAÇÃO*`
+      : `*ORÇAMENTO — REI DO FORRO*
 ----------
 *Área:* ${m2(area)}m²
 ${textoForro}
 *Acabamento:* ${acabamento?.nome ?? "—"}${estrutura ? `\n*Estrutura:* ${nomeEstrutura}` : ""}
 
-*INSTALAÇÃO COMPLETA*
+*INSTALAÇÃO COMPLETA*`;
+    doc.texto = `${cabecalho}
 _valor do metro quadrado_
 ${textoM2}${textoOutros}
 ----------
@@ -223,7 +245,7 @@ _${doc.obs}_`;
     const forroVista = cent(linhasForro.reduce((s, [, , v]) => s + v, 0));
     const materiais = itens.reduce((s, i) => s + cent(i.quantidade * i.preco), 0);
     const valorServico = cent(servico);
-    const linhaSrv = valorServico ? [[linhaServico(area), `R$ ${brl(valorServico)}`]] : [];
+    const linhaSrv = valorServico ? [[linhaServico(area, valorServico), `R$ ${brl(valorServico)}`]] : [];
     const taxa = taxaLogistica(tipo, area);
     const linhasOutros = [
       ...(taxa ? [["Logística", `R$ ${brl(taxa)}`]] : []),

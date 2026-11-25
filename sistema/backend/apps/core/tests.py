@@ -114,6 +114,46 @@ class OrcamentoApiTest(ApiBase):
         self.assertEqual(r.status_code, 201, r.data)
         self.assertEqual(r.data["total_vista"], "1047.40")   # 23 × 33,80 = 777,40 + 10 × 27,00
 
+    def test_sem_forro_so_a_instalacao_por_m2(self):
+        """Cliente já tem forro e material: R$ 25,00/m² de instalação por padrão, valor ajustável."""
+        self.client.force_authenticate(self.vendedor)
+        base = {"cliente": self.cliente.id, "tipo": "instalado", "forro": None, "area_m2": "30"}
+        r = self.client.post("/api/orcamentos/", {**base, "acabamento": self.sanca.id}, format="json")
+        self.assertEqual(r.status_code, 201, r.data)
+        self.assertEqual((r.data["forro_nome"], r.data["preco_servico_m2"], r.data["preco_m2_vista"]),
+                         ("Sem forro (cliente já tem)", "25.00", "25.00"))
+        self.assertEqual((r.data["total_vista"], r.data["acabamento"]), ("750.00", None))   # sem acréscimo de sanca
+
+        r = self.client.post("/api/orcamentos/", {**base, "preco_servico_m2": "30"}, format="json")
+        self.assertEqual(r.data["total_vista"], "900.00")   # 30 m² × R$ 30,00
+        orc_id = r.data["id"]
+
+        hoje = timezone.localdate()
+        seg = hoje + timedelta(days=(7 - hoje.weekday()) % 7 or 7)
+        os_ = self.client.post("/api/ordens-servico/", {
+            "orcamento": orc_id, "endereco": self.endereco.id, "modalidade": "vista",
+            "agendar_instalacao": {"data": str(seg), "turno": "manha"},
+        }, format="json")
+        self.assertEqual(os_.status_code, 201, os_.data)
+        self.assertEqual((os_.data["tipo"], os_.data["tipo_display"], os_.data["valor_total"]),
+                         ("instalado", "Só Instalação", "900.00"))
+        self.assertEqual(os_.data["orcamento_detalhe"]["forro_nome"], "Sem forro (cliente já tem)")
+        self.assertEqual(OrdemServico.objects.get(pk=os_.data["id"]).comissao_valor, D("60.00"))   # instalação 30 × 2
+
+        self.client.force_authenticate(self.diretor)
+        self.assertEqual(self.client.get("/api/painel/").status_code, 200)   # sem forro não entra em "forros"
+        self.client.force_authenticate(self.vendedor)
+
+        # escolher um forro de novo volta à conta normal
+        r = self.client.patch(f"/api/orcamentos/{orc_id}/", {"forro": self.forro.id}, format="json")
+        self.assertEqual((r.data["preco_servico_m2"], r.data["total_vista"]), (None, "1920.00"))   # 30 × 64
+
+        r = self.client.post("/api/orcamentos/", {**base, "tipo": "material"}, format="json")
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("forro", r.data)
+        r = self.client.post("/api/orcamentos/", {**base, "preco_servico_m2": "0"}, format="json")
+        self.assertEqual(r.status_code, 400)
+
     def test_materiais_em_acabamentos_e_estrutura_com_cor(self):
         from django.core.management import call_command
 

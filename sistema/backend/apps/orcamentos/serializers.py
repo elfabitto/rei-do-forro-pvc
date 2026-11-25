@@ -7,7 +7,7 @@ from apps.clientes.serializers import ClienteResumoSerializer
 from apps.core.permissions import pode_editar_registro
 
 from .models import (
-    CORES_MATERIAL, Orcamento, OrcamentoItem, TipoOrcamento, area_do_compartimento, area_dos_compartimentos,
+    CORES_MATERIAL, SEM_FORRO, Orcamento, OrcamentoItem, TipoOrcamento, area_do_compartimento, area_dos_compartimentos,
 )
 
 
@@ -63,17 +63,20 @@ class OrcamentoResumoSerializer(serializers.ModelSerializer):
     """
 
     tipo_display = serializers.CharField(source="get_tipo_display", read_only=True)
-    forro_nome = serializers.CharField(source="forro.nome", read_only=True)
+    forro_nome = serializers.SerializerMethodField()
     acabamento_nome = serializers.CharField(source="acabamento.nome", read_only=True, default=None)
     estrutura_nome = serializers.CharField(source="estrutura.nome", read_only=True, default=None)
     itens = OrcamentoItemSerializer(many=True, read_only=True)
+
+    def get_forro_nome(self, obj):
+        return obj.forro.nome if obj.forro_id else SEM_FORRO
 
     class Meta:
         model = Orcamento
         fields = ["id", "numero", "tipo", "tipo_display", "area_m2", "largura", "comprimento", "compartimentos",
                   "tamanho_folha", "quantidade_folhas",
                   "forro_nome", "forros_adicionais", "por_forro", "acabamento_nome", "estrutura_nome", "abatimento_estrutura",
-                  "preco_m2_vista",
+                  "preco_servico_m2", "preco_m2_vista",
                   "preco_m2_cartao", "taxa_logistica", "desconto", "total_vista", "total_cartao", "observacoes",
                   "itens"]
 
@@ -89,7 +92,7 @@ def _conferir_desconto(orcamento):
 class OrcamentoSerializer(serializers.ModelSerializer):
     itens = OrcamentoItemSerializer(many=True, required=False)
     cliente_detalhe = ClienteResumoSerializer(source="cliente", read_only=True)
-    forro_nome = serializers.CharField(source="forro.nome", read_only=True)
+    forro_nome = serializers.SerializerMethodField()
     acabamento_nome = serializers.CharField(source="acabamento.nome", read_only=True, default=None)
     estrutura_nome = serializers.CharField(source="estrutura.nome", read_only=True, default=None)
     vendedor_nome = serializers.CharField(source="vendedor.get_full_name", read_only=True)
@@ -107,7 +110,7 @@ class OrcamentoSerializer(serializers.ModelSerializer):
         fields = ["id", "numero", "cliente", "cliente_detalhe", "tipo", "tipo_display",
                   "visita", "visita_numero",
                   "largura", "comprimento", "compartimentos", "tamanho_folha", "quantidade_folhas",
-                  "area_m2", "forro", "forro_nome", "forros_adicionais", "por_forro",
+                  "area_m2", "forro", "forro_nome", "forros_adicionais", "por_forro", "preco_servico_m2",
                   "acabamento", "acabamento_nome", "estrutura", "estrutura_nome", "abatimento_estrutura",
                   "preco_m2_vista", "preco_m2_cartao",
                   "taxa_logistica", "desconto", "total_vista", "total_cartao", "status", "status_display",
@@ -122,6 +125,14 @@ class OrcamentoSerializer(serializers.ModelSerializer):
             # omitido = o próprio usuário logado (ver perform_create da view)
             "vendedor": {"required": False},
         }
+
+    def get_forro_nome(self, obj):
+        return obj.forro.nome if obj.forro_id else SEM_FORRO
+
+    def validate_preco_servico_m2(self, valor):
+        if valor is not None and not 0 < valor <= Decimal("9999"):
+            raise serializers.ValidationError("Informe o valor do m² da instalação.")
+        return valor
 
     def get_tem_os(self, obj):
         return getattr(obj, "ordem_servico", None).numero if hasattr(obj, "ordem_servico") else None
@@ -216,6 +227,15 @@ class OrcamentoSerializer(serializers.ModelSerializer):
             if total - soma_adicionais <= 0:
                 raise serializers.ValidationError({"area_m2": "Informe a medida do primeiro forro."})
         tipo = attrs.get("tipo", getattr(self.instance, "tipo", None))
+        sem_forro = not (attrs["forro"] if "forro" in attrs else getattr(self.instance, "forro", None))
+        if sem_forro:
+            # cliente já tem forro e material: só a instalação, um tipo só
+            if tipo != TipoOrcamento.INSTALADO:
+                raise serializers.ValidationError(
+                    {"forro": "Sem forro, o orçamento é só da instalação: escolha o tipo Instalado."})
+            if adicionais:
+                raise serializers.ValidationError(
+                    {"forros_adicionais": "Sem forro não há outros tipos de forro."})
         if tipo == TipoOrcamento.MATERIAL and attrs.get("estrutura"):
             raise serializers.ValidationError(
                 {"estrutura": "A estrutura por m² só existe no orçamento Instalado; "

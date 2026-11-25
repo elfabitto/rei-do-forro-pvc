@@ -287,7 +287,7 @@ def painel(request):
         if o.orcamento_id:
             # com dois forros (ex.: branco na casa, cedro no beiral), cada um conta os seus m²
             partes = [(g["nome"], Decimal(g["area_m2"])) for g in o.orcamento.por_forro] \
-                or [(o.orcamento.forro.nome, o.orcamento.area_m2)]
+                or ([(o.orcamento.forro.nome, o.orcamento.area_m2)] if o.orcamento.forro_id else [])   # sem forro: só instalação
             for nome, area in partes:
                 f = forros[nome]
                 f["m2"] += area

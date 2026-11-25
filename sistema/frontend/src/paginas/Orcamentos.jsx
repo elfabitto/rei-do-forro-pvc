@@ -33,7 +33,10 @@ function VerOrcamento({ orcamento, aoFechar }) {
   // os itens gravados voltam separados: material de catálogo de um lado,
   // "Outro" (verba) do outro — é como o documento os apresenta
   const gravados = orcamento.itens ?? [];
-  const doc = forro && taxas.dados && montarDocumento({
+  const semForro = !orcamento.forro;   // só a instalação: o m² gravado no lugar do forro
+  const doc = (forro || semForro) && taxas.dados && montarDocumento({
+    semForro,
+    precoServico: Number(orcamento.preco_servico_m2) || undefined,
     tipo: orcamento.tipo,
     area: Number(orcamento.area_m2),
     forro,

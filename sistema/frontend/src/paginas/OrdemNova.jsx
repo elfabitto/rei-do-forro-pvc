@@ -298,7 +298,7 @@ export default function OrdemNova() {
                 <div className="row"><span className="k">Cliente</span>
                   <span className="v">{orc.cliente_detalhe?.nome}</span></div>
                 <div className="row"><span className="k">Tipo</span>
-                  <span className="v">{comInstalacao ? "Instalação Completa" : "Fornecimento de Material"}</span></div>
+                  <span className="v">{!orc.forro ? "Só Instalação" : comInstalacao ? "Instalação Completa" : "Fornecimento de Material"}</span></div>
                 <div className="row"><span className="k">Área</span><span className="v">{num(orc.area_m2)} m²</span></div>
                 {/* com mais de um forro: cada forro seguido das medidas dele */}
                 {forrosEMedidas(orc).map(([nome, valor], i) => (
@@ -329,7 +329,7 @@ export default function OrdemNova() {
                           {i.unidade === VERBA
                             ? i.descricao
                             : ehServico(i)
-                              ? linhaServico(orc.area_m2)
+                              ? linhaServico(orc.area_m2, i.total)
                               : `${nomeComCor(i.descricao, i.cor)} — ${quantidadeTexto(i.quantidade, i.unidade)}`}
                         </span>
                         <span className="v">{brl(i.total)}</span>

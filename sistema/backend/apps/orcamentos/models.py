@@ -15,6 +15,11 @@ TAXA_LOGISTICA = Decimal("80.00")
 # taxa cadastrada em Parâmetros (TaxasCartao): o mesmo que sai na finalização.
 PARCELAS_ORCAMENTO = 5
 
+# "Sem forro": o cliente já tem forro e material, o orçamento é só da instalação, por m².
+# R$ 25,00 é o padrão (o mesmo sugerido para o Serviço do orçamento de Material); muda por orçamento.
+PRECO_SERVICO_M2 = Decimal("25.00")
+SEM_FORRO = "Sem forro (cliente já tem)"
+
 # cores de perfil, moldura e sanca no orçamento de Material — a 1ª é a padrão
 CORES_MATERIAL = ["Branco", "Mogno", "Guaruba", "Cerejeira", "Bege", "Cinza"]
 COR_PADRAO = CORES_MATERIAL[0]
@@ -72,7 +77,11 @@ class Orcamento(models.Model):
     quantidade_folhas = models.PositiveIntegerField("quantidade de folhas", null=True, blank=True)
     area_m2 = models.DecimalField("área (m²)", max_digits=9, decimal_places=2, validators=[MinValueValidator(Decimal("0.01"))])
 
-    forro = models.ForeignKey("catalogo.Forro", on_delete=models.PROTECT, related_name="orcamentos")
+    # vazio = "Sem forro": só a instalação (tipo Instalado), cobrada por `preco_servico_m2`
+    forro = models.ForeignKey("catalogo.Forro", on_delete=models.PROTECT, related_name="orcamentos",
+                              null=True, blank=True)
+    preco_servico_m2 = models.DecimalField("m² da instalação (sem forro)", max_digits=9, decimal_places=2,
+                                           null=True, blank=True)
     # estrutura (ripão) do Instalado; vazio = a padrão, sem acréscimo (orçamentos antigos)
     estrutura = models.ForeignKey(
         "catalogo.Estrutura", on_delete=models.PROTECT, related_name="orcamentos", null=True, blank=True,
@@ -149,6 +158,9 @@ class Orcamento(models.Model):
         Instalado. `forro` é um dos outros forros do orçamento; sem ele, o 1º.
         Acabamento e estrutura valem para a casa toda.
         """
+        if not (forro or self.forro_id):   # sem forro: só a instalação, sem acabamento nem estrutura
+            vista = self.preco_servico_m2 or PRECO_SERVICO_M2
+            return vista, self.no_cartao(vista)
         vista = (forro or self.forro).preco_m2(self.tipo, "vista")
         if self.tipo == TipoOrcamento.INSTALADO:
             vista += (self.acabamento.acrescimo_m2 if self.acabamento_id else 0) \
@@ -164,6 +176,8 @@ class Orcamento(models.Model):
 
         adicionais = self.forros_adicionais or []
         compartimentos = self.compartimentos or []
+        if not self.forro_id:
+            return [{"forro": None, "area": self.area_m2}]
         de_outro = lambda c: c.get("forro") and c["forro"] != self.forro_id   # noqa: E731 — formato antigo
         if not adicionais and not any(de_outro(c) for c in compartimentos):
             return [{"forro": self.forro, "area": self.area_m2}]
@@ -216,6 +230,12 @@ class Orcamento(models.Model):
         if self.tipo == TipoOrcamento.MATERIAL:
             self.acabamento = None
             self.estrutura = None   # no Material o ripão entra como peça, por dúzia
+        if self.forro_id:
+            self.preco_servico_m2 = None
+        else:   # sem forro: o cliente já tem tudo, só a instalação
+            self.acabamento = self.estrutura = None
+            self.preco_servico_m2 = self.preco_servico_m2 or PRECO_SERVICO_M2
+            self.forros_adicionais = []
 
         self.preco_m2_vista, self.preco_m2_cartao = self.precos_vigentes()
         self.taxa_logistica = (
